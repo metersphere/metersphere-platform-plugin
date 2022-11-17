@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>io.metersphere</groupId>
+    <artifactId>metersphere-platform-plugin</artifactId>
+    <packaging>pom</packaging>
+    <version>${revision}</version>
+
+    <modules>
+        <module>metersphere-plugin-sdk</module>
+        <module>metersphere-platform-plugin-sdk</module>
+        <module>metersphere-jira-plugin</module>
+    </modules>
+
+    <properties>
+        <!-- 这里版本没什么作用，该pom文件主要方便整体打包 -->
+        <revision>main</revision>
+        <maven.compiler.source>11</maven.compiler.source>
+        <maven.compiler.target>11</maven.compiler.target>
+    </properties>
+
+</project>

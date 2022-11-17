@@ -1,0 +1,97 @@
+{
+  "serviceIntegration": {
+    "label": "Jira",
+    "image": "/static/index.png",
+    "tips": "使用指引：<br> 1. Jira software server 认证信息为 账号密码，Jira software cloud 认证信息为 账号+令牌(账户设置-安全-创建API令牌) <br> 2. 保存 Basic Auth 账号信息后，需要在 MeterSphere 项目中手动关联 ID/key 和缺陷模板 马上关联项目 <br> 3. 添加你的个人平台账号 马上添加",
+    "formItems": [
+      {
+        "name": "account",
+        "type": "input",
+        "defaultValue": "",
+        "required": true,
+        "i18n": true,
+        "label": "organization.integration.account",
+        "message": "organization.integration.input_api_account"
+      },
+      {
+        "name": "password",
+        "type": "password",
+        "defaultValue": "",
+        "required": true,
+        "i18n": true,
+        "label": "Token",
+        "message": "organization.integration.input_api_password"
+      },
+      {
+        "name": "url",
+        "type": "input",
+        "defaultValue": "",
+        "required": true,
+        "i18n": true,
+        "label": "organization.integration.jira_url",
+        "message": "organization.integration.input_jira_url"
+      }
+    ]
+  },
+
+  "projectConfig": {
+    "formItems": [
+      {
+        "name": "jiraKey",
+        "type": "input",
+        "defaultValue": "",
+        "required": true,
+        "i18n": true,
+        "label": "project.jira_key",
+        "withProjectCheck": true,
+        "instructionsIcon": "/static/jira-key.png"
+      },
+      {
+        "name": "jiraIssueTypeId",
+        "type": "select",
+        "defaultValue": "",
+        "required": true,
+        "i18n": true,
+        "cascade": "jiraKey",
+        "optionMethod": "getIssueTypes",
+        "label": "organization.integration.jira_issuetype"
+      },
+      {
+        "name": "jiraStoryTypeId",
+        "type": "select",
+        "defaultValue": "",
+        "required": true,
+        "i18n": true,
+        "cascade": "jiraKey",
+        "optionMethod": "getIssueTypes",
+        "label": "organization.integration.jira_storytype"
+      }
+    ]
+  },
+
+  "accountConfig": {
+    "label": "organization.integration.jira_information",
+    "instructionsInfo": "organization.integration.jira_prompt_information",
+    "i18n": true,
+    "formItems": [
+      {
+        "name": "jiraAccount",
+        "type": "input",
+        "defaultValue": "",
+        "required": false,
+        "i18n": true,
+        "label": "organization.integration.account",
+        "message": "organization.integration.input_api_account"
+      },
+      {
+        "name": "jiraPassword",
+        "type": "password",
+        "defaultValue": "",
+        "required": false,
+        "i18n": true,
+        "label": "Token",
+        "message": "organization.integration.input_api_password"
+      }
+    ]
+  }
+}
