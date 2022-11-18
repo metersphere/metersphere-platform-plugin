@@ -87,8 +87,9 @@ public class JiraPlatform extends AbstractPlatform {
 
     public JiraConfig setUserConfig(String userPlatformInfo) {
         JiraConfig config = getIntegrationConfig();
-        JiraUserPlatformInfo userInfo = JSON.parseObject(userPlatformInfo, JiraUserPlatformInfo.class);
-        if (userInfo != null && StringUtils.isNotBlank(userInfo.getJiraAccount())
+        JiraUserPlatformInfo userInfo = StringUtils.isBlank(userPlatformInfo) ? JSON.parseObject(userPlatformInfo, JiraUserPlatformInfo.class)
+                : new JiraUserPlatformInfo();
+        if (StringUtils.isNotBlank(userInfo.getJiraAccount())
                 && StringUtils.isNotBlank(userInfo.getJiraPassword())) {
             config.setAccount(userInfo.getJiraAccount());
             config.setPassword(userInfo.getJiraPassword());
@@ -96,10 +97,6 @@ public class JiraPlatform extends AbstractPlatform {
         validateConfig(config);
         jiraClientV2.setConfig(config);
         return config;
-    }
-
-    public PlatformIssuesDTO getUpdateIssue(JiraIssue jiraIssue) {
-        return getUpdateIssue(null, jiraIssue);
     }
 
     public PlatformIssuesDTO getUpdateIssue(PlatformIssuesDTO issue, JiraIssue jiraIssue) {
@@ -119,15 +116,12 @@ public class JiraPlatform extends AbstractPlatform {
             // 先转换下desc的图片
             String description = dealWithDescription(Optional.ofNullable(fields.get("description")).orElse("").toString(), fileContentMap);
             fields.put("description", description);
-            PlatformCustomFieldItemDTO descItem = null;
             List<PlatformCustomFieldItemDTO> customFieldItems = syncIssueCustomFieldList(issue.getCustomFields(), jiraIssue.getFields());
 
             // 其他自定义里有富文本框的也转换下图片
             for (PlatformCustomFieldItemDTO item : customFieldItems) {
-                if (StringUtils.equals("description", item.getId())) {
+                if (!StringUtils.equals("description", item.getId())) {
                     // desc转过了，跳过
-                    descItem = item;
-                } else {
                     if (StringUtils.equals(CustomFieldType.RICH_TEXT.getValue(), item.getType())) {
                         item.setValue(dealWithDescription((String) item.getValue(), fileContentMap));
                     }
@@ -245,10 +239,10 @@ public class JiraPlatform extends AbstractPlatform {
 
 
     public JiraProjectConfig getProjectConfig(String configStr) {
-        JiraProjectConfig projectConfig = JSON.parseObject(configStr, JiraProjectConfig.class);
-        if (projectConfig == null) {
+        if (StringUtils.isBlank(configStr)) {
             MSPluginException.throwException("请在项目中添加项目配置！");
         }
+        JiraProjectConfig projectConfig = JSON.parseObject(configStr, JiraProjectConfig.class);
         return projectConfig;
     }
 
@@ -278,7 +272,7 @@ public class JiraPlatform extends AbstractPlatform {
 
     @Override
     public IssuesWithBLOBs addIssue(PlatformIssuesUpdateRequest request) {
-        setUserConfig(request.getUserPlatformInfo());
+        setUserConfig(request.getUserPlatformUserConfig());
         projectConfig = getProjectConfig(request.getProjectConfig());
         this.isThirdPartTemplate = projectConfig.isThirdPartTemplate();
         validateProjectKey(projectConfig.getJiraKey());
@@ -297,9 +291,7 @@ public class JiraPlatform extends AbstractPlatform {
         request.setPlatformId(result.getKey());
         request.setId(UUID.randomUUID().toString());
 
-        IssuesWithBLOBs issues = new IssuesWithBLOBs();
-        BeanUtils.copyBean(issues, request);
-        return issues;
+        return request;
     }
 
     private List<File> getImageFiles(PlatformIssuesUpdateRequest request) {
@@ -517,7 +509,7 @@ public class JiraPlatform extends AbstractPlatform {
 
     @Override
     public IssuesWithBLOBs updateIssue(PlatformIssuesUpdateRequest request) {
-        setUserConfig(request.getUserPlatformInfo());
+        setUserConfig(request.getUserPlatformUserConfig());
 
         projectConfig = getProjectConfig(request.getProjectConfig());
         validateProjectKey(projectConfig.getJiraKey());

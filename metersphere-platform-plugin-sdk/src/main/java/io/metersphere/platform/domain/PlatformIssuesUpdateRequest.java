@@ -8,7 +8,7 @@ import java.util.Set;
 @Getter
 @Setter
 public class PlatformIssuesUpdateRequest extends PlatformIssuesDTO {
-    private String userPlatformInfo;
+    private String userPlatformUserConfig;
     private String projectConfig;
     private Set<String> msAttachmentNames;
     private PlatformStatusDTO transitions;
