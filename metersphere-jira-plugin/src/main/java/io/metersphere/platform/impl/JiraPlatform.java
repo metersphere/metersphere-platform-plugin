@@ -212,15 +212,15 @@ public class JiraPlatform extends AbstractPlatform {
     }
 
     @Override
-    public List<DemandDTO> getDemands(String projectConfig) {
+    public List<DemandDTO> getDemands(String projectConfigStr) {
         List<DemandDTO> list = new ArrayList<>();
-        JiraProjectConfig jiraProjectConfig = getProjectConfig(projectConfig);
+        projectConfig = getProjectConfig(projectConfigStr);
         validateStoryType();
 
         int maxResults = 50, startAt = 0;
         List demands;
         do {
-            demands = jiraClientV2.getDemands(jiraProjectConfig.getJiraKey(), jiraProjectConfig.getJiraStoryTypeId(), startAt, maxResults);
+            demands = jiraClientV2.getDemands(projectConfig.getJiraKey(), projectConfig.getJiraStoryTypeId(), startAt, maxResults);
             for (int i = 0; i < demands.size(); i++) {
                 Map o = (Map) demands.get(i);
                 String issueKey = o.get("key").toString();
@@ -578,7 +578,7 @@ public class JiraPlatform extends AbstractPlatform {
 
     @Override
     public SyncIssuesResult syncIssues(SyncIssuesRequest request) {
-        JiraProjectConfig projectConfig = getProjectConfig(request.getProjectConfig());
+        projectConfig = getProjectConfig(request.getProjectConfig());
         super.isThirdPartTemplate = projectConfig.isThirdPartTemplate();
 
         if (projectConfig.isThirdPartTemplate()) {
@@ -628,7 +628,7 @@ public class JiraPlatform extends AbstractPlatform {
             add("timetracking");
             add("attachment");
         }};
-        JiraProjectConfig projectConfig = getProjectConfig(projectConfigStr);
+        projectConfig = getProjectConfig(projectConfigStr);
 
         Map<String, JiraCreateMetadataResponse.Field> createMetadata =
                 jiraClientV2.getCreateMetadata(projectConfig.getJiraKey(), projectConfig.getJiraIssueTypeId());
