@@ -1,6 +1,7 @@
 package im.metersphere.plugin.loader;
 
 import im.metersphere.plugin.storage.StorageStrategy;
+import im.metersphere.plugin.utils.LogUtil;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.*;
@@ -114,7 +115,7 @@ public class PluginClassLoader extends ClassLoader {
             try (InputStream in = jar.getInputStream(je)) {
                 loadJar(in, je);
             } catch (IOException e) {
-                e.printStackTrace();
+                LogUtil.error(e);
             }
         }
     }
@@ -145,7 +146,7 @@ public class PluginClassLoader extends ClassLoader {
                 Class<?> clazz = defineClass(className, bytes, 0, bytes.length);
                 clazzSet.add(clazz);
             } catch (Throwable e) {
-                e.printStackTrace();
+                LogUtil.error(e);
             }
         } else if (!name.endsWith("/")) {
             // 非目录即静态资源
@@ -166,6 +167,7 @@ public class PluginClassLoader extends ClassLoader {
             try {
                 return storageStrategy.get(name);
             } catch (IOException e) {
+                LogUtil.error(e);
                 return null;
             }
         }

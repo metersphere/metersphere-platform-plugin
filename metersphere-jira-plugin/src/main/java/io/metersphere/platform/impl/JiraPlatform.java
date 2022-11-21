@@ -87,8 +87,8 @@ public class JiraPlatform extends AbstractPlatform {
 
     public JiraConfig setUserConfig(String userPlatformInfo) {
         JiraConfig config = getIntegrationConfig();
-        JiraUserPlatformInfo userInfo = StringUtils.isBlank(userPlatformInfo) ? JSON.parseObject(userPlatformInfo, JiraUserPlatformInfo.class)
-                : new JiraUserPlatformInfo();
+        JiraUserPlatformInfo userInfo = StringUtils.isBlank(userPlatformInfo) ? new JiraUserPlatformInfo()
+                :  JSON.parseObject(userPlatformInfo, JiraUserPlatformInfo.class);
         if (StringUtils.isNotBlank(userInfo.getJiraAccount())
                 && StringUtils.isNotBlank(userInfo.getJiraPassword())) {
             config.setAccount(userInfo.getJiraAccount());

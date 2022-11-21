@@ -12,7 +12,7 @@ public class JiraPlatformMetaInfo extends AbstractPlatformMetaInfo {
 
     @Override
     public String getVersion() {
-        return "main";
+        return "2.4.0";
     }
 
     @Override
