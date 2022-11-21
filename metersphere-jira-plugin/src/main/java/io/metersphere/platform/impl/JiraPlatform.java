@@ -160,7 +160,7 @@ public class JiraPlatform extends AbstractPlatform {
             String splitStr = splitStrs[j];
             if (StringUtils.isNotEmpty(splitStr)) {
                 List<String> keys = fileContentMap.keySet().stream().filter(key -> splitStr.contains(key)).collect(Collectors.toList());
-                if (!CollectionUtils.isNotEmpty(keys)) {
+                if (CollectionUtils.isNotEmpty(keys)) {
                     description = description.replace(splitStr, fileContentMap.get(keys.get(0)));
                     fileContentMap.remove(keys.get(0));
                 } else {
@@ -583,6 +583,8 @@ public class JiraPlatform extends AbstractPlatform {
 
         if (projectConfig.isThirdPartTemplate()) {
             super.defaultCustomFields = getCustomFieldsValuesString(getThirdPartCustomField(request.getProjectConfig()));
+        } else {
+            super.defaultCustomFields = request.getDefaultCustomFields();
         }
 
         List<PlatformIssuesDTO> issues = request.getIssues();

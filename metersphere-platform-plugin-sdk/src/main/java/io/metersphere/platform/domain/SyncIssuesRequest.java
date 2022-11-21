@@ -9,5 +9,6 @@ import java.util.List;
 @Getter
 public class SyncIssuesRequest {
     private String projectConfig;
+    private String defaultCustomFields;;
     private List<PlatformIssuesDTO> issues;
 }
