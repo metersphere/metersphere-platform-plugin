@@ -1,10 +1,12 @@
 package io.metersphere.platform.domain;
 
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
+@EqualsAndHashCode
 public class SelectOption {
     public SelectOption(String text, String value) {
         this.text = text;
