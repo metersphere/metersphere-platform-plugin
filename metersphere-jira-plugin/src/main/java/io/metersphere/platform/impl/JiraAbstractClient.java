@@ -48,6 +48,7 @@ public abstract class JiraAbstractClient extends BaseClient {
             fields = ((JiraCreateMetadataResponse) getResultForObject(JiraCreateMetadataResponse.class, response))
                     .getProjects().get(0).getIssuetypes().get(0).getFields();
         } catch (Exception e) {
+            LogUtil.error(e);
             MSPluginException.throwException("请检查服务集成信息或Jira项目ID");
         }
         fields.remove("project");

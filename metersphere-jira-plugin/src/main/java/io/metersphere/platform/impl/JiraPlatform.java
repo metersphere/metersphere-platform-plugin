@@ -1,19 +1,17 @@
 package io.metersphere.platform.impl;
 
 
-import io.metersphere.platform.constants.AttachmentSyncType;
-import io.metersphere.platform.constants.CustomFieldType;
-import io.metersphere.platform.domain.*;
 import im.metersphere.plugin.exception.MSPluginException;
 import im.metersphere.plugin.utils.JSON;
 import im.metersphere.plugin.utils.LogUtil;
-import io.metersphere.platform.api.AbstractPlatform;
 import io.metersphere.base.domain.IssuesWithBLOBs;
-
-import io.metersphere.platform.utils.BeanUtils;
+import io.metersphere.platform.api.AbstractPlatform;
+import io.metersphere.platform.constants.AttachmentSyncType;
+import io.metersphere.platform.constants.CustomFieldType;
+import io.metersphere.platform.domain.*;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang.StringEscapeUtils;
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.HttpClientErrorException;
@@ -830,6 +828,7 @@ public class JiraPlatform extends AbstractPlatform {
         return JSON.toJSONString(options);
     }
 
+    @Override
     public ResponseEntity proxyForGet(String url, Class responseEntityClazz) {
         return jiraClientV2.proxyForGet(url, responseEntityClazz);
     }
