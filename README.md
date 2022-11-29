@@ -2,7 +2,7 @@ MeterSphere 缺陷平台插件
 =============================
 [MeterSphere](https://github.com/metersphere/metersphere) 是一站式开源持续测试平台，涵盖测试跟踪、接口测试、性能测试、团队协作等功能，兼容JMeter 等开源标准，有效助力开发和测试团队充分利用云弹性进行高度可扩展的自动化测试，加速高质量软件的交付
 
-该项目是 Metersphere 为支持对接第三方平台缺陷与需求，所开发的插件项目；用户可通过上传第三方平台的插件，实现 Metersphere 与对应平台缺陷与需求的创建、关和同步，目前已插件化 Jira 平台插件，Metersphere 原本所支持的平台包括 TAPD、禅道以及 AzureDevops，尚在插件化中
+该项目是 Metersphere 为支持对接第三方平台缺陷与需求（如 Jira、禅道等），所开发的插件项目；用户可通过上传第三方平台的插件，实现 Metersphere 与对应平台缺陷与需求的创建、关联和同步，目前已插件化 Jira 平台插件，Metersphere 原本所支持的平台包括 TAPD、禅道以及 AzureDevops，尚在插件化中
 
 ### 下载插件
   在该项目的 [release](https://github.com/metersphere/metersphere-platform-plugin/releases) 页面下载对应版本的平台插件
