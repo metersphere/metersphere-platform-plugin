@@ -1,4 +1,4 @@
-package io.metersphere.platform.impl;
+package io.metersphere.platform.client;
 
 import io.metersphere.platform.domain.*;
 import im.metersphere.plugin.exception.MSPluginException;

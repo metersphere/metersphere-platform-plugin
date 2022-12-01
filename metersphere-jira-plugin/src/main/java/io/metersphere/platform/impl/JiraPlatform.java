@@ -6,6 +6,7 @@ import im.metersphere.plugin.utils.JSON;
 import im.metersphere.plugin.utils.LogUtil;
 import io.metersphere.base.domain.IssuesWithBLOBs;
 import io.metersphere.platform.api.AbstractPlatform;
+import io.metersphere.platform.client.JiraClientV2;
 import io.metersphere.platform.constants.AttachmentSyncType;
 import io.metersphere.platform.constants.CustomFieldType;
 import io.metersphere.platform.domain.*;

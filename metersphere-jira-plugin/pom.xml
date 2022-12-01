@@ -6,7 +6,12 @@
 
     <groupId>io.metersphere</groupId>
     <artifactId>metersphere-jira-plugin</artifactId>
-    <!--  这个版本号对照 MS 版本号，表示支持 MS 2.4.0 ~ 最新发布的版本  -->
+    <!--
+        插件的版本与 Metersphere 版本相对应
+        例如：现有 Jira 插件 v2.4.0 与 v2.6.0(最新版本)，则
+        Jira v2.4.0 插件支持 v2.4.0 ~ v2.6.0 版本的 Metersphere
+        Jira v2.6.0 插件支持 v2.6.0 至最新版本的 Metersphere，直到有新的 Jira 插件发布
+     -->
     <version>2.4.0</version>
 
     <properties>
