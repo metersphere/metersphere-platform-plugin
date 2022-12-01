@@ -4,9 +4,6 @@ MeterSphere 缺陷平台插件
 
 该项目是 Metersphere 为支持对接第三方平台缺陷与需求（如 Jira、禅道等），所开发的插件项目；用户可通过上传第三方平台的插件，实现 Metersphere 与对应平台缺陷与需求的创建、关联和同步，目前已插件化 Jira 平台插件，Metersphere 原本所支持的平台包括 TAPD、禅道以及 AzureDevops，尚在插件化中
 
-### 下载插件
-  在该项目的 [release](https://github.com/metersphere/metersphere-platform-plugin/releases) 页面下载对应版本的平台插件
-  
 ### 版本说明
 插件的版本与 Metersphere 版本相对应
 <br>
@@ -16,12 +13,14 @@ Jira v2.4.0 插件支持 v2.4.0 ~ v2.6.0 版本的 Metersphere
 <br>
 Jira v2.6.0 插件支持 v2.6.0 至最新版本的 Metersphere，直到有新的 Jira 插件发布
 
+### 下载插件
+在该项目的 [release](https://github.com/metersphere/metersphere-platform-plugin/releases) 页面下载对应版本的平台插件
+
 ### 使用说明
-![img.png](img/system-setting.png)
+参考 Wiki [使用说明](https://github.com/metersphere/metersphere-platform-plugin/wiki/%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E)
 
-![img.png](img/project-setting.png)
-
-![img.png](img/issue-list.png)
+### 开发指南
+参考 Wiki [插件开发指南](https://github.com/metersphere/metersphere-platform-plugin/wiki/%E6%8F%92%E4%BB%B6%E5%BC%80%E5%8F%91%E6%8C%87%E5%8D%97)
 
 ## 问题反馈
 
