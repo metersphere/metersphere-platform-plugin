@@ -32,8 +32,17 @@ public interface Platform {
      * 项目设置中选项，从平台获取下拉框选项
      * frontend.json 中选项值配置了 optionMethod ，项目设置时调用
      * @return 返回下拉列表
+     *  该接口后续版本将废弃，替换为 getFormOptions
      */
+    @Deprecated
     List<SelectOption> getProjectOptions(GetOptionRequest request);
+
+    /**
+     * 项目设置和缺陷表单中，调用接口获取下拉框选项
+     * 配置文件的表单中选项值配置了 optionMethod ，则调用获取表单的选项值
+     * @return 返回下拉列表
+     */
+    List<SelectOption> getFormOptions(GetOptionRequest request);
 
     /**
      * 更新缺陷
@@ -76,12 +85,6 @@ public interface Platform {
     boolean isAttachmentUploadSupport();
 
     /**
-     * 获取缺陷平台项目下的相关人员
-     * @return
-     */
-    List<PlatformUser> getPlatformUser();
-
-    /**
      * 同步缺陷最新变更
      * 开源用户点击同步缺陷时调用
      */
@@ -96,7 +99,7 @@ public interface Platform {
 
     /**
      * 获取第三方平台缺陷的自定义字段
-     * frontend.json 中选项值配置了 optionMethod ，项目设置时调用
+     * 需要 PluginMetaInfo 的 isThirdPartTemplateSupport 返回 true
      * @return
      */
     List<PlatformCustomFieldItemDTO> getThirdPartCustomField(String projectConfig);
@@ -105,11 +108,11 @@ public interface Platform {
      * Get请求的代理
      * 目前使用场景：富文本框中如果有图片是存储在第三方平台，MS 通过 url 访问
      * 这时如果第三方平台需要登入才能访问到静态资源，可以通过将富文本框图片内容构造如下格式访问
-     * ![name](/resource/md/get/url?platform=Jira?project_id=&workspace_id=&url=)
-     * @param url
+     * ![name](/resource/md/get/path?platform=Jira?project_id=&workspace_id=&path=)
+     * @param path
      * @return
      */
-    ResponseEntity proxyForGet(String url, Class responseEntityClazz);
+    ResponseEntity proxyForGet(String path, Class responseEntityClazz);
 
     /**
      * 同步 MS 缺陷附件到第三方平台

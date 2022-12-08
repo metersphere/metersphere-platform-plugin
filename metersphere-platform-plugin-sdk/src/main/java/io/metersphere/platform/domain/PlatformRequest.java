@@ -7,5 +7,6 @@ import lombok.Setter;
 @Setter
 public class PlatformRequest {
     private String integrationConfig;
+    private String workspaceId;
     private String userPlatformInfo;
 }

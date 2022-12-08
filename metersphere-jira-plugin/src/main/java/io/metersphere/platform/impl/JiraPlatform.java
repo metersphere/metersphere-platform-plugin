@@ -18,9 +18,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.HttpClientErrorException;
 
 import java.io.File;
-import java.lang.reflect.InvocationTargetException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URLDecoder;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
@@ -39,6 +39,8 @@ public class JiraPlatform extends AbstractPlatform {
 
     protected Boolean isSass = false;
     protected JiraProjectConfig projectConfig;
+
+    private Set<String> jiraImageFileNames;
 
     public JiraPlatform(PlatformRequest request) {
         super.key = JiraPlatformMetaInfo.KEY;
@@ -66,22 +68,6 @@ public class JiraPlatform extends AbstractPlatform {
 
     public JiraConfig getIntegrationConfig() {
         return getIntegrationConfig(JiraConfig.class);
-    }
-
-    @Override
-    public List<SelectOption> getProjectOptions(GetOptionRequest request) {
-        String method = request.getOptionMethod();
-        try {
-            // 这里反射调用 getIssueTypes 获取下拉框选项
-            return (List<SelectOption>) this.getClass().getMethod(method, request.getClass()).invoke(this, request);
-        } catch (InvocationTargetException e) {
-            LogUtil.error(e);
-            MSPluginException.throwException(e.getTargetException());
-        }  catch (Exception e) {
-            LogUtil.error(e);
-            MSPluginException.throwException(e);
-        }
-        return null;
     }
 
     public JiraConfig setUserConfig(String userPlatformInfo) {
@@ -115,7 +101,8 @@ public class JiraPlatform extends AbstractPlatform {
             // 先转换下desc的图片
             String description = dealWithDescription(Optional.ofNullable(fields.get("description")).orElse("").toString(), fileContentMap);
             fields.put("description", description);
-            List<PlatformCustomFieldItemDTO> customFieldItems = syncIssueCustomFieldList(issue.getCustomFields(), jiraIssue.getFields());
+            // todo check
+            List<PlatformCustomFieldItemDTO> customFieldItems = syncIssueCustomFieldList(issue.getCustomFieldList(), jiraIssue.getFields());
 
             // 其他自定义里有富文本框的也转换下图片
             for (PlatformCustomFieldItemDTO item : customFieldItems) {
@@ -167,10 +154,13 @@ public class JiraPlatform extends AbstractPlatform {
                         // 解析标签内容
                         String name = getHyperLinkPathForImg("\\!\\[(.*?)\\]", StringEscapeUtils.unescapeJava(splitStr));
                         String path = getHyperLinkPathForImg("\\|(.*?)\\)", splitStr);
-                        path = "/resource/md/get/url?platform=Jira&url=" + URLEncoder.encode(path, StandardCharsets.UTF_8);
-
-                        // 解析标签内容为图片超链接格式，进行替换
-                        description = description.replace(splitStr, "\n\n![" + name + "](" + path + ")");
+                        try {
+                            path = getProxyPath(new URI(path).getPath());
+                            // 解析标签内容为图片超链接格式，进行替换
+                            description = description.replace(splitStr, "\n\n![" + name + "](" + path + ")");
+                        } catch (URISyntaxException e) {
+                            LogUtil.error(e);
+                        }
                     }
                     description = description.replace(splitStr, StringEscapeUtils.unescapeJava(splitStr.replace("MS附件：", "")));
                 }
@@ -187,14 +177,18 @@ public class JiraPlatform extends AbstractPlatform {
                 Map attachment = (Map) attachments.get(i);
                 String filename = attachment.get("filename").toString();
                 String content = attachment.get("content").toString();
-                content = "/resource/md/get/url?platform=Jira&url=" + URLEncoder.encode(content, StandardCharsets.UTF_8);
 
-                if (StringUtils.contains(attachment.get("mimeType").toString(), "image")) {
-                    String contentUrl = "![" + filename + "](" + content + ")";
-                    fileContentMap.put(filename, contentUrl);
-                } else {
-                    String contentUrl = "附件[" + filename + "]下载地址:" + content;
-                    fileContentMap.put(filename, contentUrl);
+                try {
+                    content = getProxyPath(new URI(content).getPath());
+                    if (StringUtils.contains(attachment.get("mimeType").toString(), "image")) {
+                        String contentUrl = "![" + filename + "](" + content + ")";
+                        fileContentMap.put(filename, contentUrl);
+                    } else {
+                        String contentUrl = "附件[" + filename + "]下载地址:" + content;
+                        fileContentMap.put(filename, contentUrl);
+                    }
+                } catch (URISyntaxException e) {
+                    e.printStackTrace();
                 }
             }
         }
@@ -257,8 +251,19 @@ public class JiraPlatform extends AbstractPlatform {
         }
     }
 
+    @Override
+    public List<SelectOption> getFormOptions(GetOptionRequest request)  {
+        return getFormOptions(this, request);
+    }
+
+    @Override
+    @Deprecated
+    public List<SelectOption> getProjectOptions(GetOptionRequest request) {
+        return getFormOptions(this, request);
+    }
+
     /**
-     * 由 getProjectOptions 反射调用
+     * 由 getFormOptions 反射调用
      * @return
      */
     public List<SelectOption> getIssueTypes(GetOptionRequest request) {
@@ -513,6 +518,7 @@ public class JiraPlatform extends AbstractPlatform {
         projectConfig = getProjectConfig(request.getProjectConfig());
         validateProjectKey(projectConfig.getJiraKey());
         validateIssueType();
+        jiraImageFileNames = new HashSet<>();
 
         Map param = buildUpdateParam(request, projectConfig.getJiraIssueTypeId(), projectConfig.getJiraKey());
         jiraClientV2.updateIssue(request.getPlatformId(), JSON.toJSONString(param));
@@ -571,11 +577,6 @@ public class JiraPlatform extends AbstractPlatform {
     }
 
     @Override
-    public List<PlatformUser> getPlatformUser() {
-        return null;
-    }
-
-    @Override
     public SyncIssuesResult syncIssues(SyncIssuesRequest request) {
         projectConfig = getProjectConfig(request.getProjectConfig());
         super.isThirdPartTemplate = projectConfig.isThirdPartTemplate();
@@ -595,7 +596,6 @@ public class JiraPlatform extends AbstractPlatform {
                 JiraIssue jiraIssue = jiraClientV2.getIssues(item.getPlatformId());
                 item = getUpdateIssue(item, jiraIssue);
                 syncIssuesResult.getUpdateIssues().add(item);
-                syncIssuesResult.getCustomFieldMap().put(item.getId(), item.getCustomFields());
                 // 同步第三方平台附件
                 syncJiraIssueAttachments(syncIssuesResult, item, jiraIssue);
             } catch (HttpClientErrorException e) {
@@ -830,8 +830,8 @@ public class JiraPlatform extends AbstractPlatform {
     }
 
     @Override
-    public ResponseEntity proxyForGet(String url, Class responseEntityClazz) {
-        return jiraClientV2.proxyForGet(url, responseEntityClazz);
+    public ResponseEntity proxyForGet(String path, Class responseEntityClazz) {
+        return jiraClientV2.proxyForGet(path, responseEntityClazz);
     }
 
     @Override
@@ -926,7 +926,7 @@ public class JiraPlatform extends AbstractPlatform {
                 Map attachment = (Map) attachments.get(i);
                 String filename = attachment.get("filename").toString();
                 jiraFileNames.add(filename);
-                if (!msFileNames.contains(filename)) {
+                if (!msFileNames.contains(filename) && !jiraImageFileNames.contains(filename)) {
                     String fileId = attachment.get("id").toString();
                     jiraClientV2.deleteAttachment(fileId);
                 }
@@ -957,6 +957,7 @@ public class JiraPlatform extends AbstractPlatform {
             } else if (msRichAttachmentUrl.contains("platform=Jira")) {
                 // Jira同步的图片URL
                 filename = msRichAttachmentUrl.substring(msRichAttachmentUrl.indexOf("[") + 1, msRichAttachmentUrl.indexOf("]"));
+                jiraImageFileNames.add(filename);
             }
             parseRichText = parseRichText.replace(msRichAttachmentUrl, "\n!" + filename + "|width=1360,height=876!\n");
         }

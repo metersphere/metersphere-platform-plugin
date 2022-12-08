@@ -1,10 +1,11 @@
 package io.metersphere.platform.api;
 
 import im.metersphere.plugin.exception.MSPluginException;
+import im.metersphere.plugin.utils.JSON;
 import im.metersphere.plugin.utils.LogUtil;
 import io.metersphere.platform.utils.EncryptUtils;
 import io.metersphere.platform.utils.EnvProxySelector;
-import im.metersphere.plugin.utils.JSON;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.conn.ssl.TrustStrategy;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -16,6 +17,8 @@ import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
 import javax.net.ssl.SSLContext;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
 
@@ -68,5 +71,17 @@ public abstract class BaseClient {
 
     protected  Object getResultForObject(Class clazz,ResponseEntity<String> response) {
         return JSON.parseObject(getResult(response), clazz);
+    }
+
+    public void validateProxyUrl(String url, String ...path) {
+        try {
+            if (!StringUtils.containsAny(new URI(url).getPath(), path)) {
+                // 只允许访问图片
+                MSPluginException.throwException("illegal path");
+            }
+        } catch (URISyntaxException e) {
+            LogUtil.error(e);
+            MSPluginException.throwException("illegal path");
+        }
     }
 }

@@ -1,10 +1,10 @@
 package io.metersphere.platform.client;
 
-import io.metersphere.platform.domain.*;
 import im.metersphere.plugin.exception.MSPluginException;
 import im.metersphere.plugin.utils.JSON;
 import im.metersphere.plugin.utils.LogUtil;
 import io.metersphere.platform.api.BaseClient;
+import io.metersphere.platform.domain.*;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.*;
@@ -280,8 +280,10 @@ public abstract class JiraAbstractClient extends BaseClient {
         }
     }
 
-    public ResponseEntity proxyForGet(String url, Class responseEntityClazz) {
-        LogUtil.info("jira proxyForGet: " + url);
+    public ResponseEntity proxyForGet(String path, Class responseEntityClazz) {
+        LogUtil.info("jira proxyForGet: " + path);
+        String url = this.ENDPOINT + path;
+        validateProxyUrl(url, "/secure/attachment");
         return restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), responseEntityClazz);
     }
 }
