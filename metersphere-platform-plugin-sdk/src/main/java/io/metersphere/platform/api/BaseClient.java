@@ -35,7 +35,7 @@ public abstract class BaseClient {
             SSLConnectionSocketFactory csf = new SSLConnectionSocketFactory(sslContext);
             CloseableHttpClient httpClient = HttpClients.custom()
                     // 可以支持设置系统代理
-                    .setRoutePlanner(new SystemDefaultRoutePlanner(new EnvProxySelector()))
+//                    .setRoutePlanner(new SystemDefaultRoutePlanner(new EnvProxySelector()))
                     .setSSLSocketFactory(csf)
                     .build();
             HttpComponentsClientHttpRequestFactory requestFactory = new HttpComponentsClientHttpRequestFactory();
