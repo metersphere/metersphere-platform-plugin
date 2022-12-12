@@ -29,6 +29,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class ZentaoPlatform extends AbstractPlatform {
 
@@ -37,6 +38,8 @@ public class ZentaoPlatform extends AbstractPlatform {
     protected final String[] imgArray = {
             "bmp", "jpg", "png", "tif", "gif", "jpeg"
     };
+
+    protected Map<String, String> buildMap;
 
     public ZentaoPlatform(PlatformRequest request) {
         super.key = ZentaoPlatformMetaInfo.KEY;
@@ -103,7 +106,11 @@ public class ZentaoPlatform extends AbstractPlatform {
         }
         if (issue == null) {
             issue = new PlatformIssuesDTO();
-            issue.setCustomFields(defaultCustomFields);
+            if (StringUtils.isNotBlank(defaultCustomFields)) {
+                issue.setCustomFieldList(JSON.parseArray(defaultCustomFields, PlatformCustomFieldItemDTO.class));
+            } else {
+                issue.setCustomFieldList(new ArrayList<>());
+            }
         } else {
             mergeCustomField(issue, defaultCustomFields);
         }
@@ -138,6 +145,14 @@ public class ZentaoPlatform extends AbstractPlatform {
         for (PlatformCustomFieldItemDTO item : customFieldList) {
             if (StringUtils.equals(item.getId(), "openedBuild") && StringUtils.isNotBlank(item.getValue().toString())) {
                 String[] split = item.getValue().toString().split(",");
+                if (buildMap != null) {
+                    for (int i = 0; i < split.length; i++) {
+                        String s = split[i];
+                        if (StringUtils.isNotBlank(buildMap.get(s))) {
+                            split[i] = buildMap.get(s);
+                        }
+                    }
+                }
                 ArrayList<String> arrayList = new ArrayList<>(Arrays.asList(split));
                 item.setValue(arrayList);
                 break;
@@ -211,6 +226,11 @@ public class ZentaoPlatform extends AbstractPlatform {
 //        return issue;
 //    }
 
+    /**
+     * 反射调用，勿删
+     * @param request
+     * @return
+     */
     public List<SelectOption> getBuilds(GetOptionRequest request) {
         ZentaoProjectConfig projectConfig = getProjectConfig(request.getProjectConfig());
         Map<String, Object> builds = zentaoClient.getBuildsByCreateMetaData(projectConfig.getZentaoId());
@@ -226,6 +246,11 @@ public class ZentaoPlatform extends AbstractPlatform {
         return res;
     }
 
+    /**
+     * 反射调用，勿删
+     * @param request
+     * @return
+     */
     public List<SelectOption> getUsers(GetOptionRequest request) {
         String session = zentaoClient.login();
         HttpHeaders httpHeaders = new HttpHeaders();
@@ -261,6 +286,94 @@ public class ZentaoPlatform extends AbstractPlatform {
             syncZentaoIssueAttachments(syncIssuesResult, item);
         });
         return syncIssuesResult;
+    }
+
+    @Override
+    public void syncAllIssues(SyncAllIssuesRequest syncRequest) {
+        int pageNum = 1;
+        int pageSize = 200;
+        List<Map> zentaoIssues;
+        int currentSize;
+
+        ZentaoProjectConfig projectConfig = getProjectConfig(syncRequest.getProjectConfig());
+        this.defaultCustomFields = syncRequest.getDefaultCustomFields();
+
+        setBuildOptions(syncRequest);
+
+        try {
+            do {
+                SyncAllIssuesResult syncIssuesResult = new SyncAllIssuesResult();
+
+                // 获取禅道平台缺陷
+                Map response = zentaoClient.getBugsByProjectId(projectConfig.getZentaoId(), pageNum, pageSize);
+                zentaoIssues = (List) response.get("bugs");
+                currentSize = zentaoIssues.size();
+
+                List<String> allIds = zentaoIssues.stream().map(i -> i.get("id").toString()).collect(Collectors.toList());
+                syncIssuesResult.setAllIds(allIds);
+
+                if (syncRequest != null) {
+                    zentaoIssues = filterSyncZentaoIssuesByCreated(zentaoIssues, syncRequest);
+                }
+
+                if (CollectionUtils.isNotEmpty(zentaoIssues)) {
+                    for (Map zentaoIssue : zentaoIssues) {
+                        String platformId = (String) zentaoIssue.get("id");
+                        IssuesWithBLOBs issue = getUpdateIssues(null, zentaoIssue);
+
+                        // 设置临时UUID，同步附件时需要用
+                        issue.setId(UUID.randomUUID().toString());
+
+                        issue.setPlatformId(platformId);
+                        syncIssuesResult.getUpdateIssues().add(issue);
+
+                        //同步第三方平台系统附件字段
+                        syncZentaoIssueAttachments(syncIssuesResult, issue);
+                    }
+                }
+
+                pageNum++;
+
+                HashMap<Object, Object> syncParam = buildSyncAllParam(syncIssuesResult);
+                syncRequest.getHandleSyncFunc().accept(syncParam);
+
+                if (pageNum > (Integer)((Map)response.get("pager")).get("pageTotal")) {
+                    // 禅道接口有点恶心，pageNum 超过了总页数，还是会返回最后一页的数据，当缺陷总数是pageSize的时候会死循环
+                    break;
+                }
+            } while (currentSize >= pageSize);
+        } catch (Exception e) {
+            LogUtil.error(e);
+            MSPluginException.throwException(e);
+        }
+    }
+
+    private void setBuildOptions(SyncAllIssuesRequest syncRequest) {
+        try {
+            GetOptionRequest request = new GetOptionRequest();
+            request.setProjectConfig(syncRequest.getProjectConfig());
+            this.buildMap = getBuilds(request).stream().collect(Collectors.toMap(SelectOption::getText, SelectOption::getValue));
+        } catch (Exception e) {
+            LogUtil.error(e);
+        }
+    }
+
+    public List<Map> filterSyncZentaoIssuesByCreated(List<Map> zentaoIssues, SyncAllIssuesRequest syncRequest) {
+        List<Map> filterIssues = zentaoIssues.stream().filter(item -> {
+            long createTimeMills = 0;
+            try {
+                createTimeMills = DateUtils.getTime((String) item.get("openedDate")).getTime();
+                if (syncRequest.isPre()) {
+                    return createTimeMills <= syncRequest.getCreateTime().longValue();
+                } else {
+                    return createTimeMills >= syncRequest.getCreateTime().longValue();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                return false;
+            }
+        }).collect(Collectors.toList());
+        return filterIssues;
     }
 
     @Override
