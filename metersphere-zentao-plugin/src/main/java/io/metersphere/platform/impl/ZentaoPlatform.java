@@ -258,7 +258,6 @@ public class ZentaoPlatform extends AbstractPlatform {
             Map bug = zentaoClient.getBugById(item.getPlatformId());
             getUpdateIssues(item, bug);
             syncIssuesResult.getUpdateIssues().add(item);
-            syncIssuesResult.getCustomFieldMap().put(item.getId(), item.getCustomFields());
             syncZentaoIssueAttachments(syncIssuesResult, item);
         });
         return syncIssuesResult;
