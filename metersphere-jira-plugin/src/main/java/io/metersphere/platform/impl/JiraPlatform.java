@@ -617,9 +617,12 @@ public class JiraPlatform extends AbstractPlatform {
     }
 
     @Override
-    public List<PlatformStatusDTO> getStatusList(String issueKey) {
+    public List<PlatformStatusDTO> getStatusList(String projectConfig) {
+        return getPlatformStatus(jiraClientV2.getStatus());
+    }
+
+    public List<PlatformStatusDTO> getPlatformStatus(List<JiraTransitionsResponse.Transitions> transitions) {
         List<PlatformStatusDTO> platformStatusDTOS = new ArrayList<>();
-        List<JiraTransitionsResponse.Transitions> transitions = jiraClientV2.getTransitions(issueKey);
         if (CollectionUtils.isNotEmpty(transitions)) {
             transitions.forEach(item -> {
                 PlatformStatusDTO platformStatusDTO = new PlatformStatusDTO();
@@ -629,6 +632,11 @@ public class JiraPlatform extends AbstractPlatform {
             });
         }
         return platformStatusDTOS;
+    }
+
+    @Override
+    public List<PlatformStatusDTO> getTransitions(String projectConfig, String issueKey) {
+        return getPlatformStatus(jiraClientV2.getTransitions(issueKey));
     }
 
     public List<PlatformCustomFieldItemDTO> getThirdPartCustomField(String projectConfigStr) {

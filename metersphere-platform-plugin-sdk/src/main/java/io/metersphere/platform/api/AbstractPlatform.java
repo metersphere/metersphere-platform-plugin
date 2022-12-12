@@ -338,4 +338,8 @@ public abstract class AbstractPlatform implements Platform {
         return;
     }
 
+    @Override
+    public List<PlatformStatusDTO> getTransitions(String projectConfig, String issueKey) {
+        return this.getStatusList(projectConfig);
+    }
 }

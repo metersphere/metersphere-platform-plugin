@@ -403,7 +403,7 @@ public class ZentaoPlatform extends AbstractPlatform {
     }
 
     @Override
-    public List<PlatformStatusDTO> getStatusList(String issueKey) {
+    public List<PlatformStatusDTO> getStatusList(String projectConfig) {
         List<PlatformStatusDTO> platformStatusDTOS = new ArrayList<>();
         for (ZentaoIssuePlatformStatus status : ZentaoIssuePlatformStatus.values()) {
             PlatformStatusDTO platformStatusDTO = new PlatformStatusDTO();

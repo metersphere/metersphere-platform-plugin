@@ -128,9 +128,17 @@ public interface Platform {
 
     /**
      * 获取第三方平台的状态列表
-     * 编辑缺陷时的下拉框选项会调用
-     * @param issueKey
+     * 缺陷列表和编辑缺陷时会调用
      * @return
      */
-    List<PlatformStatusDTO> getStatusList(String issueKey);
+    List<PlatformStatusDTO> getStatusList(String projectConfig);
+
+    /**
+     * 获取第三方平台的状态转移列表
+     * 即编辑缺陷时的可选状态
+     * 默认会调用 getStatusList，可重写覆盖
+     * @param issueId
+     * @return
+     */
+    List<PlatformStatusDTO> getTransitions(String projectConfig, String issueId);
 }

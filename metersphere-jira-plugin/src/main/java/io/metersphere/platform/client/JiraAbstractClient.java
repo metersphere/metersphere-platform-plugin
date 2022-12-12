@@ -286,4 +286,9 @@ public abstract class JiraAbstractClient extends BaseClient {
         validateProxyUrl(url, "/secure/attachment", "/attachment/content");
         return restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), responseEntityClazz);
     }
+
+    public List<JiraTransitionsResponse.Transitions> getStatus() {
+        ResponseEntity<String> response = restTemplate.exchange(getBaseUrl() + "/issue/status", HttpMethod.GET, getAuthHttpEntity(), String.class);
+        return (List<JiraTransitionsResponse.Transitions>) getResultForList(JiraTransitionsResponse.Transitions.class, response);
+    }
 }
