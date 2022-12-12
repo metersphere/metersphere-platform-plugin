@@ -13,6 +13,7 @@
         <module>metersphere-plugin-sdk</module>
         <module>metersphere-platform-plugin-sdk</module>
         <module>metersphere-jira-plugin</module>
+        <module>metersphere-zentao-plugin</module>
     </modules>
 
     <properties>

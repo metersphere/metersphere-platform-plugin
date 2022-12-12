@@ -65,6 +65,14 @@ public abstract class AbstractPlatform implements Platform {
         return null;
     }
 
+    protected HashMap<Object, Object> buildSyncAllParam(SyncAllIssuesResult syncIssuesResult) {
+        HashMap<Object, Object> syncParam = new HashMap<>();
+        syncParam.put("updateIssues", syncIssuesResult.getUpdateIssues());
+        syncParam.put("attachmentMap", syncIssuesResult.getAttachmentMap());
+        syncParam.put("allIds", syncIssuesResult.getAllIds());
+        return syncParam;
+    }
+
     @Override
     public byte[] getAttachmentContent(String fileKey) {
         return null;
@@ -324,4 +332,10 @@ public abstract class AbstractPlatform implements Platform {
     public ResponseEntity proxyForGet(String path, Class responseEntityClazz) {
         return null;
     }
+
+    @Override
+    public void syncAllIssues(SyncAllIssuesRequest request) {
+        return;
+    }
+
 }

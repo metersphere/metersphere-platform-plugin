@@ -91,6 +91,12 @@ public interface Platform {
     SyncIssuesResult syncIssues(SyncIssuesRequest request);
 
     /**
+     * 同步项目下所有的缺陷
+     * 企业版用户会调用同步缺陷
+     */
+    void syncAllIssues(SyncAllIssuesRequest request);
+
+    /**
      * 获取附件内容
      * 同步缺陷中，同步附件时会调用
      * @param fileKey 文件关键字

@@ -22,6 +22,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -41,6 +42,8 @@ public class JiraPlatform extends AbstractPlatform {
     protected JiraProjectConfig projectConfig;
 
     private Set<String> jiraImageFileNames;
+
+    private static final String ATTACHMENT_NAME = "attachment";
 
     public JiraPlatform(PlatformRequest request) {
         super.key = JiraPlatformMetaInfo.KEY;
@@ -88,7 +91,11 @@ public class JiraPlatform extends AbstractPlatform {
         try {
             if (issue == null) {
                 issue = new PlatformIssuesDTO();
-                issue.setCustomFields(defaultCustomFields);
+                if (StringUtils.isNotBlank(defaultCustomFields)) {
+                    issue.setCustomFieldList(JSON.parseArray(defaultCustomFields, PlatformCustomFieldItemDTO.class));
+                } else {
+                    issue.setCustomFieldList(new ArrayList<>());
+                }
             } else {
                 mergeCustomField(issue, defaultCustomFields);
             }
@@ -962,5 +969,101 @@ public class JiraPlatform extends AbstractPlatform {
             parseRichText = parseRichText.replace(msRichAttachmentUrl, "\n!" + filename + "|width=1360,height=876!\n");
         }
         return parseRichText;
+    }
+
+    @Override
+    public void syncAllIssues(SyncAllIssuesRequest syncRequest) {
+        setConfig();
+        JiraProjectConfig projectConfig = getProjectConfig(syncRequest.getProjectConfig());
+        this.isThirdPartTemplate = projectConfig.isThirdPartTemplate();
+
+        int startAt = 0;
+        // Jira最大支持100
+        int maxResults = 100;
+        List<JiraIssue> jiraIssues;
+        int currentSize;
+
+        this.defaultCustomFields = syncRequest.getDefaultCustomFields();
+        this.projectConfig = projectConfig;
+
+        do {
+            SyncAllIssuesResult syncIssuesResult = new SyncAllIssuesResult();
+
+            String jiraKey = projectConfig.getJiraKey();
+            validateIssueType();
+            validateProjectKey(jiraKey);
+
+            JiraIssueListResponse result = jiraClientV2.getProjectIssues(startAt, maxResults, jiraKey, projectConfig.getJiraIssueTypeId());
+            jiraIssues = result.getIssues();
+
+            currentSize = jiraIssues.size();
+            List<String> allIds = jiraIssues.stream().map(JiraIssue::getId).collect(Collectors.toList());
+            // 创建的时候是 platform_id 存的key，之前全量同步存的是id，统一改成存key，这里做兼容处理
+            allIds.addAll(jiraIssues.stream().map(JiraIssue::getKey).collect(Collectors.toList()));
+
+            syncIssuesResult.setAllIds(allIds);
+
+            if (syncRequest != null) {
+                jiraIssues = filterSyncJiraIssueByCreated(jiraIssues, syncRequest);
+            }
+            Map<String, Object> attachmentMap = new HashMap<>();
+
+            if (CollectionUtils.isNotEmpty(jiraIssues)) {
+                if (!jiraIssues.get(0).getFields().containsKey(ATTACHMENT_NAME)) {
+                    // 如果不包含附件信息，则查询下附件
+                    try {
+                        JiraIssueListResponse response = jiraClientV2.getProjectIssuesAttachment(startAt, maxResults,
+                                jiraKey, projectConfig.getJiraIssueTypeId());
+                        List<JiraIssue> jiraIssuesWithAttachment = response.getIssues();
+                        attachmentMap = jiraIssuesWithAttachment.stream()
+                                .collect(Collectors.toMap(JiraIssue::getKey,
+                                        i -> i.getFields().get(ATTACHMENT_NAME)));
+                    } catch (Exception e) {
+                        LogUtil.error(e);
+                    }
+                }
+
+                for (JiraIssue jiraIssue : jiraIssues) {
+                    if (attachmentMap.containsKey(jiraIssue.getKey())) {
+                        // 接口可能缺少附件字段，单独获取
+                        jiraIssue.getFields().put(ATTACHMENT_NAME, attachmentMap.get(jiraIssue.getKey()));
+                    }
+                    PlatformIssuesDTO issue = getUpdateIssue(null, jiraIssue);
+
+                    // 设置临时UUID，同步附件时需要用
+                    issue.setId(UUID.randomUUID().toString());
+
+                    issue.setPlatformId(jiraIssue.getKey());
+                    syncIssuesResult.getUpdateIssues().add(issue);
+
+                    //同步第三方平台系统附件字段
+                    syncJiraIssueAttachments(syncIssuesResult, issue, jiraIssue);
+                }
+            }
+
+            startAt += maxResults;
+
+            HashMap<Object, Object> syncParam = buildSyncAllParam(syncIssuesResult);
+
+            syncRequest.getHandleSyncFunc().accept(syncParam);
+        } while (currentSize >= maxResults);
+    }
+
+    private List<JiraIssue> filterSyncJiraIssueByCreated(List<JiraIssue> jiraIssues, SyncAllIssuesRequest syncRequest) {
+        List<JiraIssue> filterIssues = jiraIssues.stream().filter(jiraIssue -> {
+            long createTimeMills = 0;
+            try {
+                createTimeMills =  new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss").parse((String) jiraIssue.getFields().get("created")).getTime();
+                if (syncRequest.isPre()) {
+                    return createTimeMills <= syncRequest.getCreateTime().longValue();
+                } else {
+                    return createTimeMills >= syncRequest.getCreateTime().longValue();
+                }
+            } catch (ParseException e) {
+                e.printStackTrace();
+                return false;
+            }
+        }).collect(Collectors.toList());
+        return filterIssues;
     }
 }

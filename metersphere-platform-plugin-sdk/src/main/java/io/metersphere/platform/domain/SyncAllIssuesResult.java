@@ -11,9 +11,11 @@ import java.util.Map;
 
 @Setter
 @Getter
-public class SyncIssuesResult {
+public class SyncAllIssuesResult extends SyncIssuesResult {
     private List<IssuesWithBLOBs> updateIssues = new ArrayList<>();
-    private List<IssuesWithBLOBs> addIssues = new ArrayList<>();
-    private  Map<String, List<PlatformAttachment>> attachmentMap = new HashMap<>();
-    private List<String> deleteIssuesIds = new ArrayList<>();
+    private Map<String, List<PlatformAttachment>> attachmentMap = new HashMap<>();
+    /**
+     * 保存当前查询到的缺陷的平台ID
+     */
+    private List<String> allIds = new ArrayList<>();
 }
