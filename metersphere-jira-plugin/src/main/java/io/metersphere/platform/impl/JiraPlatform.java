@@ -973,7 +973,6 @@ public class JiraPlatform extends AbstractPlatform {
 
     @Override
     public void syncAllIssues(SyncAllIssuesRequest syncRequest) {
-        setConfig();
         JiraProjectConfig projectConfig = getProjectConfig(syncRequest.getProjectConfig());
         this.isThirdPartTemplate = projectConfig.isThirdPartTemplate();
 

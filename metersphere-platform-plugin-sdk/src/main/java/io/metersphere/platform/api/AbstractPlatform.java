@@ -103,7 +103,7 @@ public abstract class AbstractPlatform implements Platform {
             customFields = customFields.stream()
                     .filter(i -> StringUtils.isNotBlank(i.getCustomData()))
                     .collect(Collectors.toList());
-            issue.setCustomFields(JSON.toJSONString(customFields));
+            issue.setCustomFieldList(customFields);
         }
     }
 
