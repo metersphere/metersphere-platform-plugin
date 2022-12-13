@@ -7,7 +7,9 @@ pipeline {
     environment {
         JAVA_HOME = '/opt/jdk-11'
     }
-    options { quietPeriod(600) }
+    triggers {
+        pollSCM('0 * * * *')
+    }
     stages {
         stage('Build/Test') {
             steps {
