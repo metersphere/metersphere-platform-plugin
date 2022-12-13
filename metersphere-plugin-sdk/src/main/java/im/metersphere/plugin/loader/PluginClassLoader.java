@@ -5,9 +5,7 @@ import im.metersphere.plugin.utils.LogUtil;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.*;
-import java.util.Enumeration;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarInputStream;
@@ -21,6 +19,20 @@ public class PluginClassLoader extends ClassLoader {
      * 记录加载的类
      */
     protected final Set<Class> clazzSet = new HashSet<>();
+    protected final static int CLASS_RELOAD_TIME = 10;
+    protected Map<String, byteArrayWrapper> loadErrorMap = new HashMap<>();
+
+    private class byteArrayWrapper {
+        private byte[] values;
+
+        public byteArrayWrapper(byte[] values) {
+            this.values = values;
+        }
+
+        public byte[] getValues() {
+            return values;
+        }
+    }
 
     public Set<Class> getClazzSet() {
         return clazzSet;
@@ -96,6 +108,7 @@ public class PluginClassLoader extends ClassLoader {
                 while ((je = jis.getNextJarEntry()) != null) {
                     loadJar(jis, je);
                 }
+                reloadErrorClazz();
             } catch (IOException e) {
                 throw e;
             }
@@ -118,10 +131,12 @@ public class PluginClassLoader extends ClassLoader {
                 LogUtil.error(e);
             }
         }
+        reloadErrorClazz();
     }
 
     /**
      * 加载 jar 包的 class，并存储静态资源
+     *
      * @param in
      * @param je
      * @throws IOException
@@ -134,9 +149,10 @@ public class PluginClassLoader extends ClassLoader {
                     .replace("/", ".")
                     .replace(".class", "");
             BufferedInputStream bis;
+            byte[] bytes = null;
             try (ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
                 int line;
-                byte[] bytes = new byte[1024];
+                bytes = new byte[1024];
                 bis = new BufferedInputStream(in);
                 while ((line = bis.read(bytes)) != -1) {
                     bos.write(bytes, 0, line);
@@ -145,6 +161,8 @@ public class PluginClassLoader extends ClassLoader {
                 bytes = bos.toByteArray();
                 Class<?> clazz = defineClass(className, bytes, 0, bytes.length);
                 clazzSet.add(clazz);
+            } catch (NoClassDefFoundError e) {
+                loadErrorMap.put(className, new byteArrayWrapper(bytes));
             } catch (Throwable e) {
                 LogUtil.error(e);
             }
@@ -152,6 +170,29 @@ public class PluginClassLoader extends ClassLoader {
             // 非目录即静态资源
             if (storageStrategy != null) {
                 storageStrategy.store(name, in);
+            }
+        }
+    }
+
+    /**
+     * 由于 loadJar 中是按照条目加载的
+     * 加载顺序不确定，如果父类没有先加载会加载失败
+     * 这里针对加载失败的类，再次加载
+     */
+    private synchronized void reloadErrorClazz() {
+        for (int i = 0; i < CLASS_RELOAD_TIME; i++) {
+            Iterator<String> iterator = loadErrorMap.keySet().iterator();
+            while (iterator.hasNext()) {
+                String className = iterator.next();
+                try {
+                    LogUtil.info("reload class: " + className);
+                    byte[] bytes = loadErrorMap.get(className).getValues();
+                    Class<?> clazz = defineClass(className, bytes, 0, bytes.length);
+                    clazzSet.add(clazz);
+                    iterator.remove();
+                } catch (Throwable e) {
+                    LogUtil.error(e);
+                }
             }
         }
     }

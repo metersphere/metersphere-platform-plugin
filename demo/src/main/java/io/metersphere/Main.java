@@ -12,7 +12,7 @@ import java.io.IOException;
 
 public class Main {
     public static void main(String[] args) throws FileNotFoundException {
-        String jiraPath = "D:\\source\\metersphere-platform-plugin\\metersphere-jira-plugin\\target\\metersphere-jira-plugin-main-jar-with-dependencies.jar";
+        String jiraPath = "D:\\source\\metersphere-platform-plugin\\metersphere-zentao-plugin\\target\\metersphere-zentao-plugin-2.5.0-jar-with-dependencies.jar";
 
         PluginManager pluginManager = new PluginManager();
 
