@@ -19,6 +19,7 @@ public class RequestUrl {
     private String storyGet;
     private String userGet;
     private String buildsGet;
+    private String buildsGetV17;
     private String fileUpload;
     private String fileDelete;
     private String fileDownload;

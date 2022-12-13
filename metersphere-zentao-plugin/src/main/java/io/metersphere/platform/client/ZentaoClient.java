@@ -11,9 +11,11 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.*;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
 
 import java.io.File;
 import java.util.Map;
+import java.util.Set;
 
 public abstract class ZentaoClient extends BaseClient {
 
@@ -24,7 +26,6 @@ public abstract class ZentaoClient extends BaseClient {
     protected String PASSWD;
 
     public RequestUrl requestUrl;
-    protected String url;
 
     public ZentaoClient(String url) {
         ENDPOINT = url;
@@ -152,6 +153,38 @@ public abstract class ZentaoClient extends BaseClient {
         return (Map<String, Object>) JSON.parseMap(response.getBody()).get("data");
     }
 
+    public Map<String, Object> getBuildsV17(String projectId) {
+        String sessionId = login();
+        ResponseEntity<String> response = restTemplate.exchange(requestUrl.getBuildsGetV17(),
+                HttpMethod.GET, null, String.class, projectId, sessionId);
+        return (Map<String, Object>) JSON.parseMap(response.getBody()).get("data");
+    }
+
+    public String uploadFile(File file) {
+        String id = "";
+        String sessionId = login();
+        HttpHeaders httpHeaders = new HttpHeaders();
+        MultiValueMap<String, Object> paramMap = new LinkedMultiValueMap<>();
+        paramMap.add("files", new FileSystemResource(file));
+        HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(paramMap, httpHeaders);
+        RestTemplate restTemplate = new RestTemplate();
+        try {
+            ResponseEntity<String> responseEntity = restTemplate.exchange(requestUrl.getFileUpload(), HttpMethod.POST, requestEntity,
+                    String.class, null, sessionId);
+            String body = responseEntity.getBody();
+            Map obj = JSON.parseMap(body);
+            Map data = (Map) JSON.parseObject(obj.get("data").toString());
+            Set<String> set = data.keySet();
+            if (!set.isEmpty()) {
+                id = (String) set.toArray()[0];
+            }
+        } catch (Exception e) {
+            LogUtil.error(e, e.getMessage());
+        }
+        LogUtil.info("upload file id: " + id);
+        return id;
+    }
+
     public Map getBugsByProjectId(String projectId, Integer pageNum, Integer pageSize) {
         String sessionId = login();
         ResponseEntity<String> response = restTemplate.exchange(requestUrl.getBugList(),
@@ -201,8 +234,8 @@ public abstract class ZentaoClient extends BaseClient {
         ResponseEntity<String> response = restTemplate.exchange(requestUrl.getProductGet(),
                 HttpMethod.GET, null, String.class, relateId, sessionId);
         try {
-            Object data = JSON.parseMap(response.getBody()).get("data");
-            if (!StringUtils.equals((String) data, "false")) {
+            Map data = ((Map) JSON.parseObject(JSON.parseMap(response.getBody()).get("data").toString()));
+            if (StringUtils.isNotBlank(((Map) data.get("product")).get("id").toString())) {
                 return;
             }
         } catch (Exception e) {

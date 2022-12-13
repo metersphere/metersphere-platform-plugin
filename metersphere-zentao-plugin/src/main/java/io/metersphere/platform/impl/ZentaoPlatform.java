@@ -233,16 +233,24 @@ public class ZentaoPlatform extends AbstractPlatform {
      */
     public List<SelectOption> getBuilds(GetOptionRequest request) {
         ZentaoProjectConfig projectConfig = getProjectConfig(request.getProjectConfig());
-        Map<String, Object> builds = zentaoClient.getBuildsByCreateMetaData(projectConfig.getZentaoId());
-        if (builds == null || builds.isEmpty()) {
-            builds = zentaoClient.getBuilds(projectConfig.getZentaoId());
-        }
-        List<SelectOption> res = new ArrayList<>();
-        builds.forEach((k, v) -> {
-            if (StringUtils.isNotBlank(k)) {
-                res.add(new SelectOption(v.toString(), k));
+        Map<String, Object> builds = null;
+        try {
+            builds = zentaoClient.getBuildsByCreateMetaData(projectConfig.getZentaoId());
+            if (builds == null || builds.isEmpty()) {
+                builds = zentaoClient.getBuilds(projectConfig.getZentaoId());
             }
-        });
+        } catch (Exception e) {
+            builds = zentaoClient.getBuildsV17(projectConfig.getZentaoId());
+        }
+
+        List<SelectOption> res = new ArrayList<>();
+        if (builds != null) {
+            builds.forEach((k, v) -> {
+                if (StringUtils.isNotBlank(k)) {
+                    res.add(new SelectOption(v.toString(), k));
+                }
+            });
+        }
         return res;
     }
 
@@ -513,7 +521,7 @@ public class ZentaoPlatform extends AbstractPlatform {
             } else {
                 String fileName = originSubUrl.substring(10);
                 // upload zentao
-                String id = uploadFile(new File(MD_IMAGE_DIR + "/" + fileName));
+                String id = zentaoClient.uploadFile(new File(MD_IMAGE_DIR + "/" + fileName));
                 // todo delete local file
                 int index = fileName.lastIndexOf(".");
                 String suffix = "";
@@ -527,33 +535,6 @@ public class ZentaoPlatform extends AbstractPlatform {
         // image link
         String netImgRegex = "!\\[(.*?)]\\((http.*?)\\)";
         return zentaoSteps.replaceAll(netImgRegex, "<img src=\"$2\" alt=\"$1\"/>");
-    }
-
-
-    private String uploadFile(File file) {
-        String id = "";
-        String session = zentaoClient.login();
-        HttpHeaders httpHeaders = new HttpHeaders();
-        MultiValueMap<String, Object> paramMap = new LinkedMultiValueMap<>();
-        paramMap.add("files", new FileSystemResource(file));
-        HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(paramMap, httpHeaders);
-        RestTemplate restTemplate = new RestTemplate();
-        try {
-            String fileUpload = zentaoClient.requestUrl.getFileUpload();
-            ResponseEntity<String> responseEntity = restTemplate.exchange(fileUpload, HttpMethod.POST, requestEntity,
-                    String.class, null, session);
-            String body = responseEntity.getBody();
-            Map obj = JSON.parseMap(body);
-            Map data = (Map) JSON.parseObject(obj.get("data").toString());
-            Set<String> set = data.keySet();
-            if (!set.isEmpty()) {
-                id = (String) set.toArray()[0];
-            }
-        } catch (Exception e) {
-            LogUtil.error(e, e.getMessage());
-        }
-        LogUtil.info("upload file id: " + id);
-        return id;
     }
 
     private String zentao2MsDescription(String ztDescription) {
@@ -723,8 +704,8 @@ public class ZentaoPlatform extends AbstractPlatform {
 
     private void handleBuildParam(MultiValueMap<String, Object> paramMap) {
         try {
-            List<Object> buildValue = paramMap.get("openedBuild[]");
-            paramMap.remove("openedBuild[]");
+            List<Object> buildValue = paramMap.get("openedBuild");
+            paramMap.remove("openedBuild");
             if (CollectionUtils.isNotEmpty(buildValue)) {
                 List<String> builds= JSON.parseArray(buildValue.get(0).toString(), String.class);
                 if (CollectionUtils.isNotEmpty(builds)) {
