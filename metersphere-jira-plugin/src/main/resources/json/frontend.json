@@ -2,7 +2,7 @@
   "serviceIntegration": {
     "label": "Jira",
     "image": "/static/index.png",
-    "tips": "使用指引：<br> 1. Jira software server 认证信息为 账号密码，Jira software cloud 认证信息为 账号+令牌(账户设置-安全-创建API令牌) <br> 2. 保存 Basic Auth 账号信息后，需要在 MeterSphere 项目中手动关联 ID/key 和缺陷模板 马上关联项目 <br> 3. 添加你的个人平台账号 马上添加",
+    "tips": "Jira software server 认证信息为 账号密码，Jira software cloud 认证信息为 账号+令牌(账户设置-安全-创建API令牌)",
     "formItems": [
       {
         "name": "account",

@@ -2,7 +2,7 @@
   "serviceIntegration": {
     "label": "Zentao",
     "image": "/static/index.jpg",
-    "tips": "使用指引：<br> 1. 账号密码为具有相应权限的Zentao账号，账号需要具有 超级model调用接口权限 <br> 2. 保存 Basic Auth 账号信息后，需要在 MeterSphere 项目中手动关联 ID/key 和缺陷模板 马上关联项目 <br> 3. 添加你的个人平台账号 马上添加",
+    "tips": "账号密码为具有相应权限的Zentao账号，账号需要具有 超级model调用接口权限",
     "formItems": [
       {
         "name": "account",
