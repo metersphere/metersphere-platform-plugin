@@ -618,11 +618,23 @@ public class JiraPlatform extends AbstractPlatform {
 
     @Override
     public List<PlatformStatusDTO> getStatusList(String projectConfig) {
-        return getPlatformStatus(jiraClientV2.getStatus());
+        List<PlatformStatusDTO> platformStatusDTOS = new ArrayList<>();
+        List<JiraTransitionsResponse.Transitions> transitions = jiraClientV2.getStatus();
+        if (CollectionUtils.isNotEmpty(transitions)) {
+            transitions.forEach(item -> {
+                PlatformStatusDTO platformStatusDTO = new PlatformStatusDTO();
+                platformStatusDTO.setLabel(item.getName());
+                platformStatusDTO.setValue(item.getName());
+                platformStatusDTOS.add(platformStatusDTO);
+            });
+        }
+        return platformStatusDTOS;
     }
 
-    public List<PlatformStatusDTO> getPlatformStatus(List<JiraTransitionsResponse.Transitions> transitions) {
+    @Override
+    public List<PlatformStatusDTO> getTransitions(String projectConfig, String issueKey) {
         List<PlatformStatusDTO> platformStatusDTOS = new ArrayList<>();
+        List<JiraTransitionsResponse.Transitions> transitions = jiraClientV2.getTransitions(issueKey);
         if (CollectionUtils.isNotEmpty(transitions)) {
             transitions.forEach(item -> {
                 PlatformStatusDTO platformStatusDTO = new PlatformStatusDTO();
@@ -632,11 +644,6 @@ public class JiraPlatform extends AbstractPlatform {
             });
         }
         return platformStatusDTOS;
-    }
-
-    @Override
-    public List<PlatformStatusDTO> getTransitions(String projectConfig, String issueKey) {
-        return getPlatformStatus(jiraClientV2.getTransitions(issueKey));
     }
 
     public List<PlatformCustomFieldItemDTO> getThirdPartCustomField(String projectConfigStr) {
