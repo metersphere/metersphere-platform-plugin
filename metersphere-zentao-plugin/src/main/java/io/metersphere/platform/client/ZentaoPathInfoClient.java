@@ -12,11 +12,11 @@ public class ZentaoPathInfoClient extends ZentaoClient {
     private static final String BUG_CREATE = "/api-getModel-bug-create.json?zentaosid=";
     private static final String BUG_UPDATE = "/api-getModel-bug-update-bugID={1}.json?zentaosid={2}";
     private static final String BUG_DELETE = "/bug-delete-{1}-yes.json?zentaosid={2}";
-    private static final String BUG_GET = "/api-getModel-bug-getById-bugID={1}?zentaosid={2}";
-    private static final String STORY_GET = "/api-getModel-story-getProductStories-productID={key}?zentaosid=";
+    private static final String BUG_GET = "/api-getModel-bug-getById-bugID={1}.json?zentaosid={2}";
+    private static final String STORY_GET = "/api-getModel-story-getProductStories-productID={key}.json?zentaosid=";
     private static final String USER_GET = "/api-getModel-user-getList.json?zentaosid=";
-    private static final String BUILDS_GET = "/api-getModel-build-getProductBuildPairs-productID={0}?zentaosid={1}";
-    private static final String BUILDS_GET_V17 = "/api-getModel-build-getBuildPairs-productID={0}?zentaosid={1}";
+    private static final String BUILDS_GET = "/api-getModel-build-getProductBuildPairs-productID={0}.json?zentaosid={1}";
+    private static final String BUILDS_GET_V17 = "/api-getModel-build-getBuildPairs-productID={0}.json?zentaosid={1}";
     private static final String CREATE_META_DATA="/bug-create-{0}.json?zentaosid={1}";
     private static final String FILE_UPLOAD = "/api-getModel-file-saveUpload-objectType=bug,objectID={1}.json?zentaosid={2}";
     private static final String FILE_DELETE = "/file-delete-{1}-.yes.json?zentaosid={2}";

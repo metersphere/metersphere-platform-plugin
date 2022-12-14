@@ -597,10 +597,10 @@ public class ZentaoPlatform extends AbstractPlatform {
 
                     if (Arrays.stream(imgArray).anyMatch(imgType -> StringUtils.equals(imgType, srcContent.substring(srcContent.indexOf('.') + 1)))) {
                         if (zentaoClient instanceof ZentaoGetClient) {
-                            path = zentaoClient.getBaseUrl() + "/index.php?m=file&f=read&fileID=" + srcContent;
+                            path = "/index.php?m=file&f=read&fileID=" + srcContent;
                         } else {
                             // 禅道开源版
-                            path = zentaoClient.getBaseUrl() + "/file-read-" + srcContent;
+                            path = "/file-read-" + srcContent;
                         }
                     } else {
                         return result;

@@ -235,7 +235,7 @@ public abstract class ZentaoClient extends BaseClient {
                 HttpMethod.GET, null, String.class, relateId, sessionId);
         try {
             Map data = ((Map) JSON.parseObject(JSON.parseMap(response.getBody()).get("data").toString()));
-            if (StringUtils.isNotBlank(((Map) data.get("product")).get("id").toString())) {
+            if (data.get("id") != null || ((Map) data.get("product")).get("id") != null) {
                 return;
             }
         } catch (Exception e) {
