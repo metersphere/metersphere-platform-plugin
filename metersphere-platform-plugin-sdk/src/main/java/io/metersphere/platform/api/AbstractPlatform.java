@@ -306,7 +306,12 @@ public abstract class AbstractPlatform implements Platform {
             if (endpoint.endsWith("/")) {
                 endpoint = endpoint.substring(0, endpoint.length() - 1);
             }
-            path = " <img src=\"" + endpoint + path + "\"/>";
+            String format = " <img src=\"%s\"/>";
+            if (path.trim().startsWith("http")) {
+                path = String.format(format, path);
+            } else {
+                path = String.format(format, endpoint + path);
+            }
             result = matcher.replaceFirst(path);
             matcher = pattern.matcher(result);
         }
