@@ -351,6 +351,13 @@ public class JiraPlatform extends AbstractPlatform {
                         fields.put(key, (Integer) field.get("id"));
                     } catch (Exception e) {}
                 }
+
+                if (StringUtils.equals(schema.getType(), "timetracking")) {
+                    Map newField = new LinkedHashMap<>();
+                    newField.put("originalEstimate", fields.get(key).toString());
+                    fields.put(key, newField);
+                }
+
                 if (isUserKey) {
                     if (schema.getType() != null && schema.getType().endsWith("user")) {
                         Map field = (Map) fields.get(key);
@@ -458,7 +465,6 @@ public class JiraPlatform extends AbstractPlatform {
 
         customFields.forEach(item -> {
             String fieldName = item.getCustomData();
-            String name = item.getName();
             if (StringUtils.isNotBlank(fieldName)) {
                 if (ObjectUtils.isNotEmpty(item.getValue())) {
                     if (StringUtils.isNotBlank(item.getType())) {
@@ -646,9 +652,9 @@ public class JiraPlatform extends AbstractPlatform {
         return platformStatusDTOS;
     }
 
+    @Override
     public List<PlatformCustomFieldItemDTO> getThirdPartCustomField(String projectConfigStr) {
         Set<String> ignoreSet = new HashSet() {{
-            add("timetracking");
             add("attachment");
         }};
         projectConfig = getProjectConfig(projectConfigStr);
@@ -662,7 +668,7 @@ public class JiraPlatform extends AbstractPlatform {
         for (String name : createMetadata.keySet()) {
             JiraCreateMetadataResponse.Field item = createMetadata.get(name);
             if (ignoreSet.contains(name)) {
-                continue;  // timetracking, attachment todo
+                continue;  // attachment todo
             }
             JiraCreateMetadataResponse.Schema schema = item.getSchema();
             PlatformCustomFieldItemDTO customField = new PlatformCustomFieldItemDTO();
@@ -760,7 +766,9 @@ public class JiraPlatform extends AbstractPlatform {
             // 系统字段
             value = fieldTypeMap.get(customField.getId());
             String type = schema.getType();
-            if ("user".equals(type)) {
+            if ("timetracking".equals(type)) {
+                value = CustomFieldType.INPUT.getValue();
+            } else if ("user".equals(type)) {
                 value = CustomFieldType.SELECT.getValue();
                 customField.setOptions(userOptions);
             } else if ("date".equals(type)) {
