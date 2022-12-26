@@ -11,7 +11,7 @@
         "required": true,
         "i18n": true,
         "label": "organization.integration.account",
-        "message": "organization.integration.input_api_account'"
+        "message": "organization.integration.input_api_account"
       },
       {
         "name": "password",
