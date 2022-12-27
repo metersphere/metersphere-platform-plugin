@@ -1005,7 +1005,12 @@ public class JiraPlatform extends AbstractPlatform {
         List<JiraIssue> jiraIssues;
         int currentSize;
 
-        this.defaultCustomFields = syncRequest.getDefaultCustomFields();
+        if (this.isThirdPartTemplate) {
+            super.defaultCustomFields = getCustomFieldsValuesString(getThirdPartCustomField(syncRequest.getProjectConfig()));
+        } else {
+            super.defaultCustomFields = syncRequest.getDefaultCustomFields();
+        }
+
         this.projectConfig = projectConfig;
 
         do {
