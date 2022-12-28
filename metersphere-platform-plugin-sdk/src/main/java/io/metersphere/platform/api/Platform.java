@@ -141,4 +141,18 @@ public interface Platform {
      * @return
      */
     List<PlatformStatusDTO> getTransitions(String projectConfig, String issueId);
+
+    /**
+     * 用例关联需求时调用
+     * 可在第三方平台添加用例和需求的关联关系
+     * @param request
+     */
+    void handleDemandUpdate(DemandUpdateRequest request);
+
+    /**
+     * 用例批量关联需求时调用
+     * 可在第三方平台添加用例和需求的关联关系
+     * @param request
+     */
+    void handleDemandUpdateBatch(DemandUpdateRequest request);
 }

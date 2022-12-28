@@ -347,4 +347,12 @@ public abstract class AbstractPlatform implements Platform {
     public List<PlatformStatusDTO> getTransitions(String projectConfig, String issueKey) {
         return this.getStatusList(projectConfig);
     }
+
+    @Override
+    public void handleDemandUpdate(DemandUpdateRequest request) {
+    }
+
+    @Override
+    public void handleDemandUpdateBatch(DemandUpdateRequest request) {
+    }
 }
