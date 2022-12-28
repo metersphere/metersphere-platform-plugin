@@ -153,6 +153,20 @@ public abstract class ZentaoClient extends BaseClient {
         return (Map<String, Object>) JSON.parseMap(response.getBody()).get("data");
     }
 
+    public Map<String, Object> getUsers() {
+        String sessionId = login();
+        ResponseEntity<String> response = restTemplate.exchange(requestUrl.getUserGet() + sessionId,
+                HttpMethod.GET, null, String.class);
+        return (Map<String, Object>) JSON.parseMap(response.getBody());
+    }
+
+    public Map<String, Object> getDemands(String projectKey) {
+        String sessionId = login();
+        ResponseEntity<String> response = restTemplate.exchange(requestUrl.getStoryGet() + sessionId,
+                HttpMethod.GET, null, String.class, projectKey);
+        return (Map<String, Object>) JSON.parseMap(response.getBody());
+    }
+
     public Map<String, Object> getBuildsV17(String projectId) {
         String sessionId = login();
         ResponseEntity<String> response = restTemplate.exchange(requestUrl.getBuildsGetV17(),
