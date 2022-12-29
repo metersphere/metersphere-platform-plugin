@@ -589,6 +589,10 @@ public class ZentaoPlatform extends AbstractPlatform {
                 } else {
                     name = name.replaceAll("&amp;", "&");
                     path = path.replaceAll("&amp;", "&");
+                    if (path.contains("/")) {
+                        String[] split = path.split("/");
+                        path = "/" + split[split.length - 1];
+                    }
                 }
                 StringBuilder stringBuilder = new StringBuilder();
                 for (String item : path.split("&")) {
