@@ -418,8 +418,6 @@ public class ZentaoPlatform extends AbstractPlatform {
 
             Map<String, Object> obj = zentaoClient.getDemands(projectConfig.getZentaoId());
 
-            LogUtil.info("project story: " + projectConfig.getZentaoId() + obj);
-
             if (obj != null) {
                 String data = obj.get("data").toString();
                 if (StringUtils.isBlank(data)) {
@@ -427,7 +425,7 @@ public class ZentaoPlatform extends AbstractPlatform {
                 }
                 // 兼容处理11.5版本格式 [{obj},{obj}]
                 if (data.charAt(0) == '[') {
-                    List array = (List) obj.get("data");
+                    List array = JSON.parseArray(data);
                     for (int i = 0; i < array.size(); i++) {
                         Map o = (Map) array.get(i);
                         DemandDTO demandDTO = new DemandDTO();
@@ -478,7 +476,7 @@ public class ZentaoPlatform extends AbstractPlatform {
                 }
             }
         } catch (Exception e) {
-            LogUtil.error("get zentao demand fail " + e.getMessage());
+            LogUtil.error("get zentao demand fail: ", e);
         }
         return list;
     }
