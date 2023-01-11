@@ -134,7 +134,9 @@ public abstract class AbstractPlatform implements Platform {
 
     protected List<PlatformCustomFieldItemDTO> syncIssueCustomFieldList(List<PlatformCustomFieldItemDTO> customFields, Map issue) {
         Set<String> names = issue.keySet();
-        customFields.forEach(item -> {
+        Iterator<PlatformCustomFieldItemDTO> iterator = customFields.iterator();
+        while (iterator.hasNext()) {
+            PlatformCustomFieldItemDTO item = iterator.next();
             String fieldName = item.getCustomData();
             Object value = issue.get(fieldName);
             if (value != null) {
@@ -174,6 +176,9 @@ public abstract class AbstractPlatform implements Platform {
                 } else {
                     item.setValue(null);
                 }
+            } else if (!this.isThirdPartTemplate) {
+                // 如果不是第三方模板，并且不是需要更新的模板字段，则去掉，否则空值会覆盖原字段的值
+                iterator.remove();
             } else {
                 try {
                     if (item.getValue() != null) {
@@ -183,7 +188,7 @@ public abstract class AbstractPlatform implements Platform {
                     LogUtil.error(e);
                 }
             }
-        });
+        }
         return customFields;
     }
 
