@@ -89,7 +89,7 @@ public class PluginManager {
             Class<T> clazz = getImplClass(pluginId, superClazz);
             return clazz.getConstructor().newInstance();
         } catch (InvocationTargetException e) {
-            LogUtil.error(e);
+            LogUtil.error(e.getTargetException());
             MSPluginException.throwException(e.getTargetException());
         } catch (Exception e) {
             LogUtil.error(e);
@@ -103,7 +103,7 @@ public class PluginManager {
             Class<T> clazz = getImplClass(pluginId, superClazz);
             return clazz.getConstructor(param.getClass()).newInstance(param);
         } catch (InvocationTargetException e) {
-            LogUtil.error(e);
+            LogUtil.error(e.getTargetException());
             MSPluginException.throwException(e.getTargetException());
         } catch (Exception e) {
             LogUtil.error(e);
