@@ -12,6 +12,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.SystemDefaultRoutePlanner;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
@@ -35,7 +36,7 @@ public abstract class BaseClient {
             SSLConnectionSocketFactory csf = new SSLConnectionSocketFactory(sslContext);
             CloseableHttpClient httpClient = HttpClients.custom()
                     // 可以支持设置系统代理
-//                    .setRoutePlanner(new SystemDefaultRoutePlanner(new EnvProxySelector()))
+                    .setRoutePlanner(new SystemDefaultRoutePlanner(new EnvProxySelector()))
                     .setSSLSocketFactory(csf)
                     .build();
             HttpComponentsClientHttpRequestFactory requestFactory = new HttpComponentsClientHttpRequestFactory();
@@ -50,8 +51,8 @@ public abstract class BaseClient {
     protected  HttpHeaders getBasicHttpHeaders(String userName, String passWd) {
         String authKey = EncryptUtils.base64Encoding(userName + ":" + passWd);
         HttpHeaders headers = new HttpHeaders();
-        headers.add("Authorization", "Basic " + authKey);
-        headers.add("Accept", "application/json");
+        headers.setBasicAuth(authKey);
+        headers.add(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE);
         return headers;
     }
 
