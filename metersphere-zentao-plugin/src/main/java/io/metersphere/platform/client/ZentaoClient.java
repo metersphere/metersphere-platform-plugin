@@ -11,7 +11,6 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.*;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestTemplate;
 
 import java.io.File;
 import java.util.Map;
@@ -181,7 +180,6 @@ public abstract class ZentaoClient extends BaseClient {
         MultiValueMap<String, Object> paramMap = new LinkedMultiValueMap<>();
         paramMap.add("files", new FileSystemResource(file));
         HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(paramMap, httpHeaders);
-        RestTemplate restTemplate = new RestTemplate();
         try {
             ResponseEntity<String> responseEntity = restTemplate.exchange(requestUrl.getFileUpload(), HttpMethod.POST, requestEntity,
                     String.class, null, sessionId);
