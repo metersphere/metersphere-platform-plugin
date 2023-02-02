@@ -2,14 +2,36 @@
   "serviceIntegration": {
     "label": "Jira",
     "image": "/static/index.png",
-    "tips": "Jira software server 认证信息为 账号密码，Jira software cloud 认证信息为 账号+令牌(账户设置-安全-创建API令牌)",
+    "tips": "私有化部署选择 Basic Auth 填写账号密码，选择 Bearer Token 填写 Token </br> Sass 版本只能选择 Basic Auth，填写（账号 + 密码）或者（账号+令牌）(账户设置-安全-创建API令牌)",
     "formItems": [
+      {
+        "name": "authType",
+        "type": "select",
+        "defaultValue": "basic",
+        "required": true,
+        "i18n": true,
+        "options": [
+          {
+            "text": "Basic Auth",
+            "value": "basic"
+          },
+          {
+            "text": "Bearer Token",
+            "value": "bearer"
+          }
+        ],
+        "label": "api_test.definition.request.verification_method"
+      },
       {
         "name": "account",
         "type": "input",
         "defaultValue": "",
         "required": true,
         "i18n": true,
+        "displayConditions": {
+          "field": "authType",
+          "value": "basic"
+        },
         "label": "organization.integration.account",
         "message": "organization.integration.input_api_account"
       },
@@ -19,8 +41,25 @@
         "defaultValue": "",
         "required": true,
         "i18n": true,
-        "label": "Token",
+        "displayConditions": {
+          "field": "authType",
+          "value": "basic"
+        },
+        "label": "organization.integration.password",
         "message": "organization.integration.input_api_password"
+      },
+      {
+        "name": "token",
+        "type": "password",
+        "defaultValue": "",
+        "required": true,
+        "i18n": true,
+        "displayConditions": {
+          "field": "authType",
+          "value": "bearer"
+        },
+        "label": "Token",
+        "message": "organization.integration.input_token"
       },
       {
         "name": "url",
@@ -75,11 +114,33 @@
     "i18n": true,
     "formItems": [
       {
+        "name": "authType",
+        "type": "select",
+        "defaultValue": "basic",
+        "required": false,
+        "i18n": true,
+        "options": [
+          {
+            "text": "Basic Auth",
+            "value": "basic"
+          },
+          {
+            "text": "Bearer Token",
+            "value": "bearer"
+          }
+        ],
+        "label": "api_test.definition.request.verification_method"
+      },
+      {
         "name": "jiraAccount",
         "type": "input",
         "defaultValue": "",
         "required": false,
         "i18n": true,
+        "displayConditions": {
+          "field": "authType",
+          "value": "basic"
+        },
         "label": "organization.integration.account",
         "message": "organization.integration.input_api_account"
       },
@@ -89,8 +150,25 @@
         "defaultValue": "",
         "required": false,
         "i18n": true,
-        "label": "Token",
+        "displayConditions": {
+          "field": "authType",
+          "value": "basic"
+        },
+        "label": "organization.integration.password",
         "message": "organization.integration.input_api_password"
+      },
+      {
+        "name": "token",
+        "type": "password",
+        "defaultValue": "",
+        "required": false,
+        "i18n": true,
+        "displayConditions": {
+          "field": "authType",
+          "value": "bearer"
+        },
+        "label": "Token",
+        "message": "organization.integration.input_token"
       }
     ]
   }

@@ -8,4 +8,6 @@ import lombok.Setter;
 public class JiraUserPlatformInfo {
     private String jiraAccount;
     private String jiraPassword;
+    private String token;
+    private String authType;
 }

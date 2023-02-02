@@ -77,8 +77,14 @@ public class JiraPlatform extends AbstractPlatform {
         JiraConfig config = getIntegrationConfig();
         JiraUserPlatformInfo userInfo = StringUtils.isBlank(userPlatformInfo) ? new JiraUserPlatformInfo()
                 :  JSON.parseObject(userPlatformInfo, JiraUserPlatformInfo.class);
+        if (StringUtils.isNotBlank(userInfo.getAuthType()) && StringUtils.isNotBlank(userInfo.getToken())) {
+            config.setAuthType(userInfo.getAuthType());
+            config.setToken(userInfo.getToken());
+        }
         if (StringUtils.isNotBlank(userInfo.getJiraAccount())
                 && StringUtils.isNotBlank(userInfo.getJiraPassword())) {
+            // 历史数据 authType 为空
+            config.setAuthType(userInfo.getAuthType());
             config.setAccount(userInfo.getJiraAccount());
             config.setPassword(userInfo.getJiraPassword());
         }

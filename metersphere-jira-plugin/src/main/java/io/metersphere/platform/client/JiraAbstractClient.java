@@ -27,6 +27,10 @@ public abstract class JiraAbstractClient extends BaseClient {
 
     protected  String PASSWD;
 
+    protected  String TOKEN;
+
+    protected  String AUTH_TYPE;
+
     public JiraIssue getIssues(String issuesId) {
         LogUtil.info("getIssues: " + issuesId);
         ResponseEntity<String> responseEntity;
@@ -210,10 +214,10 @@ public abstract class JiraAbstractClient extends BaseClient {
     }
 
     protected HttpHeaders getAuthHeader() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(PASSWD);
-        headers.add(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE);
-        return headers;
+        if (StringUtils.isNotBlank(AUTH_TYPE) && StringUtils.equals(AUTH_TYPE, "bearer")) {
+            return getBearHttpHeaders(TOKEN);
+        }
+        return getBasicHttpHeaders(USER_NAME, PASSWD);
     }
 
     protected HttpHeaders getAuthJsonHeader() {
@@ -242,6 +246,8 @@ public abstract class JiraAbstractClient extends BaseClient {
         ENDPOINT = url;
         USER_NAME = config.getAccount();
         PASSWD = config.getPassword();
+        TOKEN = config.getToken();
+        AUTH_TYPE = config.getAuthType();
     }
 
     public JiraIssueListResponse getProjectIssues(Integer startAt, Integer maxResults, String projectKey, String issueType) {
