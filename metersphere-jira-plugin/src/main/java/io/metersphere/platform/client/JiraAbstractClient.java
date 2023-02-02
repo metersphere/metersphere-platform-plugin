@@ -210,7 +210,10 @@ public abstract class JiraAbstractClient extends BaseClient {
     }
 
     protected HttpHeaders getAuthHeader() {
-        return getBasicHttpHeaders(USER_NAME, PASSWD);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(PASSWD);
+        headers.add(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE);
+        return headers;
     }
 
     protected HttpHeaders getAuthJsonHeader() {
