@@ -341,14 +341,14 @@ public class JiraPlatform extends AbstractPlatform {
             for (String key : createMetadata.keySet()) {
                 JiraCreateMetadataResponse.Field item = createMetadata.get(key);
                 JiraCreateMetadataResponse.Schema schema = item.getSchema();
-                if (schema == null) {
+                if (schema == null || fields.get(key) == null) {
                     continue;
                 }
                 if (schema.getCustom() != null && schema.getCustom().endsWith("sprint")) {
                     try {
                         Map field = (Map) fields.get(key);
                         // sprint 传参数比较特殊，需要要传数值
-                        fields.put(key, (Integer) field.get("id"));
+                        fields.put(key, field.get("id"));
                     } catch (Exception e) {}
                 }
 
