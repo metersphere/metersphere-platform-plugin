@@ -1,8 +1,8 @@
 package io.metersphere.platform.client;
 
-import im.metersphere.plugin.exception.MSPluginException;
-import im.metersphere.plugin.utils.JSON;
-import im.metersphere.plugin.utils.LogUtil;
+import io.metersphere.plugin.exception.MSPluginException;
+import io.metersphere.plugin.utils.JSON;
+import io.metersphere.plugin.utils.LogUtil;
 import io.metersphere.platform.api.BaseClient;
 import io.metersphere.platform.domain.*;
 import io.metersphere.platform.utils.UnicodeConvertUtils;
@@ -291,7 +291,7 @@ public abstract class ZentaoClient extends BaseClient {
     }
 
     public ResponseEntity proxyForGet(String path, Class responseEntityClazz) {
-        im.metersphere.plugin.utils.LogUtil.info("zentao proxyForGet: " + path);
+        LogUtil.info("zentao proxyForGet: " + path);
         String url = this.ENDPOINT + path;
         validateProxyUrl(url, "/index.php", "/file-read-");
         return restTemplate.exchange(url, HttpMethod.GET, null, responseEntityClazz);

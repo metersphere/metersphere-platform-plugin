@@ -1,6 +1,6 @@
 package io.metersphere.platform.utils;
 
-import im.metersphere.plugin.utils.LogUtil;
+import io.metersphere.plugin.utils.LogUtil;
 
 import java.text.SimpleDateFormat;
 import java.util.Calendar;

@@ -1,19 +1,16 @@
 package io.metersphere.platform.impl;
 
-
-
-import im.metersphere.plugin.exception.MSPluginException;
-import im.metersphere.plugin.utils.JSON;
-import im.metersphere.plugin.utils.LogUtil;
-
-import io.metersphere.platform.utils.BeanUtils;
-
 import io.metersphere.base.domain.IssuesWithBLOBs;
 import io.metersphere.platform.api.AbstractPlatform;
 import io.metersphere.platform.client.JiraClientV2;
 import io.metersphere.platform.constants.AttachmentSyncType;
 import io.metersphere.platform.constants.CustomFieldType;
 import io.metersphere.platform.domain.*;
+import io.metersphere.platform.utils.BeanUtils;
+
+import io.metersphere.plugin.exception.MSPluginException;
+import io.metersphere.plugin.utils.JSON;
+import io.metersphere.plugin.utils.LogUtil;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang3.ObjectUtils;

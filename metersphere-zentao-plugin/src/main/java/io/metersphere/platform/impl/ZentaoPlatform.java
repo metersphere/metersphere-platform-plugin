@@ -1,8 +1,8 @@
 package io.metersphere.platform.impl;
 
-import im.metersphere.plugin.exception.MSPluginException;
-import im.metersphere.plugin.utils.JSON;
-import im.metersphere.plugin.utils.LogUtil;
+import io.metersphere.plugin.exception.MSPluginException;
+import io.metersphere.plugin.utils.JSON;
+import io.metersphere.plugin.utils.LogUtil;
 import io.metersphere.base.domain.IssuesWithBLOBs;
 import io.metersphere.platform.api.AbstractPlatform;
 import io.metersphere.platform.client.ZentaoClient;

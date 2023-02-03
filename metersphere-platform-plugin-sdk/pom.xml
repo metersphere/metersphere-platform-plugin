@@ -18,7 +18,7 @@
         <dependency>
             <groupId>io.metersphere</groupId>
             <artifactId>metersphere-plugin-sdk</artifactId>
-            <version>1.1.0</version>
+            <version>1.2.0</version>
         </dependency>
 
         <dependency>
@@ -43,7 +43,7 @@
             <groupId>io.metersphere</groupId>
             <artifactId>domain</artifactId>
             <!--    MS 会排除这个依赖    -->
-            <version>2.6</version>
+            <version>main</version>
             <exclusions>
                 <exclusion>
                     <groupId>org.springframework.boot</groupId>

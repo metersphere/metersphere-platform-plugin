@@ -1,8 +1,8 @@
 package io.metersphere.platform.client;
 
-import im.metersphere.plugin.exception.MSPluginException;
-import im.metersphere.plugin.utils.JSON;
-import im.metersphere.plugin.utils.LogUtil;
+import io.metersphere.plugin.exception.MSPluginException;
+import io.metersphere.plugin.utils.JSON;
+import io.metersphere.plugin.utils.LogUtil;
 import io.metersphere.platform.api.BaseClient;
 import io.metersphere.platform.domain.*;
 import org.apache.commons.lang3.StringUtils;

@@ -1,6 +1,6 @@
 package io.metersphere.platform.loader;
 
-import im.metersphere.plugin.loader.PluginManager;
+import io.metersphere.plugin.loader.PluginManager;
 import io.metersphere.platform.api.Platform;
 import io.metersphere.platform.api.PluginMetaInfo;
 import io.metersphere.platform.domain.PlatformRequest;

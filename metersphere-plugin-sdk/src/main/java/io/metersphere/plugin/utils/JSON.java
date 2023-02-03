@@ -1,4 +1,4 @@
-package im.metersphere.plugin.utils;
+package io.metersphere.plugin.utils;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;

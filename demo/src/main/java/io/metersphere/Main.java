@@ -1,7 +1,7 @@
 package io.metersphere;
 
-import im.metersphere.plugin.loader.PluginManager;
-import im.metersphere.plugin.storage.LocalStorageStrategy;
+import io.metersphere.plugin.loader.PluginManager;
+import io.metersphere.plugin.storage.LocalStorageStrategy;
 import io.metersphere.platform.api.Platform;
 import io.metersphere.platform.domain.GetOptionRequest;
 import io.metersphere.platform.domain.PlatformRequest;

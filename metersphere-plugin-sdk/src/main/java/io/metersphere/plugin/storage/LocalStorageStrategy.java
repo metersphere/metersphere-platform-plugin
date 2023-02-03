@@ -1,4 +1,4 @@
-package im.metersphere.plugin.storage;
+package io.metersphere.plugin.storage;
 import org.apache.commons.io.FileUtils;
 
 import java.io.*;
