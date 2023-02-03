@@ -1,6 +1,6 @@
-package im.metersphere.plugin.exception;
+package io.metersphere.plugin.exception;
 
-import im.metersphere.plugin.utils.LogUtil;
+import io.metersphere.plugin.utils.LogUtil;
 
 import java.lang.reflect.Constructor;
 

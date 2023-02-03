@@ -1,4 +1,4 @@
-package im.metersphere.plugin.storage;
+package io.metersphere.plugin.storage;
 
 import java.io.IOException;
 import java.io.InputStream;

@@ -1,7 +1,7 @@
-package im.metersphere.plugin.loader;
+package io.metersphere.plugin.loader;
 
-import im.metersphere.plugin.storage.StorageStrategy;
-import im.metersphere.plugin.utils.LogUtil;
+import io.metersphere.plugin.storage.StorageStrategy;
+import io.metersphere.plugin.utils.LogUtil;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.*;

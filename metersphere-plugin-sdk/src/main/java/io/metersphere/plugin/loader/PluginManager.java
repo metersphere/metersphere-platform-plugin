@@ -1,8 +1,8 @@
-package im.metersphere.plugin.loader;
+package io.metersphere.plugin.loader;
 
-import im.metersphere.plugin.exception.MSPluginException;
-import im.metersphere.plugin.storage.StorageStrategy;
-import im.metersphere.plugin.utils.LogUtil;
+import io.metersphere.plugin.exception.MSPluginException;
+import io.metersphere.plugin.storage.StorageStrategy;
+import io.metersphere.plugin.utils.LogUtil;
 
 import java.io.IOException;
 import java.io.InputStream;
