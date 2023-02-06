@@ -142,11 +142,6 @@ public abstract class AbstractPlatform implements Platform {
             if (value != null) {
                 if (value instanceof Map) {
                     item.setValue(getSyncJsonParamValue(value));
-                    if (StringUtils.equals(fieldName, "assignee")) {
-                        item.setValue(((Map) value).get("displayName"));
-                    } else {
-                        item.setValue(getSyncJsonParamValue(value));
-                    }
                 } else if (value instanceof List) {
                     // Sprint 是单选 同步回来是 JSONArray
                     if (StringUtils.equals(item.getType(), "select")) {
@@ -171,7 +166,7 @@ public abstract class AbstractPlatform implements Platform {
                     item.setValue(value);
                 }
             } else if (names.contains(fieldName)) {
-                if (item.getType().equals(CustomFieldType.CHECKBOX.getValue())) {
+                if (StringUtils.isNotBlank(item.getType()) && item.getType().equals(CustomFieldType.CHECKBOX.getValue())) {
                     item.setValue(new ArrayList<>());
                 } else {
                     item.setValue(null);

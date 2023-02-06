@@ -38,7 +38,6 @@ public class JiraPlatform extends AbstractPlatform {
 
     protected SimpleDateFormat sdfWithZone = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
 
-    protected Boolean isSass = false;
     protected JiraProjectConfig projectConfig;
 
     private Set<String> jiraImageFileNames;
@@ -55,9 +54,6 @@ public class JiraPlatform extends AbstractPlatform {
     public JiraConfig setConfig() {
         JiraConfig config = getIntegrationConfig();
         validateConfig(config);
-        if (config.getUrl().contains(".atlassian.net")) {
-            this.isSass = true;
-        }
         jiraClientV2.setConfig(config);
         return config;
     }
@@ -114,7 +110,6 @@ public class JiraPlatform extends AbstractPlatform {
             // 先转换下desc的图片
             String description = dealWithDescription(Optional.ofNullable(fields.get("description")).orElse("").toString(), fileContentMap);
             fields.put("description", description);
-            // todo check
             List<PlatformCustomFieldItemDTO> customFieldItems = syncIssueCustomFieldList(issue.getCustomFieldList(), jiraIssue.getFields());
 
             // 其他自定义里有富文本框的也转换下图片
@@ -337,12 +332,6 @@ public class JiraPlatform extends AbstractPlatform {
 
         try {
             Map<String, JiraCreateMetadataResponse.Field> createMetadata = jiraClientV2.getCreateMetadata(projectConfig.getJiraKey(), projectConfig.getJiraIssueTypeId());
-            List<JiraUser> userOptions = jiraClientV2.getAssignableUser(projectConfig.getJiraKey());
-
-            Boolean isUserKey = false;
-            if (CollectionUtils.isNotEmpty(userOptions) && StringUtils.isBlank(userOptions.get(0).getAccountId())) {
-                isUserKey = true;
-            }
 
             for (String key : createMetadata.keySet()) {
                 JiraCreateMetadataResponse.Field item = createMetadata.get(key);
@@ -364,20 +353,24 @@ public class JiraPlatform extends AbstractPlatform {
                     fields.put(key, newField);
                 }
 
-                if (isUserKey) {
-                    if (schema.getType() != null && schema.getType().endsWith("user")) {
-                        Map field = (Map) fields.get(key);
-                        // 如果不是用户ID，则是用户的key，参数调整为key
-                        Map newField = new LinkedHashMap<>();
-                        newField.put("name", field.get("id").toString());
-                        fields.put(key, newField);
-                    }
-                    if (schema.getCustom() != null && schema.getCustom().endsWith("multiuserpicker")) { // 多选用户列表
-                        try {
-                            List<Map> userItems = (List) fields.get(key);
-                            userItems.forEach(i -> i.put("name", i.get("id")));
-                        } catch (Exception e) {LogUtil.error(e);}
-                    }
+                if (schema.getType() != null && schema.getType().endsWith("user")) {
+                    Map field = (Map) fields.get(key);
+                    // 如果不是用户ID，则是用户的key，参数调整为key
+                    Map newField = new LinkedHashMap<>();
+                    // name 是私有化部署使用
+                    newField.put("name", field.get("id").toString());
+                    // id 是sass使用
+                    newField.put("id", field.get("id").toString());
+                    fields.put(key, newField);
+                }
+                if (schema.getCustom() != null && schema.getCustom().endsWith("multiuserpicker")) { // 多选用户列表
+                    try {
+                        List<Map> userItems = (List) fields.get(key);
+                        userItems.forEach(i -> {
+                            i.put("name", i.get("id"));
+                            i.put("id", i.get("id"));
+                        });
+                    } catch (Exception e) {LogUtil.error(e);}
                 }
             }
         } catch (Exception e) {
@@ -476,15 +469,7 @@ public class JiraPlatform extends AbstractPlatform {
                     if (StringUtils.isNotBlank(item.getType())) {
                         if (StringUtils.equalsAny(item.getType(), "select", "radio", "member")) {
                             Map param = new LinkedHashMap<>();
-                            if (fieldName.equals("assignee") || fieldName.equals("reporter")) {
-                                if (isThirdPartTemplate || isSass) {
-                                    param.put("id", item.getValue());
-                                } else {
-                                    param.put("accountId", item.getValue());
-                                }
-                            } else {
-                                param.put("id", item.getValue());
-                            }
+                            param.put("id", item.getValue());
                             fields.put(fieldName, param);
                         } else if (StringUtils.equalsAny(item.getType(),  "multipleSelect", "checkbox", "multipleMember")) {
                             List attrs = new ArrayList();
