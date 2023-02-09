@@ -1,6 +1,7 @@
 package io.metersphere.platform.impl;
 
 
+import io.metersphere.platform.utils.BeanUtils;
 import io.metersphere.plugin.exception.MSPluginException;
 import io.metersphere.plugin.utils.JSON;
 import io.metersphere.plugin.utils.LogUtil;
@@ -43,6 +44,12 @@ public class JiraPlatform extends AbstractPlatform {
     private Set<String> jiraImageFileNames;
 
     private static final String ATTACHMENT_NAME = "attachment";
+    private static final String SPRINT_FIELD_NAME = "sprint";
+    private static final String DESCRIPTION_FIELD_NAME = "description";
+    private static final String SUMMARY_FIELD_NAME = "summary";
+    private static final String TIME_TRACKING_FIELD_NAME = "timetracking";
+    private static final String ORIGINAL_ESTIMATE_TRACKING_FIELD_NAME = "originalEstimate";
+    private static final String REMAINING_ESTIMATE_TRACKING_FIELD_NAME = "remainingEstimate";
 
     public JiraPlatform(PlatformRequest request) {
         super.key = JiraPlatformMetaInfo.KEY;
@@ -72,7 +79,7 @@ public class JiraPlatform extends AbstractPlatform {
     public JiraConfig setUserConfig(String userPlatformInfo) {
         JiraConfig config = getIntegrationConfig();
         JiraUserPlatformInfo userInfo = StringUtils.isBlank(userPlatformInfo) ? new JiraUserPlatformInfo()
-                :  JSON.parseObject(userPlatformInfo, JiraUserPlatformInfo.class);
+                : JSON.parseObject(userPlatformInfo, JiraUserPlatformInfo.class);
         if (StringUtils.isNotBlank(userInfo.getAuthType()) && StringUtils.isNotBlank(userInfo.getToken())) {
             config.setAuthType(userInfo.getAuthType());
             config.setToken(userInfo.getToken());
@@ -105,16 +112,18 @@ public class JiraPlatform extends AbstractPlatform {
             Map fields = jiraIssue.getFields();
             String status = getStatus(fields);
 
-            Map<String, String> fileContentMap = getContextMap((List) fields.get("attachment"));
+            Map<String, String> fileContentMap = getContextMap((List) fields.get(ATTACHMENT_NAME));
 
             // 先转换下desc的图片
-            String description = dealWithDescription(Optional.ofNullable(fields.get("description")).orElse("").toString(), fileContentMap);
-            fields.put("description", description);
+            String description = dealWithDescription(Optional.ofNullable(fields.get(DESCRIPTION_FIELD_NAME)).orElse("").toString(), fileContentMap);
+            fields.put(DESCRIPTION_FIELD_NAME, description);
             List<PlatformCustomFieldItemDTO> customFieldItems = syncIssueCustomFieldList(issue.getCustomFieldList(), jiraIssue.getFields());
+
+            parseSpecialCustomField(customFieldItems, fields);
 
             // 其他自定义里有富文本框的也转换下图片
             for (PlatformCustomFieldItemDTO item : customFieldItems) {
-                if (!StringUtils.equals("description", item.getId())) {
+                if (!StringUtils.equals(DESCRIPTION_FIELD_NAME, item.getId())) {
                     // desc转过了，跳过
                     if (StringUtils.equals(CustomFieldType.RICH_TEXT.getValue(), item.getType())) {
                         item.setValue(dealWithDescription((String) item.getValue(), fileContentMap));
@@ -123,7 +132,7 @@ public class JiraPlatform extends AbstractPlatform {
             }
 
             Map assignee = (Map) fields.get("assignee");
-            issue.setTitle(fields.get("summary").toString());
+            issue.setTitle(fields.get(SUMMARY_FIELD_NAME).toString());
             issue.setLastmodify(assignee == null ? "" : assignee.get("displayName").toString());
             issue.setDescription(description);
             issue.setPlatformStatus(status);
@@ -143,15 +152,58 @@ public class JiraPlatform extends AbstractPlatform {
         }
     }
 
+    private void parseSpecialCustomField(List<PlatformCustomFieldItemDTO> customFieldItems, Map fields) {
+        for (PlatformCustomFieldItemDTO customFieldItem : customFieldItems) {
+            Object value = customFieldItem.getValue();
+            try {
+                // 解析 sprint 的 ID 重新设置
+                if (value != null && value instanceof List) {
+                    List arrayValue = (List) value;
+                    if (CollectionUtils.isEmpty(arrayValue)) {
+                        continue;
+                    }
+                    String valueStr = arrayValue.get(0).toString();
+                    if (!StringUtils.contains(valueStr, "sprint")) {
+                        continue;
+                    }
+
+                    String idRegex = "(id=\\d+,)";
+                    Pattern pattern = Pattern.compile(idRegex);
+                    Matcher matcher = pattern.matcher(valueStr);
+
+                    if (matcher.find()) {
+                        valueStr = matcher.group();
+                        valueStr = valueStr.substring(3, valueStr.length() - 1);
+                    }
+                    customFieldItem.setValue(valueStr);
+
+                }
+
+                // 设置 时间跟踪
+                if (StringUtils.equals(customFieldItem.getId(), ORIGINAL_ESTIMATE_TRACKING_FIELD_NAME)) {
+                    Map timeTracking = (Map) fields.get(TIME_TRACKING_FIELD_NAME);
+                    customFieldItem.setValue(timeTracking.get(ORIGINAL_ESTIMATE_TRACKING_FIELD_NAME));
+                }
+
+                if (StringUtils.equals(customFieldItem.getId(), REMAINING_ESTIMATE_TRACKING_FIELD_NAME)) {
+                    Map timeTracking = (Map) fields.get(TIME_TRACKING_FIELD_NAME);
+                    customFieldItem.setValue(timeTracking.get(REMAINING_ESTIMATE_TRACKING_FIELD_NAME));
+                }
+            } catch (Exception e) {
+                LogUtil.error(e);
+            }
+        }
+    }
+
     private String dealWithDescription(String description, Map<String, String> fileContentMap) {
         if (StringUtils.isBlank(description)) {
             return description;
         }
 
         description = description.replaceAll("!image", "\n!image");
-        String[] splitStrs = description.split("\\n");
-        for (int j = 0; j < splitStrs.length; j++) {
-            String splitStr = splitStrs[j];
+        String[] splits = description.split("\\n");
+        for (int j = 0; j < splits.length; j++) {
+            String splitStr = splits[j];
             if (StringUtils.isNotEmpty(splitStr)) {
                 List<String> keys = fileContentMap.keySet().stream().filter(key -> splitStr.contains(key)).collect(Collectors.toList());
                 if (CollectionUtils.isNotEmpty(keys)) {
@@ -226,7 +278,7 @@ public class JiraPlatform extends AbstractPlatform {
                 Map o = (Map) demands.get(i);
                 String issueKey = o.get("key").toString();
                 Map fields = (Map) o.get("fields");
-                String summary = fields.get("summary").toString();
+                String summary = fields.get(SUMMARY_FIELD_NAME).toString();
                 DemandDTO demandDTO = new DemandDTO();
                 demandDTO.setName(summary);
                 demandDTO.setId(issueKey);
@@ -260,7 +312,7 @@ public class JiraPlatform extends AbstractPlatform {
     }
 
     @Override
-    public List<SelectOption> getFormOptions(GetOptionRequest request)  {
+    public List<SelectOption> getFormOptions(GetOptionRequest request) {
         return getFormOptions(this, request);
     }
 
@@ -272,6 +324,7 @@ public class JiraPlatform extends AbstractPlatform {
 
     /**
      * 由 getFormOptions 反射调用
+     *
      * @return
      */
     public List<SelectOption> getIssueTypes(GetOptionRequest request) {
@@ -314,7 +367,7 @@ public class JiraPlatform extends AbstractPlatform {
             if (StringUtils.isNotBlank(fieldName)) {
                 if (item.getValue() != null) {
                     if (StringUtils.isNotBlank(item.getType())) {
-                        if (StringUtils.equalsAny(item.getType(),  "richText")) {
+                        if (StringUtils.equalsAny(item.getType(), "richText")) {
                             files.addAll(getImageFiles(item.getValue().toString()));
                         }
                     }
@@ -326,6 +379,7 @@ public class JiraPlatform extends AbstractPlatform {
 
     /**
      * 参数比较特殊，需要特别处理
+     *
      * @param fields
      */
     private void setSpecialParam(Map fields) {
@@ -336,41 +390,52 @@ public class JiraPlatform extends AbstractPlatform {
             for (String key : createMetadata.keySet()) {
                 JiraCreateMetadataResponse.Field item = createMetadata.get(key);
                 JiraCreateMetadataResponse.Schema schema = item.getSchema();
+
+                if (StringUtils.equals(key, TIME_TRACKING_FIELD_NAME)) {
+                    Map newField = new LinkedHashMap<>();
+                    // originalEstimate -> 2d 转成 timetracking : { originalEstimate: 2d}
+                    newField.put(ORIGINAL_ESTIMATE_TRACKING_FIELD_NAME, fields.get(ORIGINAL_ESTIMATE_TRACKING_FIELD_NAME));
+                    newField.put(REMAINING_ESTIMATE_TRACKING_FIELD_NAME, fields.get(REMAINING_ESTIMATE_TRACKING_FIELD_NAME));
+                    fields.put(key, newField);
+                    fields.remove(ORIGINAL_ESTIMATE_TRACKING_FIELD_NAME);
+                    fields.remove(REMAINING_ESTIMATE_TRACKING_FIELD_NAME);
+                }
+
                 if (schema == null || fields.get(key) == null) {
                     continue;
                 }
-                if (schema.getCustom() != null && schema.getCustom().endsWith("sprint")) {
-                    try {
+
+                if (schema.getCustom() != null) {
+                    if (schema.getCustom().endsWith(SPRINT_FIELD_NAME)) {
+
                         Map field = (Map) fields.get(key);
-                        // sprint 传参数比较特殊，需要要传数值
-                        fields.put(key, field.get("id"));
-                    } catch (Exception e) {}
-                }
+                        Object id = field.get("id");
+                        if (id != null) {
+                            // sprint 传参数比较特殊，需要要传数值
+                            fields.put(key, Integer.parseInt(id.toString()));
+                        }
 
-                if (StringUtils.equals(schema.getType(), "timetracking")) {
-                    Map newField = new LinkedHashMap<>();
-                    newField.put("originalEstimate", fields.get(key).toString());
-                    fields.put(key, newField);
-                }
+                    } else if (schema.getCustom().endsWith("multiuserpicker")) { // 多选用户列表
 
-                if (schema.getType() != null && schema.getType().endsWith("user")) {
-                    Map field = (Map) fields.get(key);
-                    // 如果不是用户ID，则是用户的key，参数调整为key
-                    Map newField = new LinkedHashMap<>();
-                    // name 是私有化部署使用
-                    newField.put("name", field.get("id").toString());
-                    // id 是sass使用
-                    newField.put("id", field.get("id").toString());
-                    fields.put(key, newField);
-                }
-                if (schema.getCustom() != null && schema.getCustom().endsWith("multiuserpicker")) { // 多选用户列表
-                    try {
                         List<Map> userItems = (List) fields.get(key);
                         userItems.forEach(i -> {
                             i.put("name", i.get("id"));
                             i.put("id", i.get("id"));
                         });
-                    } catch (Exception e) {LogUtil.error(e);}
+                    }
+                }
+
+                if (schema.getType() != null) {
+                    if (schema.getType().endsWith("user")) {
+                        Map field = (Map) fields.get(key);
+                        // 如果不是用户ID，则是用户的key，参数调整为key
+                        Map newField = new LinkedHashMap<>();
+                        // name 是私有化部署使用
+                        newField.put("name", field.get("id").toString());
+                        // id 是sass使用
+                        newField.put("id", field.get("id").toString());
+                        fields.put(key, newField);
+                    }
                 }
             }
         } catch (Exception e) {
@@ -401,12 +466,12 @@ public class JiraPlatform extends AbstractPlatform {
 
         if (isThirdPartTemplate) {
             parseCustomFiled(request, fields);
-            request.setTitle(fields.get("summary").toString());
+            request.setTitle(fields.get(SUMMARY_FIELD_NAME).toString());
         } else {
-            fields.put("summary", request.getTitle());
-            fields.put("description", desc);
+            fields.put(SUMMARY_FIELD_NAME, request.getTitle());
+            fields.put(DESCRIPTION_FIELD_NAME, desc);
             // 添加后，解析图片会用到
-            request.getCustomFieldList().add(getRichTextCustomField("description", desc));
+            request.getCustomFieldList().add(getRichTextCustomField(DESCRIPTION_FIELD_NAME, desc));
             parseCustomFiled(request, fields);
         }
         setSpecialParam(fields);
@@ -471,7 +536,7 @@ public class JiraPlatform extends AbstractPlatform {
                             Map param = new LinkedHashMap<>();
                             param.put("id", item.getValue());
                             fields.put(fieldName, param);
-                        } else if (StringUtils.equalsAny(item.getType(),  "multipleSelect", "checkbox", "multipleMember")) {
+                        } else if (StringUtils.equalsAny(item.getType(), "multipleSelect", "checkbox", "multipleMember")) {
                             List attrs = new ArrayList();
                             if (item.getValue() != null) {
                                 List values = JSON.parseArray((String) item.getValue());
@@ -482,7 +547,7 @@ public class JiraPlatform extends AbstractPlatform {
                                 });
                             }
                             fields.put(fieldName, attrs);
-                        } else if (StringUtils.equalsAny(item.getType(),  "cascadingSelect")) {
+                        } else if (StringUtils.equalsAny(item.getType(), "cascadingSelect")) {
                             if (item.getValue() != null) {
                                 Map attr = new LinkedHashMap<>();
                                 List values = JSON.parseArray((String) item.getValue());
@@ -502,7 +567,7 @@ public class JiraPlatform extends AbstractPlatform {
                             }
                         } else if (StringUtils.equalsAny(item.getType(), "richText")) {
                             fields.put(fieldName, parseRichTextImageUrlToJira(item.getValue().toString()));
-                            if (fieldName.equals("description")) {
+                            if (fieldName.equals(DESCRIPTION_FIELD_NAME)) {
                                 request.setDescription(item.getValue().toString());
                             }
                         } else {
@@ -646,7 +711,7 @@ public class JiraPlatform extends AbstractPlatform {
     @Override
     public List<PlatformCustomFieldItemDTO> getThirdPartCustomField(String projectConfigStr) {
         Set<String> ignoreSet = new HashSet() {{
-            add("attachment");
+            add(ATTACHMENT_NAME);
         }};
         projectConfig = getProjectConfig(projectConfigStr);
 
@@ -655,7 +720,7 @@ public class JiraPlatform extends AbstractPlatform {
 
         String userOptions = getUserOptions(projectConfig.getJiraKey());
         List<PlatformCustomFieldItemDTO> fields = new ArrayList<>();
-        char filedKey = 'A';
+        Character filedKey = 'A';
         for (String name : createMetadata.keySet()) {
             JiraCreateMetadataResponse.Field item = createMetadata.get(name);
             if (ignoreSet.contains(name)) {
@@ -671,9 +736,12 @@ public class JiraPlatform extends AbstractPlatform {
             setCustomFiledType(schema, customField, userOptions);
             setCustomFiledDefaultValue(customField, item);
             List options = getAllowedValuesOptions(item.getAllowedValues());
-            if (options != null)
+            setSpecialFieldOptions(customField, schema);
+            if (options != null) {
                 customField.setOptions(JSON.toJSONString(options));
+            }
             fields.add(customField);
+            filedKey = handleSpecialField(customField, fields, filedKey);
         }
 
         fields = fields.stream().filter(i -> StringUtils.isNotBlank(i.getType()))
@@ -683,8 +751,8 @@ public class JiraPlatform extends AbstractPlatform {
         fields.sort((a, b) -> {
             if (a.getType().equals(CustomFieldType.RICH_TEXT.getValue())) return 1;
             if (b.getType().equals(CustomFieldType.RICH_TEXT.getValue())) return -1;
-            if (a.getId().equals("summary")) return -1;
-            if (b.getId().equals("summary")) return 1;
+            if (a.getId().equals(SUMMARY_FIELD_NAME)) return -1;
+            if (b.getId().equals(SUMMARY_FIELD_NAME)) return 1;
             if (a.getType().equals(CustomFieldType.INPUT.getValue())) return -1;
             if (b.getType().equals(CustomFieldType.INPUT.getValue())) return 1;
             return a.getType().compareTo(b.getType());
@@ -692,11 +760,42 @@ public class JiraPlatform extends AbstractPlatform {
         return fields;
     }
 
+    private Character handleSpecialField(PlatformCustomFieldItemDTO customFieldItem,
+                                    List<PlatformCustomFieldItemDTO> fields, Character filedKey) {
+        String id = customFieldItem.getId();
+        if (StringUtils.equals(id, ORIGINAL_ESTIMATE_TRACKING_FIELD_NAME)) {
+            PlatformCustomFieldItemDTO remainingEstimate = new PlatformCustomFieldItemDTO();
+            BeanUtils.copyBean(remainingEstimate, customFieldItem);
+            remainingEstimate.setId(REMAINING_ESTIMATE_TRACKING_FIELD_NAME);
+            remainingEstimate.setCustomData(REMAINING_ESTIMATE_TRACKING_FIELD_NAME);
+            remainingEstimate.setName("Remaining Estimate");
+            remainingEstimate.setKey(String.valueOf(filedKey++));
+            fields.add(remainingEstimate);
+        }
+        return filedKey;
+    }
+
+    private void setSpecialFieldOptions(PlatformCustomFieldItemDTO customField, JiraCreateMetadataResponse.Schema item) {
+        String customType = item.getCustom();
+        if (StringUtils.isNotBlank(customType)) {
+            if (customType.contains(SPRINT_FIELD_NAME)) {
+                try {
+                    List<JiraSuggestions> sprints = jiraClientV2.getSprint();
+                    List<SelectOption> options = new ArrayList<>();
+                    sprints.forEach(sprint -> options.add(new SelectOption(sprint.getName(), sprint.getId().toString())));
+                    customField.setOptions(JSON.toJSONString(options));
+                } catch (Exception e) {
+                    LogUtil.error(e);
+                }
+            }
+        }
+    }
+
 
     private void setCustomFiledType(JiraCreateMetadataResponse.Schema schema, PlatformCustomFieldItemDTO customField, String userOptions) {
         Map<String, String> fieldTypeMap = new HashMap() {{
-            put("summary", CustomFieldType.INPUT.getValue());
-            put("description", CustomFieldType.RICH_TEXT.getValue());
+            put(SUMMARY_FIELD_NAME, CustomFieldType.INPUT.getValue());
+            put(DESCRIPTION_FIELD_NAME, CustomFieldType.RICH_TEXT.getValue());
             put("components", CustomFieldType.MULTIPLE_SELECT.getValue());
             put("fixVersions", CustomFieldType.MULTIPLE_SELECT.getValue());
             put("versions", CustomFieldType.MULTIPLE_SELECT.getValue());
@@ -752,12 +851,19 @@ public class JiraPlatform extends AbstractPlatform {
                 value = CustomFieldType.SELECT.getValue();
             } else if (customType.contains("customfieldtypes") && StringUtils.equals(schema.getType(), "project")) {
                 value = CustomFieldType.SELECT.getValue();
+            } else if (customType.contains("epic-link")) {
+                value = CustomFieldType.SELECT.getValue();
+            } else if (customType.contains(SPRINT_FIELD_NAME)) {
+                value = CustomFieldType.SELECT.getValue();
             }
         } else {
             // 系统字段
             value = fieldTypeMap.get(customField.getId());
             String type = schema.getType();
-            if ("timetracking".equals(type)) {
+            if (TIME_TRACKING_FIELD_NAME.equals(type)) {
+                customField.setId(ORIGINAL_ESTIMATE_TRACKING_FIELD_NAME);
+                customField.setCustomData(ORIGINAL_ESTIMATE_TRACKING_FIELD_NAME);
+                customField.setName("Original Estimate");
                 value = CustomFieldType.INPUT.getValue();
             } else if ("user".equals(type)) {
                 value = CustomFieldType.SELECT.getValue();
@@ -867,7 +973,7 @@ public class JiraPlatform extends AbstractPlatform {
             // 删除附件
             JiraIssue jiraIssue = jiraClientV2.getIssues(request.getPlatformId());
             Map fields = jiraIssue.getFields();
-            List attachments = (List) fields.get("attachment");
+            List attachments = (List) fields.get(ATTACHMENT_NAME);
             if (!attachments.isEmpty() && attachments.size() > 0) {
                 for (int i = 0; i < attachments.size(); i++) {
                     Map attachment = (Map) attachments.get(i);
@@ -884,7 +990,7 @@ public class JiraPlatform extends AbstractPlatform {
     public void syncJiraIssueAttachments(SyncIssuesResult syncIssuesResult, PlatformIssuesDTO issue, JiraIssue jiraIssue) {
         try {
 
-            List attachments = (List) jiraIssue.getFields().get("attachment");
+            List attachments = (List) jiraIssue.getFields().get(ATTACHMENT_NAME);
             // 同步Jira中新的附件
             if (CollectionUtils.isNotEmpty(attachments)) {
                 Map<String, List<PlatformAttachment>> attachmentMap = syncIssuesResult.getAttachmentMap();
@@ -941,7 +1047,7 @@ public class JiraPlatform extends AbstractPlatform {
         // 获得所有Jira附件, 遍历删除MS中不存在的
         JiraIssue jiraIssue = jiraClientV2.getIssues(request.getPlatformId());
         Map fields = jiraIssue.getFields();
-        List attachments = (List) fields.get("attachment");
+        List attachments = (List) fields.get(ATTACHMENT_NAME);
         if (!attachments.isEmpty() && attachments.size() > 0) {
             for (int i = 0; i < attachments.size(); i++) {
                 Map attachment = (Map) attachments.get(i);
@@ -1071,7 +1177,7 @@ public class JiraPlatform extends AbstractPlatform {
         List<JiraIssue> filterIssues = jiraIssues.stream().filter(jiraIssue -> {
             long createTimeMills = 0;
             try {
-                createTimeMills =  new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss").parse((String) jiraIssue.getFields().get("created")).getTime();
+                createTimeMills = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss").parse((String) jiraIssue.getFields().get("created")).getTime();
                 if (syncRequest.isPre()) {
                     return createTimeMills <= syncRequest.getCreateTime().longValue();
                 } else {
