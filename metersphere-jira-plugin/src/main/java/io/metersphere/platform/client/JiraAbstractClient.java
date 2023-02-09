@@ -8,11 +8,13 @@ import io.metersphere.platform.domain.*;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.*;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -131,6 +133,12 @@ public abstract class JiraAbstractClient extends BaseClient {
     public List<JiraTransitionsResponse.Transitions> getTransitions(String issueKey) {
         ResponseEntity<String> response = restTemplate.exchange(getBaseUrl() + "/issue/{1}/transitions", HttpMethod.GET, getAuthHttpEntity(), String.class, issueKey);
         return ((JiraTransitionsResponse) getResultForObject(JiraTransitionsResponse.class, response)).getTransitions();
+    }
+
+    public List<JiraSuggestions> getSprint() {
+        ResponseEntity<String> response = restTemplate.exchange(ENDPOINT + "/rest/greenhopper/1.0/sprint/picker", HttpMethod.GET, getAuthHttpEntity(), String.class);
+        List<JiraSuggestions> suggestions = ((JiraSprintResponse) getResultForObject(JiraSprintResponse.class, response)).getSuggestions();
+        return CollectionUtils.isEmpty(suggestions) ? new ArrayList<>() : suggestions;
     }
 
     public void updateIssue(String id, String body) {
