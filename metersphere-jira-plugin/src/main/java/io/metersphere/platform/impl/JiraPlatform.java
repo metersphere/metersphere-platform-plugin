@@ -79,7 +79,7 @@ public class JiraPlatform extends AbstractPlatform {
     public JiraConfig setUserConfig(String userPlatformInfo) {
         JiraConfig config = getIntegrationConfig();
         JiraUserPlatformInfo userInfo = StringUtils.isBlank(userPlatformInfo) ? new JiraUserPlatformInfo()
-                :  JSON.parseObject(userPlatformInfo, JiraUserPlatformInfo.class);
+                : JSON.parseObject(userPlatformInfo, JiraUserPlatformInfo.class);
 
         if (StringUtils.isNotBlank(userInfo.getJiraAccount())
                 && StringUtils.isNotBlank(userInfo.getJiraPassword())) {
@@ -756,7 +756,7 @@ public class JiraPlatform extends AbstractPlatform {
     }
 
     private Character handleSpecialField(PlatformCustomFieldItemDTO customFieldItem,
-                                    List<PlatformCustomFieldItemDTO> fields, Character filedKey) {
+                                         List<PlatformCustomFieldItemDTO> fields, Character filedKey) {
         String id = customFieldItem.getId();
         if (StringUtils.equals(id, ORIGINAL_ESTIMATE_TRACKING_FIELD_NAME)) {
             PlatformCustomFieldItemDTO remainingEstimate = new PlatformCustomFieldItemDTO();
@@ -1184,5 +1184,27 @@ public class JiraPlatform extends AbstractPlatform {
             }
         }).collect(Collectors.toList());
         return filterIssues;
+    }
+
+    @Override
+    protected Object getSyncJsonParamValue(Object value) {
+        Map valObj = ((Map) value);
+        Map child = (Map) valObj.get("child");
+
+        String idValue = Optional.ofNullable(valObj.get(ID_FIELD_NAME))
+                .orElse(StringUtils.EMPTY)
+                .toString();
+
+        String accountId = Optional.ofNullable(valObj.get("accountId"))
+                .orElse(StringUtils.EMPTY)
+                .toString();
+
+        if (child != null) {// 级联框
+            return getCascadeValues(idValue, child);
+        }  else if (StringUtils.isNotBlank(accountId)) {
+            return accountId;
+        } else {
+            return valObj.get("name");
+        }
     }
 }

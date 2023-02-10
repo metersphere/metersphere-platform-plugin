@@ -31,6 +31,7 @@ public abstract class AbstractPlatform implements Platform {
 
     public static final String MD_IMAGE_DIR = "/opt/metersphere/data/image/markdown";
     public static final String PROXY_PATH = "/resource/md/get/path?platform=%s&workspaceId=%s&path=%s";
+    public static final String ID_FIELD_NAME = "id";
 
     public <T> T getIntegrationConfig(Class<T> clazz) {
         String config = request.getIntegrationConfig();
@@ -116,7 +117,7 @@ public abstract class AbstractPlatform implements Platform {
         thirdPartCustomField.forEach(item -> {
             Map<String, Object> field = new LinkedHashMap<>();
             field.put("customData", item.getCustomData());
-            field.put("id", item.getId());
+            field.put(ID_FIELD_NAME, item.getId());
             field.put("name", item.getName());
             field.put("type", item.getType());
             String defaultValue = item.getDefaultValue();
@@ -143,25 +144,15 @@ public abstract class AbstractPlatform implements Platform {
                 if (value instanceof Map) {
                     item.setValue(getSyncJsonParamValue(value));
                 } else if (value instanceof List) {
-                    // Sprint 是单选 同步回来是 JSONArray
-                    if (StringUtils.equals(item.getType(), "select")) {
-                        if (((List) value).size() > 0) {
-                            Object o = ((List) value).get(0);
-                            if (o instanceof Map) {
-                                item.setValue(getSyncJsonParamValue(o));
-                            }
+                    List<Object> values = new ArrayList<>();
+                    ((List) value).forEach(attr -> {
+                        if (attr instanceof Map) {
+                            values.add(getSyncJsonParamValue(attr));
+                        } else {
+                            values.add(attr);
                         }
-                    } else {
-                        List<Object> values = new ArrayList<>();
-                        ((List) value).forEach(attr -> {
-                            if (attr instanceof Map) {
-                                values.add(getSyncJsonParamValue(attr));
-                            } else {
-                                values.add(attr);
-                            }
-                        });
-                        item.setValue(values);
-                    }
+                    });
+                    item.setValue(values);
                 } else {
                     item.setValue(value);
                 }
@@ -189,29 +180,28 @@ public abstract class AbstractPlatform implements Platform {
 
     protected Object getSyncJsonParamValue(Object value) {
         Map valObj = ((Map) value);
-        String accountId = Optional.ofNullable(valObj.get("accountId")).orElse("").toString();
         Map child = (Map) valObj.get("child");
+
+        String idValue = Optional.ofNullable(valObj.get(ID_FIELD_NAME))
+                .orElse(StringUtils.EMPTY)
+                .toString();
+
         if (child != null) {// 级联框
-            List<Object> values = new ArrayList<>();
-            String id = Optional.ofNullable(valObj.get("id")).orElse("").toString();
-            if (StringUtils.isNotBlank(id)) {
-                values.add(valObj.get("id"));
-            }
-            if (StringUtils.isNotBlank(id)) {
-                values.add(child.get("id"));
-            }
-            return values;
-        } else if (StringUtils.isNotBlank(accountId) && isThirdPartTemplate) {
-            // 用户选择框
-            return accountId;
+            return getCascadeValues(idValue, child);
         } else {
-            String id = Optional.ofNullable(valObj.get("id")).orElse("").toString();
-            if (StringUtils.isNotBlank(id)) {
-                return valObj.get("id");
-            } else {
-                return valObj.get("key");
-            }
+            return idValue;
         }
+    }
+
+    protected List<Object> getCascadeValues(String idValue, Map child) {
+        List<Object> values = new ArrayList<>();
+        if (StringUtils.isNotBlank(idValue)) {
+            values.add(idValue);
+        }
+        if (child.get(ID_FIELD_NAME) != null && StringUtils.isNotBlank(child.get(ID_FIELD_NAME).toString())) {
+            values.add(child.get(ID_FIELD_NAME));
+        }
+        return values;
     }
 
     public void validateProjectKey(String projectId) {
