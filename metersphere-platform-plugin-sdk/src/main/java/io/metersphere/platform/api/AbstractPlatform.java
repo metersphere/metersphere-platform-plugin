@@ -189,7 +189,10 @@ public abstract class AbstractPlatform implements Platform {
         if (child != null) {// 级联框
             return getCascadeValues(idValue, child);
         } else {
-            return idValue;
+            if (StringUtils.isNotBlank(idValue)) {
+                return idValue;
+            }
+            return valObj.get("key");
         }
     }
 

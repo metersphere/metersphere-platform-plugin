@@ -1204,7 +1204,13 @@ public class JiraPlatform extends AbstractPlatform {
         }  else if (StringUtils.isNotBlank(accountId)) {
             return accountId;
         } else {
-            return valObj.get("name");
+            if (valObj.containsKey("emailAddress")) {
+                return valObj.get("name");
+            }
+            if (StringUtils.isNotBlank(idValue)) {
+                return idValue;
+            }
+            return valObj.get("key");
         }
     }
 }
