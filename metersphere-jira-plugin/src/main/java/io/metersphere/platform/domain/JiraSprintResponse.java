@@ -8,6 +8,6 @@ import java.util.List;
 @Getter
 @Setter
 public class JiraSprintResponse {
-    private List<JiraSuggestions> suggestions;
-    private List<JiraSuggestions> allMatches;
+    private List<JiraSprint> suggestions;
+    private List<JiraSprint> allMatches;
 }

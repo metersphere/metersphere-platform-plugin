@@ -5,7 +5,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class JiraSuggestions {
+public class JiraSprint {
     private String name;
     private Integer id;
 }
