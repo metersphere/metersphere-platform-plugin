@@ -33,6 +33,8 @@ public abstract class JiraAbstractClient extends BaseClient {
 
     protected  String AUTH_TYPE;
 
+    private static final String GREENHOPPER_V1_BASE_URL = "/rest/greenhopper/1.0";
+
     public JiraIssue getIssues(String issuesId) {
         LogUtil.info("getIssues: " + issuesId);
         ResponseEntity<String> responseEntity;
@@ -139,10 +141,40 @@ public abstract class JiraAbstractClient extends BaseClient {
         return ((JiraTransitionsResponse) getResultForObject(JiraTransitionsResponse.class, response)).getTransitions();
     }
 
-    public List<JiraSuggestions> getSprint() {
-        ResponseEntity<String> response = restTemplate.exchange(ENDPOINT + "/rest/greenhopper/1.0/sprint/picker", HttpMethod.GET, getAuthHttpEntity(), String.class);
-        List<JiraSuggestions> suggestions = ((JiraSprintResponse) getResultForObject(JiraSprintResponse.class, response)).getSuggestions();
-        return CollectionUtils.isEmpty(suggestions) ? new ArrayList<>() : suggestions;
+    public List<JiraSprint> getSprint() {
+        ResponseEntity<String> response = restTemplate.exchange(getGreenhopperV1BaseUrl() + "/sprint/picker?_=" + System.currentTimeMillis(),
+                HttpMethod.GET, getAuthHttpEntity(), String.class);
+        JiraSprintResponse jiraSprintResponse = ((JiraSprintResponse) getResultForObject(JiraSprintResponse.class, response));
+        List<JiraSprint> sprints = new ArrayList<>();
+        if (!CollectionUtils.isEmpty(jiraSprintResponse.getSuggestions())) {
+            sprints = jiraSprintResponse.getSuggestions();
+        }
+        if (!CollectionUtils.isEmpty(jiraSprintResponse.getAllMatches())) {
+            sprints.addAll(jiraSprintResponse.getAllMatches());
+        }
+        return sprints;
+    }
+
+    public List<JiraEpic> getEpics() {
+
+        ResponseEntity<String> response = restTemplate.exchange(getGreenhopperV1BaseUrl() + "/epics?maxResults=1000&hideDone=true&_=" + System.currentTimeMillis(),
+                HttpMethod.GET, getAuthHttpEntity(), String.class);
+        List<JiraEpicResponse.EpicLists> epicLists = ((JiraEpicResponse) getResultForObject(JiraEpicResponse.class, response)).getEpicLists();
+        if (CollectionUtils.isEmpty(epicLists)) {
+            return new ArrayList<>();
+        }
+        List<JiraEpic> jiraEpics = new ArrayList<>();
+        epicLists.forEach(item -> {
+            List<JiraEpic> epicNames = item.getEpicNames();
+            if (!CollectionUtils.isEmpty(epicNames)) {
+                jiraEpics.addAll(epicNames);
+            }
+        });
+        return jiraEpics;
+    }
+
+    public String getGreenhopperV1BaseUrl() {
+        return ENDPOINT + GREENHOPPER_V1_BASE_URL;
     }
 
     public void updateIssue(String id, String body) {

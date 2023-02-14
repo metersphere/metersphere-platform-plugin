@@ -407,16 +407,16 @@ public class JiraPlatform extends AbstractPlatform {
 
                 if (schema.getCustom() != null) {
                     if (schema.getCustom().endsWith(SPRINT_FIELD_NAME)) {
-
                         Map field = (Map) fields.get(key);
                         Object id = field.get("id");
                         if (id != null) {
                             // sprint 传参数比较特殊，需要要传数值
                             fields.put(key, Integer.parseInt(id.toString()));
                         }
-
+                    } else if (schema.getCustom().endsWith("pic-link")) {
+                        Map field = (Map) fields.get(key);
+                        fields.put(key, field.get("id"));
                     } else if (schema.getCustom().endsWith("multiuserpicker")) { // 多选用户列表
-
                         List<Map> userItems = (List) fields.get(key);
                         userItems.forEach(i -> {
                             i.put("name", i.get("id"));
@@ -776,18 +776,23 @@ public class JiraPlatform extends AbstractPlatform {
     }
 
     private void setSpecialFieldOptions(PlatformCustomFieldItemDTO customField, JiraCreateMetadataResponse.Schema item) {
-        String customType = item.getCustom();
-        if (StringUtils.isNotBlank(customType)) {
-            if (customType.contains(SPRINT_FIELD_NAME)) {
-                try {
-                    List<JiraSuggestions> sprints = jiraClientV2.getSprint();
+        try {
+            String customType = item.getCustom();
+            if (StringUtils.isNotBlank(customType)) {
+                if (customType.contains(SPRINT_FIELD_NAME)) {
+                    List<JiraSprint> sprints = jiraClientV2.getSprint();
                     List<SelectOption> options = new ArrayList<>();
                     sprints.forEach(sprint -> options.add(new SelectOption(sprint.getName(), sprint.getId().toString())));
                     customField.setOptions(JSON.toJSONString(options));
-                } catch (Exception e) {
-                    LogUtil.error(e);
+                } else if (StringUtils.contains(customType, "epic-link")) {
+                    List<JiraEpic> epics = jiraClientV2.getEpics();
+                    List<SelectOption> options = new ArrayList<>();
+                    epics.forEach(sprint -> options.add(new SelectOption(sprint.getName(), sprint.getKey())));
+                    customField.setOptions(JSON.toJSONString(options));
                 }
             }
+        } catch (Exception e) {
+            LogUtil.error(e);
         }
     }
 
