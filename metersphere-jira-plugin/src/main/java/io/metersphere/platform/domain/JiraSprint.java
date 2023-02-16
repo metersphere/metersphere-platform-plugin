@@ -8,4 +8,5 @@ import lombok.Setter;
 public class JiraSprint {
     private String name;
     private Integer id;
+    private String boardName;
 }
