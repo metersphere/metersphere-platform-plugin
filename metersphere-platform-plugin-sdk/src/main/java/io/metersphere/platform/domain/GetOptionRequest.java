@@ -14,4 +14,8 @@ public class GetOptionRequest {
      * 对应插件中获取选项的方法名
      */
     private String optionMethod;
+    /**
+     * 输入的查询关键字
+     */
+    private String query;
 }

@@ -137,8 +137,12 @@ public abstract class JiraAbstractClient extends BaseClient {
         return ((JiraTransitionsResponse) getResultForObject(JiraTransitionsResponse.class, response)).getTransitions();
     }
 
-    public List<JiraSprint> getSprint() {
-        ResponseEntity<String> response = restTemplate.exchange(getGreenhopperV1BaseUrl() + "/sprint/picker?_=" + System.currentTimeMillis(),
+    public List<JiraSprint> getSprint(String query) {
+        String url = getGreenhopperV1BaseUrl() + "/sprint/picker?_=" + System.currentTimeMillis();
+        if (StringUtils.isNotBlank(query)) {
+            url += "&query=" + query;
+        }
+        ResponseEntity<String> response = restTemplate.exchange(url,
                 HttpMethod.GET, getAuthHttpEntity(), String.class);
         JiraSprintResponse jiraSprintResponse = ((JiraSprintResponse) getResultForObject(JiraSprintResponse.class, response));
         List<JiraSprint> sprints = new ArrayList<>();
