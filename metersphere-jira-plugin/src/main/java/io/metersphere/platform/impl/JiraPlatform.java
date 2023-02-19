@@ -335,6 +335,13 @@ public class JiraPlatform extends AbstractPlatform {
                 .collect(Collectors.toList());
     }
 
+    public List<SelectOption> getSprintOptions(GetOptionRequest request) {
+        return jiraClientV2.getSprint(request.getQuery())
+                .stream()
+                .map(sprint -> new SelectOption(StringUtils.join(sprint.getName(), " (", sprint.getBoardName(), ")"), sprint.getId().toString()))
+                .collect(Collectors.toList());
+    }
+
     @Override
     public IssuesWithBLOBs addIssue(PlatformIssuesUpdateRequest request) {
         setUserConfig(request.getUserPlatformUserConfig());
@@ -780,10 +787,12 @@ public class JiraPlatform extends AbstractPlatform {
             String customType = item.getCustom();
             if (StringUtils.isNotBlank(customType)) {
                 if (customType.contains(SPRINT_FIELD_NAME)) {
-                    List<JiraSprint> sprints = jiraClientV2.getSprint();
+                    List<JiraSprint> sprints = jiraClientV2.getSprint(null);
                     List<SelectOption> options = new ArrayList<>();
                     sprints.forEach(sprint -> options.add(new SelectOption(StringUtils.join(sprint.getName(), " (", sprint.getBoardName(), ")"), sprint.getId().toString())));
                     customField.setOptions(JSON.toJSONString(options));
+                    customField.setInputSearch(true);
+                    customField.setOptionMethod("getSprintOptions");
                 } else if (StringUtils.contains(customType, "epic-link")) {
                     List<JiraEpic> epics = jiraClientV2.getEpics();
                     List<SelectOption> options = new ArrayList<>();
