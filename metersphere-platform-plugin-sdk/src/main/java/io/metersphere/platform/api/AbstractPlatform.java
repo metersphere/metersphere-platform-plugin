@@ -57,7 +57,7 @@ public abstract class AbstractPlatform implements Platform {
             // 这里反射调用 getIssueTypes 等方法，获取下拉框选项
             return (List<SelectOption>) subObject.getClass().getMethod(method, request.getClass()).invoke(subObject, request);
         } catch (InvocationTargetException e) {
-            LogUtil.error(e);
+            LogUtil.error(e.getTargetException());
             MSPluginException.throwException(e.getTargetException());
         }  catch (Exception e) {
             LogUtil.error(e);

@@ -621,6 +621,10 @@ public class ZentaoPlatform extends AbstractPlatform {
         return result;
     }
 
+    @Override
+    public byte[] getAttachmentContent(String fileKey) {
+        return zentaoClient.getAttachmentBytes(fileKey);
+    }
 
     public void syncZentaoIssueAttachments(SyncIssuesResult syncIssuesResult, IssuesWithBLOBs issue) {
         Map bugInfo = zentaoClient.getBugById(issue.getPlatformId());
