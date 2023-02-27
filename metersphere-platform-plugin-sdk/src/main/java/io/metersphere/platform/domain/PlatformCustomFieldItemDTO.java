@@ -12,4 +12,5 @@ public class PlatformCustomFieldItemDTO extends CustomField {
     private String defaultValue;
     private Boolean inputSearch;
     private String optionMethod;
+    private String optionLabel;
 }
