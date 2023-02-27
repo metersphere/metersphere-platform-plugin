@@ -158,20 +158,25 @@ public class JiraPlatform extends AbstractPlatform {
                         continue;
                     }
                     String valueStr = arrayValue.get(0).toString();
-                    if (!StringUtils.contains(valueStr, "sprint")) {
-                        continue;
+
+                    /*
+                     * 参考格式
+                     * "customfield_10105": [
+                     *    "com.atlassian.greenhopper.service.sprint.Sprint@7394e052[id=6,rapidViewId=4,state=FUTURE,name=AAA Sprint 3]"
+                     * ]
+                     */
+                    if (StringUtils.contains(valueStr, "sprint")) {
+                        String substring = valueStr.substring(valueStr.indexOf("[") + 1, valueStr.length() - 1);
+                        for (String s : substring.split(",")) {
+                            String[] param = s.split("=");
+                            if (StringUtils.equals(param[0], "id")) {
+                                customFieldItem.setValue(param[1]);
+                            } else if (StringUtils.equals(param[0], "name")) {
+                                customFieldItem.setOptionLabel(param[1]);
+                            }
+                        }
                     }
-
-                    String idRegex = "(id=\\d+,)";
-                    Pattern pattern = Pattern.compile(idRegex);
-                    Matcher matcher = pattern.matcher(valueStr);
-
-                    if (matcher.find()) {
-                        valueStr = matcher.group();
-                        valueStr = valueStr.substring(3, valueStr.length() - 1);
-                    }
-                    customFieldItem.setValue(valueStr);
-
+                    continue;
                 }
 
                 // 设置 时间跟踪
