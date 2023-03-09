@@ -171,6 +171,7 @@ public class JiraPlatform extends AbstractPlatform {
                      * ]
                      */
                     if (StringUtils.contains(valueStr, "sprint")) {
+                        // 非 sass 版本，参数值中带了名称，将名称加入下拉框选项
                         String substring = valueStr.substring(valueStr.indexOf("[") + 1, valueStr.length() - 1);
                         for (String s : substring.split(",")) {
                             String[] param = s.split("=");
@@ -180,6 +181,12 @@ public class JiraPlatform extends AbstractPlatform {
                                 customFieldItem.setOptionLabel(param[1]);
                             }
                         }
+                    } else if (StringUtils.equals(customFieldItem.getName(), "Sprint")) {
+                        // sass 版本
+                        customFieldItem.setValue(arrayValue.get(0));
+                        List<Map> sprintValue = (List) fields.get(customFieldItem.getId());
+                        Object valueName = Optional.ofNullable(sprintValue.get(0).get("name")).orElse(StringUtils.EMPTY);
+                        customFieldItem.setOptionLabel(valueName.toString());
                     }
                     continue;
                 }
