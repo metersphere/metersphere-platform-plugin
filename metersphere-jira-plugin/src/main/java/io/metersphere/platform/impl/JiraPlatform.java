@@ -187,12 +187,16 @@ public class JiraPlatform extends AbstractPlatform {
                 // 设置 时间跟踪
                 if (StringUtils.equals(customFieldItem.getId(), ORIGINAL_ESTIMATE_TRACKING_FIELD_NAME)) {
                     Map timeTracking = (Map) fields.get(TIME_TRACKING_FIELD_NAME);
-                    customFieldItem.setValue(timeTracking.get(ORIGINAL_ESTIMATE_TRACKING_FIELD_NAME));
+                    if (timeTracking != null) {
+                        customFieldItem.setValue(timeTracking.get(ORIGINAL_ESTIMATE_TRACKING_FIELD_NAME));
+                    }
                 }
 
                 if (StringUtils.equals(customFieldItem.getId(), REMAINING_ESTIMATE_TRACKING_FIELD_NAME)) {
                     Map timeTracking = (Map) fields.get(TIME_TRACKING_FIELD_NAME);
-                    customFieldItem.setValue(timeTracking.get(REMAINING_ESTIMATE_TRACKING_FIELD_NAME));
+                    if (timeTracking != null) {
+                        customFieldItem.setValue(timeTracking.get(REMAINING_ESTIMATE_TRACKING_FIELD_NAME));
+                    }
                 }
             } catch (Exception e) {
                 LogUtil.error(e);
