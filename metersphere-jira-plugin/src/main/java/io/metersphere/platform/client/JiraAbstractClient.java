@@ -1,10 +1,10 @@
 package io.metersphere.platform.client;
 
+import io.metersphere.platform.api.BaseClient;
+import io.metersphere.platform.domain.*;
 import io.metersphere.plugin.exception.MSPluginException;
 import io.metersphere.plugin.utils.JSON;
 import io.metersphere.plugin.utils.LogUtil;
-import io.metersphere.platform.api.BaseClient;
-import io.metersphere.platform.domain.*;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.*;
@@ -12,12 +12,12 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RequestCallback;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.io.InputStream;
+import java.util.*;
+import java.util.function.Consumer;
 
 public abstract class JiraAbstractClient extends BaseClient {
 
@@ -309,11 +309,17 @@ public abstract class JiraAbstractClient extends BaseClient {
         return  (JiraIssueListResponse)getResultForObject(JiraIssueListResponse.class, responseEntity);
     }
 
-    public byte[] getAttachmentContent(String url) {
-        ResponseEntity<byte[]> responseEntity;
-        responseEntity = restTemplate.exchange(url,
-                HttpMethod.GET, getAuthHttpEntity(), byte[].class);
-        return responseEntity.getBody();
+    public void getAttachmentContent(String url, Consumer<InputStream> inputStreamHandler) {
+        RequestCallback requestCallback = request -> {
+            request.getHeaders().addAll(getAuthHeader());
+            //定义请求头的接收类型
+            request.getHeaders().setAccept(Arrays.asList(MediaType.APPLICATION_OCTET_STREAM, MediaType.ALL));
+        };
+
+        restTemplate.execute(url, HttpMethod.GET, requestCallback, clientHttpResponse -> {
+            inputStreamHandler.accept(clientHttpResponse.getBody());
+            return null;
+        });
     }
 
     public JiraIssueListResponse getProjectIssuesAttachment(Integer startAt, Integer maxResults, String projectKey, String issueType) {

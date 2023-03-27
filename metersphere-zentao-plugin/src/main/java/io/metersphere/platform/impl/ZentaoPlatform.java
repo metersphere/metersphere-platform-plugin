@@ -18,10 +18,12 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
 import java.io.File;
+import java.io.InputStream;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -622,8 +624,8 @@ public class ZentaoPlatform extends AbstractPlatform {
     }
 
     @Override
-    public byte[] getAttachmentContent(String fileKey) {
-        return zentaoClient.getAttachmentBytes(fileKey);
+    public void getAttachmentContent(String fileKey, Consumer<InputStream> inputStreamHandler) {
+        zentaoClient.getAttachmentBytes(fileKey, inputStreamHandler);
     }
 
     public void syncZentaoIssueAttachments(SyncIssuesResult syncIssuesResult, IssuesWithBLOBs issue) {

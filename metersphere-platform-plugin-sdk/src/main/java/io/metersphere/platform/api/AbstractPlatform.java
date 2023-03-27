@@ -14,11 +14,13 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.MultiValueMap;
 
 import java.io.File;
+import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -75,9 +77,7 @@ public abstract class AbstractPlatform implements Platform {
     }
 
     @Override
-    public byte[] getAttachmentContent(String fileKey) {
-        return null;
-    }
+    public void getAttachmentContent(String fileKey, Consumer<InputStream> inputStreamHandler) {}
 
     protected void mergeCustomField(PlatformIssuesDTO issue, String defaultCustomField) {
         if (StringUtils.isNotBlank(defaultCustomField)) {

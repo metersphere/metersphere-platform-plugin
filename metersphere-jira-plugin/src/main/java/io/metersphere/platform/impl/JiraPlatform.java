@@ -19,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.HttpClientErrorException;
 
 import java.io.File;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLDecoder;
@@ -29,6 +30,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -1048,8 +1050,8 @@ public class JiraPlatform extends AbstractPlatform {
     }
 
     @Override
-    public byte[] getAttachmentContent(String fileKey) {
-        return jiraClientV2.getAttachmentContent(fileKey);
+    public void getAttachmentContent(String fileKey, Consumer<InputStream> inputStreamHandler) {
+        jiraClientV2.getAttachmentContent(fileKey, inputStreamHandler);
     }
 
     public void syncJiraRichTextAttachment(PlatformIssuesUpdateRequest request) {

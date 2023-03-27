@@ -11,10 +11,14 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.*;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RequestCallback;
 
 import java.io.File;
+import java.io.InputStream;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
 public abstract class ZentaoClient extends BaseClient {
 
@@ -283,11 +287,19 @@ public abstract class ZentaoClient extends BaseClient {
         }
     }
 
-    public byte[] getAttachmentBytes(String fileId) {
+    public void getAttachmentBytes(String fileId, Consumer<InputStream> inputStreamHandler) {
+
+        RequestCallback requestCallback = request -> {
+            //定义请求头的接收类型
+            request.getHeaders().setAccept(Arrays.asList(MediaType.APPLICATION_OCTET_STREAM, MediaType.ALL));
+        };
+
         String sessionId = login();
-        ResponseEntity<byte[]> response = restTemplate.exchange(requestUrl.getFileDownload(), HttpMethod.GET,
-                null, byte[].class, fileId, sessionId);
-        return response.getBody();
+        restTemplate.execute(requestUrl.getFileDownload(), HttpMethod.GET,
+                requestCallback, (clientHttpResponse) -> {
+                    inputStreamHandler.accept(clientHttpResponse.getBody());
+                    return null;
+                }, fileId, sessionId);
     }
 
     public ResponseEntity proxyForGet(String path, Class responseEntityClazz) {

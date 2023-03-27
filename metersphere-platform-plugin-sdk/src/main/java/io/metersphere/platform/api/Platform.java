@@ -4,7 +4,9 @@ import io.metersphere.base.domain.IssuesWithBLOBs;
 import io.metersphere.platform.domain.*;
 import org.springframework.http.ResponseEntity;
 
+import java.io.InputStream;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * 平台对接相关业务
@@ -97,11 +99,12 @@ public interface Platform {
     void syncAllIssues(SyncAllIssuesRequest request);
 
     /**
-     * 获取附件内容
+     * 获取附件输入流，并做相应处理
      * 同步缺陷中，同步附件时会调用
      * @param fileKey 文件关键字
+     * @param inputStreamHandler 获取响应的输入流后，做对应处理
      */
-    byte[] getAttachmentContent(String fileKey);
+    void getAttachmentContent(String fileKey, Consumer<InputStream> inputStreamHandler);
 
     /**
      * 获取第三方平台缺陷的自定义字段
