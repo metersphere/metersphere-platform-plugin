@@ -362,6 +362,7 @@ public class JiraPlatform extends AbstractPlatform {
 
     @Override
     public IssuesWithBLOBs addIssue(PlatformIssuesUpdateRequest request) {
+        jiraImageFileNames = new HashSet<>();
         setUserConfig(request.getUserPlatformUserConfig());
         projectConfig = getProjectConfig(request.getProjectConfig());
         this.isThirdPartTemplate = projectConfig.isThirdPartTemplate();
@@ -610,9 +611,11 @@ public class JiraPlatform extends AbstractPlatform {
         setUserConfig(request.getUserPlatformUserConfig());
 
         projectConfig = getProjectConfig(request.getProjectConfig());
+        jiraImageFileNames = new HashSet<>();
+        this.isThirdPartTemplate = this.projectConfig.isThirdPartTemplate();
+
         validateProjectKey(projectConfig.getJiraKey());
         validateIssueType();
-        jiraImageFileNames = new HashSet<>();
 
         Map param = buildUpdateParam(request, projectConfig.getJiraIssueTypeId(), projectConfig.getJiraKey());
         jiraClientV2.updateIssue(request.getPlatformId(), JSON.toJSONString(param));
@@ -1118,7 +1121,10 @@ public class JiraPlatform extends AbstractPlatform {
                 filename = msRichAttachmentUrl.substring(msRichAttachmentUrl.indexOf("[") + 1, msRichAttachmentUrl.indexOf("]"));
                 jiraImageFileNames.add(filename);
             }
-            parseRichText = parseRichText.replace(msRichAttachmentUrl, "\n!" + filename + "|width=1360,height=876!\n");
+            if (!msRichAttachmentUrl.contains("(http")) {
+                // 如果是图片链接则不处理
+                parseRichText = parseRichText.replace(msRichAttachmentUrl, "\n!" + filename + "|width=1360,height=876!\n");
+            }
         }
         return parseRichText;
     }
