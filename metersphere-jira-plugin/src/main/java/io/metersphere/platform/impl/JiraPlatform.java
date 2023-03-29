@@ -227,20 +227,6 @@ public class JiraPlatform extends AbstractPlatform {
                 if (CollectionUtils.isNotEmpty(keys)) {
                     description = description.replace(splitStr, fileContentMap.get(keys.get(0)));
                     fileContentMap.remove(keys.get(0));
-                } else {
-                    if (splitStr.contains("MS附件：")) {
-                        // 解析标签内容
-                        String name = getHyperLinkPathForImg("\\!\\[(.*?)\\]", StringEscapeUtils.unescapeJava(splitStr));
-                        String path = getHyperLinkPathForImg("\\|(.*?)\\)", splitStr);
-                        try {
-                            path = getProxyPath(new URI(path).getPath());
-                            // 解析标签内容为图片超链接格式，进行替换
-                            description = description.replace(splitStr, "\n\n![" + name + "](" + path + ")");
-                        } catch (URISyntaxException e) {
-                            LogUtil.error(e);
-                        }
-                    }
-                    description = description.replace(splitStr, StringEscapeUtils.unescapeJava(splitStr.replace("MS附件：", "")));
                 }
             }
         }
@@ -474,12 +460,6 @@ public class JiraPlatform extends AbstractPlatform {
         Map fields = new LinkedHashMap<>();
         Map project = new LinkedHashMap<>();
 
-        String desc = "";
-        // 附件描述信息处理
-        if (StringUtils.isNotBlank(request.getDescription())) {
-            desc = dealWithImage(request.getDescription());
-        }
-
         fields.put("project", project);
         project.put("key", jiraKey);
 
@@ -495,9 +475,8 @@ public class JiraPlatform extends AbstractPlatform {
             request.setTitle(fields.get(SUMMARY_FIELD_NAME).toString());
         } else {
             fields.put(SUMMARY_FIELD_NAME, request.getTitle());
-            fields.put(DESCRIPTION_FIELD_NAME, desc);
             // 添加后，解析图片会用到
-            request.getCustomFieldList().add(getRichTextCustomField(DESCRIPTION_FIELD_NAME, desc));
+            request.getCustomFieldList().add(getRichTextCustomField(DESCRIPTION_FIELD_NAME, request.getDescription()));
             parseCustomFiled(request, fields);
         }
         setSpecialParam(fields);
@@ -512,25 +491,6 @@ public class JiraPlatform extends AbstractPlatform {
         customField.setCustomData(name);
         customField.setValue(value);
         return customField;
-    }
-
-    private String dealWithImage(String description) {
-        String regex = "(\\!\\[.*?\\]\\((.*?)\\))";
-        Matcher matcher = Pattern.compile(regex).matcher(description);
-
-        try {
-            while (matcher.find()) {
-                if (StringUtils.isNotEmpty(matcher.group())) {
-                    // img标签内容
-                    String imgPath = matcher.group();
-                    // 解析标签内容为图片超链接格式，进行替换
-                    description = description.replace(imgPath, "\nMS附件：" + imgPath);
-                }
-            }
-        } catch (Exception exception) {
-        }
-
-        return description;
     }
 
     private String getHyperLinkPathForImg(String regex, String targetStr) {
@@ -1058,7 +1018,7 @@ public class JiraPlatform extends AbstractPlatform {
     }
 
     public void syncJiraRichTextAttachment(PlatformIssuesUpdateRequest request) {
-        List<String> jiraFileNames = new ArrayList<>();
+        Set<String> jiraFileNames = new HashSet<>();
         Set<String> msFileNames = request.getMsAttachmentNames();
 
         // 获取富文本图片附件名称
@@ -1066,16 +1026,12 @@ public class JiraPlatform extends AbstractPlatform {
                 .stream()
                 .filter(item -> item.getType().equals("richText"))
                 .collect(Collectors.toList());
+
         richTexts.forEach(richText -> {
             if (richText.getValue() != null) {
                 String url = richText.getValue().toString();
-                if (url.contains("fileName")) {
-                    // 本地上传的图片URL
-                    msFileNames.add(url.substring(url.indexOf("=") + 1, url.lastIndexOf(")")));
-                } else if (url.contains("platform=Jira")) {
-                    // Jira同步的图片URL
-                    msFileNames.add(url.substring(url.indexOf("[") + 1, url.indexOf("]")));
-                }
+                addJiraImageFileName(msFileNames, url);
+                addMsImageFileName(msFileNames, url);
             }
         });
 
@@ -1104,12 +1060,37 @@ public class JiraPlatform extends AbstractPlatform {
         });
     }
 
+    /**
+     * 获取 Ms 的图片名称 f2aef1f3.png
+     * ![Stamp.png](/resource/md/get?fileName=f2aef1f3.png)
+     */
+    private void addMsImageFileName(Set<String> fileNames, String input) {
+        addFileName(fileNames, "\\!\\[.*?\\]\\(/resource/md/get\\?fileName=(.*?)\\)", input);
+    }
+
+    /**
+     * 获取从 jira 同步后的图片名称 d4cfd42c.png
+     * ![d4cfd42c.png](/resource/md/get/path?platform=Jira&workspaceId=xxx&path=xx)
+     */
+    private void addJiraImageFileName(Set<String> fileNames, String input) {
+        addFileName(fileNames,  "\\!\\[(.*?)\\]\\(/resource/md/get/path", input);
+    }
+
+    private void addFileName(Set<String> fileNames, String pattern, String input) {
+        Matcher matcher = Pattern.compile(pattern).matcher(input);
+        while (matcher.find()) {
+            String path = matcher.group(1);
+            if (StringUtils.isNotEmpty(path)) {
+                fileNames.add(matcher.group(1));
+            }
+        }
+    }
+
     private String parseRichTextImageUrlToJira(String parseRichText) {
-        String regex = "(\\!\\[.*?\\]\\((.*?)\\))";
         if (StringUtils.isBlank(parseRichText)) {
             return "";
         }
-        Matcher matcher = Pattern.compile(regex).matcher(parseRichText);
+        Matcher matcher = Pattern.compile(MARKDOWN_IMAGE_REGULAR).matcher(parseRichText);
         while (matcher.find()) {
             String msRichAttachmentUrl = matcher.group();
             String filename = "";
@@ -1123,7 +1104,7 @@ public class JiraPlatform extends AbstractPlatform {
             }
             if (!msRichAttachmentUrl.contains("(http")) {
                 // 如果是图片链接则不处理
-                parseRichText = parseRichText.replace(msRichAttachmentUrl, "\n!" + filename + "|width=1360,height=876!\n");
+                parseRichText = parseRichText.replace(msRichAttachmentUrl, "\n\n!" + filename + "|width=1360,height=876!\n");
             }
         }
         return parseRichText;

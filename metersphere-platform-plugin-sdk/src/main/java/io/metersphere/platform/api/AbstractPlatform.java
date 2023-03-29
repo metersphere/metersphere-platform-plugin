@@ -34,6 +34,7 @@ public abstract class AbstractPlatform implements Platform {
     public static final String MD_IMAGE_DIR = "/opt/metersphere/data/image/markdown";
     public static final String PROXY_PATH = "/resource/md/get/path?platform=%s&workspaceId=%s&path=%s";
     public static final String ID_FIELD_NAME = "id";
+    public static final String MARKDOWN_IMAGE_REGULAR = "(\\!\\[.*?\\]\\((.*?)\\))";
 
     public <T> T getIntegrationConfig(Class<T> clazz) {
         String config = request.getIntegrationConfig();
@@ -215,8 +216,7 @@ public abstract class AbstractPlatform implements Platform {
 
     public List<File> getImageFiles(String input) {
         List<File> files = new ArrayList<>();
-        String regex = "(\\!\\[.*?\\]\\((.*?)\\))";
-        Pattern pattern = Pattern.compile(regex);
+        Pattern pattern = Pattern.compile(MARKDOWN_IMAGE_REGULAR);
         if (StringUtils.isBlank(input)) {
             return new ArrayList<>();
         }
@@ -287,8 +287,7 @@ public abstract class AbstractPlatform implements Platform {
 
     protected String msImg2HtmlImg(String input, String endpoint) {
         // ![中心主题.png](/resource/md/get/a0b19136_中心主题.png) -> <img src="xxx/resource/md/get/a0b19136_中心主题.png"/>
-        String regex = "(\\!\\[.*?\\]\\((.*?)\\))";
-        Pattern pattern = Pattern.compile(regex);
+        Pattern pattern = Pattern.compile(MARKDOWN_IMAGE_REGULAR);
         if (StringUtils.isBlank(input)) {
             return "";
         }
