@@ -1,18 +1,17 @@
 package io.metersphere.platform.impl;
 
 
-import io.metersphere.platform.utils.BeanUtils;
-import io.metersphere.plugin.exception.MSPluginException;
-import io.metersphere.plugin.utils.JSON;
-import io.metersphere.plugin.utils.LogUtil;
 import io.metersphere.base.domain.IssuesWithBLOBs;
 import io.metersphere.platform.api.AbstractPlatform;
 import io.metersphere.platform.client.JiraClientV2;
 import io.metersphere.platform.constants.AttachmentSyncType;
 import io.metersphere.platform.constants.CustomFieldType;
 import io.metersphere.platform.domain.*;
+import io.metersphere.platform.utils.BeanUtils;
+import io.metersphere.plugin.exception.MSPluginException;
+import io.metersphere.plugin.utils.JSON;
+import io.metersphere.plugin.utils.LogUtil;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.ResponseEntity;
@@ -117,7 +116,7 @@ public class JiraPlatform extends AbstractPlatform {
             Map<String, String> fileContentMap = getContextMap((List) fields.get(ATTACHMENT_NAME));
 
             // 先转换下desc的图片
-            String description = dealWithDescription(Optional.ofNullable(fields.get(DESCRIPTION_FIELD_NAME)).orElse("").toString(), fileContentMap);
+            String description = parseJira2MsRichText(Optional.ofNullable(fields.get(DESCRIPTION_FIELD_NAME)).orElse("").toString(), fileContentMap);
             fields.put(DESCRIPTION_FIELD_NAME, description);
             List<PlatformCustomFieldItemDTO> customFieldItems = syncIssueCustomFieldList(issue.getCustomFieldList(), jiraIssue.getFields());
 
@@ -128,7 +127,7 @@ public class JiraPlatform extends AbstractPlatform {
                 if (!StringUtils.equals(DESCRIPTION_FIELD_NAME, item.getId())) {
                     // desc转过了，跳过
                     if (StringUtils.equals(CustomFieldType.RICH_TEXT.getValue(), item.getType())) {
-                        item.setValue(dealWithDescription((String) item.getValue(), fileContentMap));
+                        item.setValue(parseJira2MsRichText((String) item.getValue(), fileContentMap));
                     }
                 }
             }
@@ -213,25 +212,74 @@ public class JiraPlatform extends AbstractPlatform {
         }
     }
 
-    private String dealWithDescription(String description, Map<String, String> fileContentMap) {
-        if (StringUtils.isBlank(description)) {
-            return description;
+    private String parseJira2MsRichText(String text, Map<String, String> fileContentMap) {
+        if (StringUtils.isBlank(text)) {
+            return text;
         }
 
-        description = description.replaceAll("!image", "\n!image");
-        String[] splits = description.split("\\n");
+        text = text.replaceAll("!image", "\n!image");
+        String[] splits = text.split("\\n");
         for (int j = 0; j < splits.length; j++) {
             String splitStr = splits[j];
             if (StringUtils.isNotEmpty(splitStr)) {
                 List<String> keys = fileContentMap.keySet().stream().filter(key -> splitStr.contains(key)).collect(Collectors.toList());
                 if (CollectionUtils.isNotEmpty(keys)) {
-                    description = description.replace(splitStr, fileContentMap.get(keys.get(0)));
+                    text = text.replace(splitStr, fileContentMap.get(keys.get(0)));
                     fileContentMap.remove(keys.get(0));
                 }
             }
         }
-        return description;
+
+        // 这个 parse 顺序不能调换
+        try {
+            text = parseJiraLink2MsLink(text);
+            text = parseSimpleJiraLink2MsLink(text);
+        } catch (Exception e) {
+            LogUtil.error(e);
+        }
+        return text;
     }
+    /**
+     * 这个格式是 ms 创建后同步到 jira 的
+     * [GGG]([http://aa.com|http://aa.com]) -> [GGG](http://aa.com)
+     * @param input
+     * @return
+     */
+    private String parseJiraLink2MsLink(String input) {
+        String pattern = "(\\(\\[.*?\\]\\))";
+        Matcher matcher = Pattern.compile(pattern).matcher(input);
+        while (matcher.find()) {
+            String group = matcher.group(1);
+            if (StringUtils.isNotEmpty(group) && group.startsWith("([http")) {
+                String[] split = group.split("\\|");
+                String msFormat = split[0].replaceFirst("\\[", "") + ")";
+                input = input.replace(group, msFormat);
+            }
+        }
+        return input;
+    }
+
+    /**
+     * 这个格式是 jira 的
+     * [http://aa.com|http://aa.com] -> [asd](http://aa.com)
+     * @param input
+     * @return
+     */
+    private String parseSimpleJiraLink2MsLink(String input) {
+        String pattern = "(\\[.*?\\])";
+        Matcher matcher = Pattern.compile(pattern).matcher(input);
+        while (matcher.find()) {
+            String group = matcher.group(1);
+            if (StringUtils.isNotEmpty(group) && group.startsWith("[http")) {
+                String[] split = group.split("\\|");
+                String msFormat = split[0].replaceFirst("\\[", "");
+                msFormat = "[" + msFormat + "]" + "(" + msFormat + ")";
+                input = input.replace(group, msFormat);
+            }
+        }
+        return input;
+    }
+
 
     private Map<String, String> getContextMap(List attachments) {
         // 附件处理
@@ -1090,7 +1138,7 @@ public class JiraPlatform extends AbstractPlatform {
         if (StringUtils.isBlank(parseRichText)) {
             return "";
         }
-        Matcher matcher = Pattern.compile(MARKDOWN_IMAGE_REGULAR).matcher(parseRichText);
+        Matcher matcher = Pattern.compile("\\!?(\\[.*?\\]\\((.*?)\\))").matcher(parseRichText);
         while (matcher.find()) {
             String msRichAttachmentUrl = matcher.group();
             String filename = "";
@@ -1102,12 +1150,28 @@ public class JiraPlatform extends AbstractPlatform {
                 filename = msRichAttachmentUrl.substring(msRichAttachmentUrl.indexOf("[") + 1, msRichAttachmentUrl.indexOf("]"));
                 jiraImageFileNames.add(filename);
             }
-            if (!msRichAttachmentUrl.contains("(http")) {
-                // 如果是图片链接则不处理
+            if (msRichAttachmentUrl.contains("(http")) {
+                parseRichText = parseMsLink2JiraLink(parseRichText);
+            } else {
+                // 非链接
                 parseRichText = parseRichText.replace(msRichAttachmentUrl, "\n\n!" + filename + "|width=1360,height=876!\n");
             }
         }
         return parseRichText;
+    }
+
+    private String parseMsLink2JiraLink(String input) {
+        String pattern = "\\!?\\[.*?\\]\\((.*?)\\)";
+        Matcher matcher = Pattern.compile(pattern).matcher(input);
+        while (matcher.find()) {
+            String group = matcher.group(0);
+            String url = matcher.group(1);
+            if (url.startsWith("http")) {
+                String jiraFormat = "[" + url + "|" + url + "]";
+                input = input.replace(group, jiraFormat);
+            }
+        }
+        return input;
     }
 
     @Override
