@@ -2,7 +2,7 @@
   "serviceIntegration": {
     "label": "Jira",
     "image": "/static/index.png",
-    "tips": "私有化部署选择 Basic Auth 填写账号密码，选择 Bearer Token 填写 Token </br> SaaS 版本只能选择 Basic Auth，填写（账号 + 密码）或者（账号+令牌）(账户设置-安全-创建API令牌)",
+    "tips": "私有化部署选择 Basic Auth 填写账号密码，选择 Bearer Token 填写 Token </br> SaaS 版本只能选择 Basic Auth，填写（账号+令牌）(账户设置-安全-创建API令牌)",
     "formItems": [
       {
         "name": "authType",
