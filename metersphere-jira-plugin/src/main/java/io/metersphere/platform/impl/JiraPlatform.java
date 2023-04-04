@@ -422,18 +422,21 @@ public class JiraPlatform extends AbstractPlatform {
     private List<File> getImageFiles(PlatformIssuesUpdateRequest request) {
         List<File> files = new ArrayList<>();
         List<PlatformCustomFieldItemDTO> customFields = request.getCustomFieldList();
-        customFields.forEach(item -> {
-            String fieldName = item.getCustomData();
-            if (StringUtils.isNotBlank(fieldName)) {
-                if (item.getValue() != null) {
-                    if (StringUtils.isNotBlank(item.getType())) {
-                        if (StringUtils.equalsAny(item.getType(), "richText")) {
-                            files.addAll(getImageFiles(item.getValue().toString()));
+        if (CollectionUtils.isNotEmpty(customFields)) {
+            customFields.forEach(item -> {
+                String fieldName = item.getCustomData();
+                if (StringUtils.isNotBlank(fieldName)) {
+                    if (item.getValue() != null) {
+                        if (StringUtils.isNotBlank(item.getType())) {
+                            if (StringUtils.equalsAny(item.getType(), "richText")) {
+                                files.addAll(getImageFiles(item.getValue().toString()));
+                            }
                         }
                     }
                 }
-            }
-        });
+            });
+        }
+
         return files;
     }
 
@@ -524,7 +527,9 @@ public class JiraPlatform extends AbstractPlatform {
         } else {
             fields.put(SUMMARY_FIELD_NAME, request.getTitle());
             // 添加后，解析图片会用到
-            request.getCustomFieldList().add(getRichTextCustomField(DESCRIPTION_FIELD_NAME, request.getDescription()));
+            if (CollectionUtils.isNotEmpty(request.getCustomFieldList())) {
+                request.getCustomFieldList().add(getRichTextCustomField(DESCRIPTION_FIELD_NAME, request.getDescription()));
+            }
             parseCustomFiled(request, fields);
         }
         setSpecialParam(fields);
@@ -561,57 +566,60 @@ public class JiraPlatform extends AbstractPlatform {
     private void parseCustomFiled(PlatformIssuesUpdateRequest request, Map fields) {
         List<PlatformCustomFieldItemDTO> customFields = request.getCustomFieldList();
 
-        customFields.forEach(item -> {
-            String fieldName = item.getCustomData();
-            if (StringUtils.isNotBlank(fieldName)) {
-                if (ObjectUtils.isNotEmpty(item.getValue())) {
-                    if (StringUtils.isNotBlank(item.getType())) {
-                        if (StringUtils.equalsAny(item.getType(), "select", "radio", "member")) {
-                            Map param = new LinkedHashMap<>();
-                            param.put("id", item.getValue());
-                            fields.put(fieldName, param);
-                        } else if (StringUtils.equalsAny(item.getType(), "multipleSelect", "checkbox", "multipleMember")) {
-                            List attrs = new ArrayList();
-                            if (item.getValue() != null) {
-                                List values = JSON.parseArray((String) item.getValue());
-                                values.forEach(v -> {
-                                    Map param = new LinkedHashMap<>();
-                                    param.put("id", v);
-                                    attrs.add(param);
-                                });
-                            }
-                            fields.put(fieldName, attrs);
-                        } else if (StringUtils.equalsAny(item.getType(), "cascadingSelect")) {
-                            if (item.getValue() != null) {
-                                Map attr = new LinkedHashMap<>();
-                                List values = JSON.parseArray((String) item.getValue());
-                                if (CollectionUtils.isNotEmpty(values)) {
-                                    if (values.size() > 0) {
-                                        attr.put("id", values.get(0));
-                                    }
-                                    if (values.size() > 1) {
+        if (CollectionUtils.isNotEmpty(customFields)) {
+            customFields.forEach(item -> {
+                String fieldName = item.getCustomData();
+                if (StringUtils.isNotBlank(fieldName)) {
+                    if (ObjectUtils.isNotEmpty(item.getValue())) {
+                        if (StringUtils.isNotBlank(item.getType())) {
+                            if (StringUtils.equalsAny(item.getType(), "select", "radio", "member")) {
+                                Map param = new LinkedHashMap<>();
+                                param.put("id", item.getValue());
+                                fields.put(fieldName, param);
+                            } else if (StringUtils.equalsAny(item.getType(), "multipleSelect", "checkbox", "multipleMember")) {
+                                List attrs = new ArrayList();
+                                if (item.getValue() != null) {
+                                    List values = JSON.parseArray((String) item.getValue());
+                                    values.forEach(v -> {
                                         Map param = new LinkedHashMap<>();
-                                        param.put("id", values.get(1));
-                                        attr.put("child", param);
-                                    }
-                                } else {
-                                    attr.put("id", item.getValue());
+                                        param.put("id", v);
+                                        attrs.add(param);
+                                    });
                                 }
-                                fields.put(fieldName, attr);
+                                fields.put(fieldName, attrs);
+                            } else if (StringUtils.equalsAny(item.getType(), "cascadingSelect")) {
+                                if (item.getValue() != null) {
+                                    Map attr = new LinkedHashMap<>();
+                                    List values = JSON.parseArray((String) item.getValue());
+                                    if (CollectionUtils.isNotEmpty(values)) {
+                                        if (values.size() > 0) {
+                                            attr.put("id", values.get(0));
+                                        }
+                                        if (values.size() > 1) {
+                                            Map param = new LinkedHashMap<>();
+                                            param.put("id", values.get(1));
+                                            attr.put("child", param);
+                                        }
+                                    } else {
+                                        attr.put("id", item.getValue());
+                                    }
+                                    fields.put(fieldName, attr);
+                                }
+                            } else if (StringUtils.equalsAny(item.getType(), "richText")) {
+                                fields.put(fieldName, parseRichTextImageUrlToJira(item.getValue().toString()));
+                                if (fieldName.equals(DESCRIPTION_FIELD_NAME)) {
+                                    request.setDescription(item.getValue().toString());
+                                }
+                            } else {
+                                fields.put(fieldName, item.getValue());
                             }
-                        } else if (StringUtils.equalsAny(item.getType(), "richText")) {
-                            fields.put(fieldName, parseRichTextImageUrlToJira(item.getValue().toString()));
-                            if (fieldName.equals(DESCRIPTION_FIELD_NAME)) {
-                                request.setDescription(item.getValue().toString());
-                            }
-                        } else {
-                            fields.put(fieldName, item.getValue());
                         }
-                    }
 
+                    }
                 }
-            }
-        });
+            });
+        }
+
     }
 
     @Override
@@ -1079,13 +1087,16 @@ public class JiraPlatform extends AbstractPlatform {
                 .filter(item -> item.getType().equals("richText"))
                 .collect(Collectors.toList());
 
-        richTexts.forEach(richText -> {
-            if (richText.getValue() != null) {
-                String url = richText.getValue().toString();
-                addJiraImageFileName(msFileNames, url);
-                addMsImageFileName(msFileNames, url);
-            }
-        });
+        if (CollectionUtils.isNotEmpty(richTexts)) {
+            richTexts.forEach(richText -> {
+                if (richText.getValue() != null) {
+                    String url = richText.getValue().toString();
+                    addJiraImageFileName(msFileNames, url);
+                    addMsImageFileName(msFileNames, url);
+                }
+            });
+
+        }
 
         // 获得所有Jira附件, 遍历删除MS中不存在的
         JiraIssue jiraIssue = jiraClientV2.getIssues(request.getPlatformId());
