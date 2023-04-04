@@ -993,7 +993,11 @@ public class JiraPlatform extends AbstractPlatform {
             } else {
                 jsonObject.put("value", val.getName());
             }
-            jsonObject.put("text", val.getDisplayName());
+            if (StringUtils.isNotBlank(val.getEmailAddress())) {
+                jsonObject.put("text", val.getAccountId() + "-" + val.getEmailAddress());
+            } else {
+                jsonObject.put("text", val.getDisplayName());
+            }
             options.add(jsonObject);
         });
         return JSON.toJSONString(options);
