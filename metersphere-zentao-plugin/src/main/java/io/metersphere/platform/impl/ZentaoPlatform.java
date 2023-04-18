@@ -356,6 +356,9 @@ public class ZentaoPlatform extends AbstractPlatform {
     }
 
     public List<Map> filterSyncZentaoIssuesByCreated(List<Map> zentaoIssues, SyncAllIssuesRequest syncRequest) {
+        if (syncRequest.getCreateTime() == null) {
+            return zentaoIssues;
+        }
         List<Map> filterIssues = zentaoIssues.stream().filter(item -> {
             long createTimeMills = 0;
             try {

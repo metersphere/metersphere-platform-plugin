@@ -1271,6 +1271,9 @@ public class JiraPlatform extends AbstractPlatform {
     }
 
     private List<JiraIssue> filterSyncJiraIssueByCreated(List<JiraIssue> jiraIssues, SyncAllIssuesRequest syncRequest) {
+        if (syncRequest.getCreateTime() == null) {
+            return jiraIssues;
+        }
         List<JiraIssue> filterIssues = jiraIssues.stream().filter(jiraIssue -> {
             long createTimeMills = 0;
             try {
