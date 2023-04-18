@@ -725,13 +725,18 @@ public class JiraPlatform extends AbstractPlatform {
     @Override
     public List<PlatformStatusDTO> getStatusList(String projectConfig) {
         List<PlatformStatusDTO> platformStatusDTOS = new ArrayList<>();
-        List<JiraTransitionsResponse.Transitions> transitions = jiraClientV2.getStatus();
-        if (CollectionUtils.isNotEmpty(transitions)) {
-            transitions.forEach(item -> {
-                PlatformStatusDTO platformStatusDTO = new PlatformStatusDTO();
-                platformStatusDTO.setLabel(item.getName());
-                platformStatusDTO.setValue(item.getName());
-                platformStatusDTOS.add(platformStatusDTO);
+        JiraProjectConfig jiraProjectConfig = getProjectConfig(projectConfig);
+        List<JiraStatusResponse> statusResponses = jiraClientV2.getStatus(jiraProjectConfig.getJiraKey());
+        List<List<JiraStatusResponse.Statuses>> issueTypeStatus = statusResponses.stream().filter(jiraStatusResponse -> jiraProjectConfig.getJiraIssueTypeId().equals(jiraStatusResponse.getId())).map(JiraStatusResponse::getStatuses).collect(Collectors.toList());
+        if (CollectionUtils.isNotEmpty(issueTypeStatus)) {
+            issueTypeStatus.forEach(item -> {
+                item.forEach(statuses -> {
+                    PlatformStatusDTO platformStatusDTO = new PlatformStatusDTO();
+                    platformStatusDTO.setLabel(statuses.getName());
+                    platformStatusDTO.setValue(statuses.getName());
+                    platformStatusDTOS.add(platformStatusDTO);
+                });
+
             });
         }
         return platformStatusDTOS;

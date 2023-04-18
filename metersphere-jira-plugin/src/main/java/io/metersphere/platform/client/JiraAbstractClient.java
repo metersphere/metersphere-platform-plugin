@@ -346,8 +346,8 @@ public abstract class JiraAbstractClient extends BaseClient {
         return restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), responseEntityClazz);
     }
 
-    public List<JiraTransitionsResponse.Transitions> getStatus() {
-        ResponseEntity<String> response = restTemplate.exchange(getBaseUrl() + "/status", HttpMethod.GET, getAuthHttpEntity(), String.class);
-        return (List<JiraTransitionsResponse.Transitions>) getResultForList(JiraTransitionsResponse.Transitions.class, response);
+    public List<JiraStatusResponse> getStatus(String jiraKey) {
+        ResponseEntity<String> response = restTemplate.exchange(getBaseUrl() + "/project/"+jiraKey+"/statuses", HttpMethod.GET, getAuthHttpEntity(), String.class);
+        return (List<JiraStatusResponse>)getResultForList(JiraStatusResponse.class, response);
     }
 }
