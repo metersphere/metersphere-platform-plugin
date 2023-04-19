@@ -16,6 +16,8 @@ import org.springframework.web.client.RequestCallback;
 
 import java.io.File;
 import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -341,7 +343,16 @@ public abstract class JiraAbstractClient extends BaseClient {
 
     public ResponseEntity proxyForGet(String path, Class responseEntityClazz) {
         LogUtil.info("jira proxyForGet: " + path);
-        String url = this.ENDPOINT + path;
+        String endpoint = this.ENDPOINT;
+        try {
+            // ENDPOINT 可能会带有前缀，比如 http://xxxx/jira
+            // 这里去掉 /jira，再拼接图片路径path
+            URI uri = new URI(this.ENDPOINT);
+            endpoint = uri.getScheme() + "://" + uri.getHost();
+        } catch (URISyntaxException e) {
+            LogUtil.error(e);
+        }
+        String url = endpoint + path;
         validateProxyUrl(url, "/secure/attachment", "/attachment/content");
         return restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), responseEntityClazz);
     }
