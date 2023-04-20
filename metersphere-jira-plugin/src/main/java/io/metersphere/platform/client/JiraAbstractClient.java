@@ -109,6 +109,20 @@ public abstract class JiraAbstractClient extends BaseClient {
         return (List<JiraUser>) getResultForList(JiraUser.class, response);
     }
 
+
+    public List<JiraUser> getAllUser() {
+        String url = getBaseUrl() + "/user/search?query=&maxResults=" + 1000 + "&startAt=" + 0;
+        ResponseEntity<String> response = null;
+        try {
+            response = restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), String.class);
+        } catch (Exception e) {
+            LogUtil.error(e.getMessage(), e);
+            MSPluginException.throwException(e.getMessage());
+        }
+        return (List<JiraUser>) getResultForList(JiraUser.class, response);
+    }
+
+
     public List getDemands(String projectKey, String issueType, int startAt, int maxResults) {
         String jql = getBaseUrl() + "/search?jql=project=" + projectKey + "+AND+issuetype=" + issueType
                 + "&maxResults=" + maxResults + "&startAt=" + startAt + "&fields=summary,issuetype";

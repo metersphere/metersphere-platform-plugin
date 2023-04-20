@@ -768,6 +768,7 @@ public class JiraPlatform extends AbstractPlatform {
                 jiraClientV2.getCreateMetadata(projectConfig.getJiraKey(), projectConfig.getJiraIssueTypeId());
 
         String userOptions = getUserOptions(projectConfig.getJiraKey());
+        String allUserOptions = getAllUserOptions();
         List<PlatformCustomFieldItemDTO> fields = new ArrayList<>();
         Character filedKey = 'A';
         for (String name : createMetadata.keySet()) {
@@ -782,7 +783,7 @@ public class JiraPlatform extends AbstractPlatform {
             customField.setCustomData(name);
             customField.setName(item.getName());
             customField.setRequired(item.isRequired());
-            setCustomFiledType(schema, customField, userOptions);
+            setCustomFiledType(schema, customField, userOptions,allUserOptions);
             setCustomFiledDefaultValue(customField, item);
             List options = getAllowedValuesOptions(item.getAllowedValues());
             setSpecialFieldOptions(customField, schema);
@@ -848,7 +849,7 @@ public class JiraPlatform extends AbstractPlatform {
     }
 
 
-    private void setCustomFiledType(JiraCreateMetadataResponse.Schema schema, PlatformCustomFieldItemDTO customField, String userOptions) {
+    private void setCustomFiledType(JiraCreateMetadataResponse.Schema schema, PlatformCustomFieldItemDTO customField, String userOptions, String allUserOptions) {
         Map<String, String> fieldTypeMap = new HashMap() {{
             put(SUMMARY_FIELD_NAME, CustomFieldType.INPUT.getValue());
             put(DESCRIPTION_FIELD_NAME, CustomFieldType.RICH_TEXT.getValue());
@@ -869,17 +870,17 @@ public class JiraPlatform extends AbstractPlatform {
                 value = "cascadingSelect";
             } else if (customType.contains("multiuserpicker")) {
                 value = CustomFieldType.MULTIPLE_SELECT.getValue();
-                customField.setOptions(userOptions);
+                customField.setOptions(allUserOptions);
             } else if (customType.contains("userpicker")) {
                 value = CustomFieldType.SELECT.getValue();
-                customField.setOptions(userOptions);
+                customField.setOptions(allUserOptions);
             } else if (customType.contains("people")) {
                 if (StringUtils.isNotBlank(schema.getType()) && StringUtils.equals(schema.getType(), "array")) {
                     value = CustomFieldType.MULTIPLE_SELECT.getValue();
                 } else {
                     value = CustomFieldType.SELECT.getValue();
                 }
-                customField.setOptions(userOptions);
+                customField.setOptions(allUserOptions);
             } else if (customType.contains("multicheckboxes")) {
                 value = CustomFieldType.CHECKBOX.getValue();
                 customField.setDefaultValue(JSON.toJSONString(new ArrayList()));
@@ -921,9 +922,12 @@ public class JiraPlatform extends AbstractPlatform {
                 customField.setCustomData(ORIGINAL_ESTIMATE_TRACKING_FIELD_NAME);
                 customField.setName("Original Estimate");
                 value = CustomFieldType.INPUT.getValue();
-            } else if ("user".equals(type)) {
+            } else if ("assignee".equals(schema.getSystem())) {
                 value = CustomFieldType.SELECT.getValue();
                 customField.setOptions(userOptions);
+            } else if ("reporter".equals(schema.getSystem())) {
+                value = CustomFieldType.SELECT.getValue();
+                customField.setOptions(allUserOptions);
             } else if ("date".equals(type)) {
                 value = CustomFieldType.DATE.getValue();
             } else if ("datetime".equals(type)) {
@@ -998,8 +1002,18 @@ public class JiraPlatform extends AbstractPlatform {
 
     private String getUserOptions(String projectKey) {
         List<JiraUser> userOptions = jiraClientV2.getAssignableUser(projectKey);
+        return handleOptions(userOptions);
+    }
+
+    private String getAllUserOptions() {
+        List<JiraUser> reportOptions = jiraClientV2.getAllUser();
+        return handleOptions(reportOptions);
+    }
+
+
+    private String handleOptions(List<JiraUser> userList) {
         List options = new ArrayList();
-        userOptions.forEach(val -> {
+        userList.forEach(val -> {
             Map jsonObject = new LinkedHashMap<>();
             if (StringUtils.isNotBlank(val.getAccountId())) {
                 jsonObject.put("value", val.getAccountId());

@@ -43,6 +43,7 @@ public class JiraCreateMetadataResponse {
         private String items;
         private String custom;
         private int customId;
+        private String system;
     }
 
     @Setter
