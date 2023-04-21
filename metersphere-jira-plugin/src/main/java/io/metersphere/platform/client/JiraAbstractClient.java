@@ -362,7 +362,7 @@ public abstract class JiraAbstractClient extends BaseClient {
             // ENDPOINT 可能会带有前缀，比如 http://xxxx/jira
             // 这里去掉 /jira，再拼接图片路径path
             URI uri = new URI(this.ENDPOINT);
-            endpoint = uri.getScheme() + "://" + uri.getHost();
+            endpoint = uri.getScheme() + "://" + uri.getHost() + ":" + uri.getPort();
         } catch (URISyntaxException e) {
             LogUtil.error(e);
         }
