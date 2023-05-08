@@ -12,7 +12,7 @@
         Jira v2.4.0 插件支持 v2.4.0 ~ v2.6.0 版本的 Metersphere
         Jira v2.6.0 插件支持 v2.6.0 至最新版本的 Metersphere，直到有新的 Jira 插件发布
      -->
-    <version>2.9.0</version>
+    <version>2.9.1</version>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>

@@ -116,8 +116,13 @@ public abstract class JiraAbstractClient extends BaseClient {
         try {
             response = restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), String.class);
         } catch (Exception e) {
-            LogUtil.error(e.getMessage(), e);
-            MSPluginException.throwException(e.getMessage());
+            try {
+                url = getBaseUrl() + "/user/search?username=\"\"&maxResults=" + 1000 + "&startAt=" + 0;
+                response = restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), String.class);
+            } catch (Exception ex) {
+                LogUtil.error(e.getMessage(), ex);
+                MSPluginException.throwException(e.getMessage());
+            }
         }
         return (List<JiraUser>) getResultForList(JiraUser.class, response);
     }
