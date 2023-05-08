@@ -768,7 +768,14 @@ public class JiraPlatform extends AbstractPlatform {
                 jiraClientV2.getCreateMetadata(projectConfig.getJiraKey(), projectConfig.getJiraIssueTypeId());
 
         String userOptions = getUserOptions(projectConfig.getJiraKey());
-        String allUserOptions = getAllUserOptions();
+
+        String allUserOptions;
+        try {
+            allUserOptions = getAllUserOptions();
+        } catch (Exception e) {
+            allUserOptions = userOptions;
+        }
+
         List<PlatformCustomFieldItemDTO> fields = new ArrayList<>();
         Character filedKey = 'A';
         for (String name : createMetadata.keySet()) {
@@ -783,7 +790,7 @@ public class JiraPlatform extends AbstractPlatform {
             customField.setCustomData(name);
             customField.setName(item.getName());
             customField.setRequired(item.isRequired());
-            setCustomFiledType(schema, customField, userOptions,allUserOptions);
+            setCustomFiledType(schema, customField, userOptions, allUserOptions);
             setCustomFiledDefaultValue(customField, item);
             List options = getAllowedValuesOptions(item.getAllowedValues());
             setSpecialFieldOptions(customField, schema);
