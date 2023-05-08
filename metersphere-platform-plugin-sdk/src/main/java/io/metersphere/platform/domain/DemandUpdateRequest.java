@@ -25,4 +25,13 @@ public class DemandUpdateRequest {
      * 项目设置的配置项
      */
     private String projectConfig;
+
+    /**
+     * 用例的增删改操作
+     */
+    private OperateType operateType;
+
+    public enum OperateType {
+        ADD, EDIT, DELETE
+    }
 }

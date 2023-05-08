@@ -23,7 +23,7 @@
         <dependency>
             <groupId>io.metersphere</groupId>
             <artifactId>metersphere-platform-plugin-sdk</artifactId>
-            <version>1.5.0</version>
+            <version>1.6.0</version>
             <!-- 打包进去会冲突 -->
             <scope>provided</scope>
         </dependency>
