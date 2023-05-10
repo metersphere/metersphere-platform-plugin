@@ -97,34 +97,48 @@ public abstract class JiraAbstractClient extends BaseClient {
         return (JiraIssueProject) getResultForObject(JiraIssueProject.class, response);
     }
 
-    public List<JiraUser> getAssignableUser(String projectKey) {
-        String url = getBaseUrl() + "/user/assignable/search?project={1}&maxResults=" + 1000 + "&startAt=" + 0;
-        ResponseEntity<String> response = null;
-        try {
-            response = restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), String.class, projectKey);
-        } catch (Exception e) {
-            LogUtil.error(e.getMessage(), e);
-            MSPluginException.throwException(e.getMessage());
-        }
-        return (List<JiraUser>) getResultForList(JiraUser.class, response);
+    public List<JiraUser> getAssignableUser(String projectKey, int maxResults, int startAt, List<JiraUser> reportOptions) {
+        List<JiraUser> resultForList;
+        do {
+            String url = getBaseUrl() + "/user/assignable/search?project={1}&maxResults=" + maxResults + "&startAt=" + startAt;
+            ResponseEntity<String> response = null;
+            try {
+                response = restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), String.class, projectKey);
+            } catch (Exception e) {
+                LogUtil.error(e.getMessage(), e);
+                MSPluginException.throwException(e.getMessage());
+            }
+            resultForList = (List<JiraUser>) getResultForList(JiraUser.class, response);
+            if (!CollectionUtils.isEmpty(resultForList)) {
+                reportOptions.addAll(resultForList);
+            }
+        } while (!CollectionUtils.isEmpty(resultForList) && resultForList.size() == maxResults);
+        return reportOptions;
     }
 
 
-    public List<JiraUser> getAllUser() {
-        String url = getBaseUrl() + "/user/search?query=&maxResults=" + 1000 + "&startAt=" + 0;
-        ResponseEntity<String> response = null;
-        try {
-            response = restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), String.class);
-        } catch (Exception e) {
+    public List<JiraUser> getAllUser(int maxResults, int startAt, List<JiraUser> reportOptions) {
+        List<JiraUser> resultForList;
+        do {
+            String url = getBaseUrl() + "/user/search?query=&maxResults=" + maxResults + "&startAt=" + startAt;
+            ResponseEntity<String> response = null;
             try {
-                url = getBaseUrl() + "/user/search?username=\"\"&maxResults=" + 1000 + "&startAt=" + 0;
                 response = restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), String.class);
-            } catch (Exception ex) {
-                LogUtil.error(e.getMessage(), ex);
-                MSPluginException.throwException(e.getMessage());
+            } catch (Exception e) {
+                try {
+                    url = getBaseUrl() + "/user/search?username=\"\"&maxResults=" + maxResults + "&startAt=" + startAt;
+                    response = restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), String.class);
+                } catch (Exception ex) {
+                    LogUtil.error(e.getMessage(), ex);
+                    MSPluginException.throwException(e.getMessage());
+                }
             }
-        }
-        return (List<JiraUser>) getResultForList(JiraUser.class, response);
+            resultForList = (List<JiraUser>) getResultForList(JiraUser.class, response);
+            if (!CollectionUtils.isEmpty(resultForList)) {
+                reportOptions.addAll(resultForList);
+            }
+        } while (!CollectionUtils.isEmpty(resultForList) && resultForList.size() == maxResults);
+        return reportOptions;
     }
 
 
