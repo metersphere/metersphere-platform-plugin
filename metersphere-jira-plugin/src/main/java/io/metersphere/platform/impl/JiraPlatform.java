@@ -767,11 +767,11 @@ public class JiraPlatform extends AbstractPlatform {
         Map<String, JiraCreateMetadataResponse.Field> createMetadata =
                 jiraClientV2.getCreateMetadata(projectConfig.getJiraKey(), projectConfig.getJiraIssueTypeId());
 
-        String userOptions = getUserOptions(projectConfig.getJiraKey(), 500, 0);
+        String userOptions = getUserOptions(projectConfig.getJiraKey());
 
         String allUserOptions;
         try {
-            allUserOptions = getAllUserOptions(500, 0);
+            allUserOptions = getAllUserOptions();
         } catch (Exception e) {
             allUserOptions = userOptions;
         }
@@ -1007,15 +1007,15 @@ public class JiraPlatform extends AbstractPlatform {
         return null;
     }
 
-    private String getUserOptions(String projectKey, int maxResults, int startAt) {
+    private String getUserOptions(String projectKey) {
         List<JiraUser> reportOptions = new ArrayList<>();
-        List<JiraUser> userOptions = jiraClientV2.getAssignableUser(projectKey, maxResults, startAt, reportOptions);
+        List<JiraUser> userOptions = jiraClientV2.getAssignableUser(projectKey, reportOptions);
         return handleOptions(userOptions);
     }
 
-    private String getAllUserOptions(int maxResults, int startAt) {
+    private String getAllUserOptions() {
         List<JiraUser> reportOptions = new ArrayList<>();
-        reportOptions = jiraClientV2.getAllUser(maxResults, startAt, reportOptions);
+        reportOptions = jiraClientV2.getAllUser(reportOptions);
         return handleOptions(reportOptions);
     }
 

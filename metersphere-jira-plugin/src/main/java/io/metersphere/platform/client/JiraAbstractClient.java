@@ -97,8 +97,10 @@ public abstract class JiraAbstractClient extends BaseClient {
         return (JiraIssueProject) getResultForObject(JiraIssueProject.class, response);
     }
 
-    public List<JiraUser> getAssignableUser(String projectKey, int maxResults, int startAt, List<JiraUser> reportOptions) {
+    public List<JiraUser> getAssignableUser(String projectKey, List<JiraUser> reportOptions) {
         List<JiraUser> resultForList;
+        int startAt = 0;
+        int maxResults = 500;
         do {
             String url = getBaseUrl() + "/user/assignable/search?project={1}&maxResults=" + maxResults + "&startAt=" + startAt;
             ResponseEntity<String> response = null;
@@ -111,14 +113,17 @@ public abstract class JiraAbstractClient extends BaseClient {
             resultForList = (List<JiraUser>) getResultForList(JiraUser.class, response);
             if (!CollectionUtils.isEmpty(resultForList)) {
                 reportOptions.addAll(resultForList);
+                startAt += maxResults;
             }
         } while (!CollectionUtils.isEmpty(resultForList) && resultForList.size() == maxResults);
         return reportOptions;
     }
 
 
-    public List<JiraUser> getAllUser(int maxResults, int startAt, List<JiraUser> reportOptions) {
+    public List<JiraUser> getAllUser(List<JiraUser> reportOptions) {
         List<JiraUser> resultForList;
+        int startAt = 0;
+        int maxResults = 500;
         do {
             String url = getBaseUrl() + "/user/search?query=&maxResults=" + maxResults + "&startAt=" + startAt;
             ResponseEntity<String> response = null;
@@ -136,6 +141,7 @@ public abstract class JiraAbstractClient extends BaseClient {
             resultForList = (List<JiraUser>) getResultForList(JiraUser.class, response);
             if (!CollectionUtils.isEmpty(resultForList)) {
                 reportOptions.addAll(resultForList);
+                startAt += maxResults;
             }
         } while (!CollectionUtils.isEmpty(resultForList) && resultForList.size() == maxResults);
         return reportOptions;
