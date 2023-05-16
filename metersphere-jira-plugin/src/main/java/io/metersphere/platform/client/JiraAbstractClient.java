@@ -97,54 +97,45 @@ public abstract class JiraAbstractClient extends BaseClient {
         return (JiraIssueProject) getResultForObject(JiraIssueProject.class, response);
     }
 
-    public List<JiraUser> getAssignableUser(String projectKey, List<JiraUser> reportOptions) {
-        List<JiraUser> resultForList;
+    public List<JiraUser> assignableUserSearch(String projectKey, String query) {
         int startAt = 0;
-        int maxResults = 500;
-        do {
-            String url = getBaseUrl() + "/user/assignable/search?project={1}&maxResults=" + maxResults + "&startAt=" + startAt;
-            ResponseEntity<String> response = null;
-            try {
-                response = restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), String.class, projectKey);
-            } catch (Exception e) {
-                LogUtil.error(e.getMessage(), e);
-                MSPluginException.throwException(e.getMessage());
-            }
-            resultForList = (List<JiraUser>) getResultForList(JiraUser.class, response);
-            if (!CollectionUtils.isEmpty(resultForList)) {
-                reportOptions.addAll(resultForList);
-                startAt += maxResults;
-            }
-        } while (!CollectionUtils.isEmpty(resultForList) && resultForList.size() == maxResults);
-        return reportOptions;
+        int maxResults = 100;
+        String url = getBaseUrl() + "/user/assignable/search?project={1}&maxResults=" + maxResults + "&startAt=" + startAt;
+        if (StringUtils.isNotBlank(query)) {
+            url += "&query=" + query;
+        }
+        ResponseEntity<String> response = null;
+        try {
+            response = restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), String.class, projectKey);
+        } catch (Exception e) {
+            LogUtil.error(e.getMessage(), e);
+            MSPluginException.throwException(e.getMessage());
+        }
+        return  (List<JiraUser>) getResultForList(JiraUser.class, response);
     }
 
 
-    public List<JiraUser> getAllUser(List<JiraUser> reportOptions) {
-        List<JiraUser> resultForList;
+    public List<JiraUser> allUserSearch(String query) {
         int startAt = 0;
-        int maxResults = 500;
-        do {
-            String url = getBaseUrl() + "/user/search?query=&maxResults=" + maxResults + "&startAt=" + startAt;
-            ResponseEntity<String> response = null;
+        int maxResults = 100;
+        String baseUrl = getBaseUrl() + "/user/search?maxResults=" + maxResults + "&startAt=" + startAt;
+        String url = baseUrl + "&query=" + (StringUtils.isNotBlank(query) ? query : "");
+        ResponseEntity<String> response = null;
+        try {
+            response = restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), String.class);
+        } catch (Exception e) {
             try {
-                response = restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), String.class);
-            } catch (Exception e) {
-                try {
-                    url = getBaseUrl() + "/user/search?username=\"\"&maxResults=" + maxResults + "&startAt=" + startAt;
-                    response = restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), String.class);
-                } catch (Exception ex) {
-                    LogUtil.error(e.getMessage(), ex);
-                    MSPluginException.throwException(e.getMessage());
+                // 兼容不同版本查询
+                if (StringUtils.isNotBlank(query)) {
+                    url = baseUrl + "&username=" + (StringUtils.isNotBlank(query) ? query : "\"\"");
                 }
+                response = restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), String.class);
+            } catch (Exception ex) {
+                LogUtil.error(e.getMessage(), ex);
+                MSPluginException.throwException(e.getMessage());
             }
-            resultForList = (List<JiraUser>) getResultForList(JiraUser.class, response);
-            if (!CollectionUtils.isEmpty(resultForList)) {
-                reportOptions.addAll(resultForList);
-                startAt += maxResults;
-            }
-        } while (!CollectionUtils.isEmpty(resultForList) && resultForList.size() == maxResults);
-        return reportOptions;
+        }
+        return (List<JiraUser>) getResultForList(JiraUser.class, response);
     }
 
 

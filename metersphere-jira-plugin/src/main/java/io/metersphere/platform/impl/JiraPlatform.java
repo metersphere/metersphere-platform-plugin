@@ -51,6 +51,8 @@ public class JiraPlatform extends AbstractPlatform {
     private static final String TIME_TRACKING_FIELD_NAME = "timetracking";
     private static final String ORIGINAL_ESTIMATE_TRACKING_FIELD_NAME = "originalEstimate";
     private static final String REMAINING_ESTIMATE_TRACKING_FIELD_NAME = "remainingEstimate";
+    private static final String USER_SEARCH_METHOD = "getUserSearchOptions";
+    private static final String ASSIGNABLE_SEARCH_METHOD = "getAssignableOptions";
 
     public JiraPlatform(PlatformRequest request) {
         super.key = JiraPlatformMetaInfo.KEY;
@@ -153,10 +155,65 @@ public class JiraPlatform extends AbstractPlatform {
         }
     }
 
+    @Override
+    protected String getCustomFieldsValuesString(List<PlatformCustomFieldItemDTO> thirdPartCustomField) {
+        List fields = new ArrayList();
+        thirdPartCustomField.forEach(item -> {
+            Map<String, Object> field = new LinkedHashMap<>();
+            field.put("customData", item.getCustomData());
+            field.put(ID_FIELD_NAME, item.getId());
+            field.put("name", item.getName());
+            field.put("type", item.getType());
+            field.put("inputSearch", item.getInputSearch());
+            field.put("optionMethod", item.getOptionMethod());
+            String defaultValue = item.getDefaultValue();
+            if (StringUtils.isNotBlank(defaultValue)) {
+                field.put("value", JSON.parseObject(defaultValue));
+            }
+            fields.add(field);
+        });
+        return JSON.toJSONString(fields);
+    }
+
     private void parseSpecialCustomField(List<PlatformCustomFieldItemDTO> customFieldItems, Map fields) {
         for (PlatformCustomFieldItemDTO customFieldItem : customFieldItems) {
             Object value = customFieldItem.getValue();
             try {
+                if (customFieldItem.getInputSearch() && StringUtils.equalsAny(customFieldItem.getOptionMethod(), USER_SEARCH_METHOD, ASSIGNABLE_SEARCH_METHOD)) {
+                    Object itemFields = fields.get(customFieldItem.getCustomData());
+                    String displayName = StringUtils.EMPTY;
+                    if (itemFields instanceof List) {
+                        HashMap<String, String> optionLabelMap = new HashMap<>();
+                        for (Object item : ((List) itemFields)) {
+                            Map fieldMap = (Map) item;
+                            String val;
+                            Object accountId = fieldMap.get("accountId");
+                            if (accountId != null && StringUtils.isNotBlank(accountId.toString())) {
+                                val = accountId.toString();
+                            } else {
+                                val = fieldMap.get("name").toString();
+                            }
+                            if (fieldMap.get("emailAddress") != null) {
+                                optionLabelMap.put(val, fieldMap.get("displayName") + " (" + fieldMap.get("emailAddress") + ")");
+                            } else {
+                                optionLabelMap.put(val, fieldMap.get("displayName").toString());
+                            }
+                        }
+                        displayName = JSON.toJSONString(optionLabelMap);
+                    } else {
+                        if (itemFields == null) {
+                            continue;
+                        }
+                        Map fieldMap = (Map) itemFields;
+                        displayName = fieldMap.get("displayName").toString();
+                        if (fieldMap.get("emailAddress") != null) {
+                            displayName += " (" + fieldMap.get("emailAddress") + ")";
+                        }
+                    }
+                    customFieldItem.setOptionLabel(displayName);
+                    continue;
+                }
+
                 // 解析 sprint 的 ID 重新设置
                 if (value != null && value instanceof List) {
                     List arrayValue = (List) value;
@@ -372,6 +429,25 @@ public class JiraPlatform extends AbstractPlatform {
     @Deprecated
     public List<SelectOption> getProjectOptions(GetOptionRequest request) {
         return getFormOptions(this, request);
+    }
+
+    public List getAssignableOptions(GetOptionRequest request) {
+        JiraProjectConfig projectConfig = getProjectConfig(request.getProjectConfig());
+        return getAssignableOptions(projectConfig.getJiraKey(), request.getQuery());
+    }
+
+    private List getAssignableOptions(String jiraKey, String query) {
+        List<JiraUser> userOptions = jiraClientV2.assignableUserSearch(jiraKey, query);
+        return handleOptions(userOptions);
+    }
+
+    public List getUserSearchOptions(GetOptionRequest request) {
+        return getUserSearchOptions(request.getQuery());
+    }
+
+    private List getUserSearchOptions(String query) {
+        List<JiraUser> reportOptions = jiraClientV2.allUserSearch(query);
+        return handleOptions(reportOptions);
     }
 
     /**
@@ -767,13 +843,14 @@ public class JiraPlatform extends AbstractPlatform {
         Map<String, JiraCreateMetadataResponse.Field> createMetadata =
                 jiraClientV2.getCreateMetadata(projectConfig.getJiraKey(), projectConfig.getJiraIssueTypeId());
 
-        String userOptions = getUserOptions(projectConfig.getJiraKey());
+        String assignableOptions = "[]";
+        String allUserOptions = "[]";
 
-        String allUserOptions;
         try {
-            allUserOptions = getAllUserOptions();
+             assignableOptions = JSON.toJSONString(getAssignableOptions(projectConfig.getJiraKey(), null));
+             allUserOptions = JSON.toJSONString(getUserSearchOptions(StringUtils.EMPTY));
         } catch (Exception e) {
-            allUserOptions = userOptions;
+            LogUtil.error(e);
         }
 
         List<PlatformCustomFieldItemDTO> fields = new ArrayList<>();
@@ -790,7 +867,7 @@ public class JiraPlatform extends AbstractPlatform {
             customField.setCustomData(name);
             customField.setName(item.getName());
             customField.setRequired(item.isRequired());
-            setCustomFiledType(schema, customField, userOptions, allUserOptions);
+            setCustomFiledType(schema, customField, assignableOptions, allUserOptions);
             setCustomFiledDefaultValue(customField, item);
             List options = getAllowedValuesOptions(item.getAllowedValues());
             setSpecialFieldOptions(customField, schema);
@@ -856,7 +933,7 @@ public class JiraPlatform extends AbstractPlatform {
     }
 
 
-    private void setCustomFiledType(JiraCreateMetadataResponse.Schema schema, PlatformCustomFieldItemDTO customField, String userOptions, String allUserOptions) {
+    private void setCustomFiledType(JiraCreateMetadataResponse.Schema schema, PlatformCustomFieldItemDTO customField, String assignableOptions, String allUserOptions) {
         Map<String, String> fieldTypeMap = new HashMap() {{
             put(SUMMARY_FIELD_NAME, CustomFieldType.INPUT.getValue());
             put(DESCRIPTION_FIELD_NAME, CustomFieldType.RICH_TEXT.getValue());
@@ -877,9 +954,13 @@ public class JiraPlatform extends AbstractPlatform {
                 value = "cascadingSelect";
             } else if (customType.contains("multiuserpicker")) {
                 value = CustomFieldType.MULTIPLE_SELECT.getValue();
+                customField.setInputSearch(true);
+                customField.setOptionMethod(USER_SEARCH_METHOD);
                 customField.setOptions(allUserOptions);
             } else if (customType.contains("userpicker")) {
                 value = CustomFieldType.SELECT.getValue();
+                customField.setInputSearch(true);
+                customField.setOptionMethod(USER_SEARCH_METHOD);
                 customField.setOptions(allUserOptions);
             } else if (customType.contains("people")) {
                 if (StringUtils.isNotBlank(schema.getType()) && StringUtils.equals(schema.getType(), "array")) {
@@ -887,6 +968,8 @@ public class JiraPlatform extends AbstractPlatform {
                 } else {
                     value = CustomFieldType.SELECT.getValue();
                 }
+                customField.setInputSearch(true);
+                customField.setOptionMethod(USER_SEARCH_METHOD);
                 customField.setOptions(allUserOptions);
             } else if (customType.contains("multicheckboxes")) {
                 value = CustomFieldType.CHECKBOX.getValue();
@@ -930,10 +1013,15 @@ public class JiraPlatform extends AbstractPlatform {
                 customField.setName("Original Estimate");
                 value = CustomFieldType.INPUT.getValue();
             } else if ("assignee".equals(schema.getSystem())) {
+                // 经办人
                 value = CustomFieldType.SELECT.getValue();
-                customField.setOptions(userOptions);
+                customField.setInputSearch(true);
+                customField.setOptionMethod(ASSIGNABLE_SEARCH_METHOD);
+                customField.setOptions(assignableOptions);
             } else if ("reporter".equals(schema.getSystem())) {
                 value = CustomFieldType.SELECT.getValue();
+                customField.setInputSearch(true);
+                customField.setOptionMethod(USER_SEARCH_METHOD);
                 customField.setOptions(allUserOptions);
             } else if ("date".equals(type)) {
                 value = CustomFieldType.DATE.getValue();
@@ -1007,20 +1095,7 @@ public class JiraPlatform extends AbstractPlatform {
         return null;
     }
 
-    private String getUserOptions(String projectKey) {
-        List<JiraUser> reportOptions = new ArrayList<>();
-        List<JiraUser> userOptions = jiraClientV2.getAssignableUser(projectKey, reportOptions);
-        return handleOptions(userOptions);
-    }
-
-    private String getAllUserOptions() {
-        List<JiraUser> reportOptions = new ArrayList<>();
-        reportOptions = jiraClientV2.getAllUser(reportOptions);
-        return handleOptions(reportOptions);
-    }
-
-
-    private String handleOptions(List<JiraUser> userList) {
+    private List handleOptions(List<JiraUser> userList) {
         List options = new ArrayList();
         userList.forEach(val -> {
             Map jsonObject = new LinkedHashMap<>();
@@ -1035,7 +1110,7 @@ public class JiraPlatform extends AbstractPlatform {
             }
             options.add(jsonObject);
         });
-        return JSON.toJSONString(options);
+        return options;
     }
 
     @Override
