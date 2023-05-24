@@ -871,7 +871,6 @@ public class JiraPlatform extends AbstractPlatform {
             } else {
                 customField.setRequired(item.isRequired());
             }
-            customField.setRequired(item.isRequired());
             setCustomFiledType(schema, customField, assignableOptions, allUserOptions);
             setCustomFiledDefaultValue(customField, item);
             List options = getAllowedValuesOptions(item.getAllowedValues());
