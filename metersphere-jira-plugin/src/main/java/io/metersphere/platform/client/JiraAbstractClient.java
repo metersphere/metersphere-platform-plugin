@@ -13,7 +13,6 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RequestCallback;
-import org.springframework.web.client.RestTemplate;
 
 import java.io.File;
 import java.io.InputStream;
@@ -37,10 +36,6 @@ public abstract class JiraAbstractClient extends BaseClient {
     protected  String AUTH_TYPE;
 
     private static final String GREENHOPPER_V1_BASE_URL = "/rest/greenhopper/1.0";
-
-    {
-        this.restTemplate = new RestTemplate();
-    }
 
     public JiraIssue getIssues(String issuesId) {
         LogUtil.info("getIssues: " + issuesId);
@@ -295,10 +290,14 @@ public abstract class JiraAbstractClient extends BaseClient {
     }
 
     protected HttpHeaders getAuthHeader() {
+        HttpHeaders headers;
         if (StringUtils.isNotBlank(AUTH_TYPE) && StringUtils.equals(AUTH_TYPE, "bearer")) {
-            return getBearHttpHeaders(TOKEN);
+            headers = getBearHttpHeaders(TOKEN);
+        } else {
+            headers = getBasicHttpHeaders(USER_NAME, PASSWD);
         }
-        return getBasicHttpHeaders(USER_NAME, PASSWD);
+        headers.set(HttpHeaders.ACCEPT_ENCODING, "gzip,x-gzip,deflate");
+        return headers;
     }
 
     protected HttpHeaders getAuthJsonHeader() {
