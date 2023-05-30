@@ -43,8 +43,7 @@ public abstract class ZentaoClient extends BaseClient {
             MultiValueMap<String, String> paramMap = new LinkedMultiValueMap<>();
             paramMap.add("account", USER_NAME);
             paramMap.add("password", PASSWD);
-            HttpEntity<MultiValueMap<String, String>> requestEntity = new HttpEntity<>(paramMap, new HttpHeaders());
-            ResponseEntity<String> response = restTemplate.exchange(loginUrl + sessionId, HttpMethod.POST, requestEntity, String.class);
+            ResponseEntity<String> response = restTemplate.exchange(loginUrl + sessionId, HttpMethod.POST, getHttpEntity(paramMap), String.class);
             getUserResponse = (GetUserResponse) getResultForObject(GetUserResponse.class, response);
         } catch (Exception e) {
             LogUtil.error(e);
@@ -63,22 +62,35 @@ public abstract class ZentaoClient extends BaseClient {
         return sessionId;
     }
 
+    protected HttpEntity<MultiValueMap> getHttpEntity() {
+        return new HttpEntity<>(getHeader());
+    }
+
+    protected HttpEntity<MultiValueMap> getHttpEntity(MultiValueMap paramMap) {
+        return new HttpEntity<>(paramMap, getHeader());
+    }
+
+    protected HttpHeaders getHeader() {
+        HttpHeaders httpHeaders = new HttpHeaders();
+        httpHeaders.set(HttpHeaders.ACCEPT_ENCODING, "gzip,x-gzip,deflate");
+        return httpHeaders;
+    }
+
     public String getSessionId() {
         String getSessionUrl = requestUrl.getSessionGet();
         ResponseEntity<String> response = restTemplate.exchange(getSessionUrl,
-                HttpMethod.GET, null, String.class);
+                HttpMethod.GET, getHttpEntity(), String.class);
         GetSessionResponse getSessionResponse = (GetSessionResponse) getResultForObject(GetSessionResponse.class, response);
         return JSON.parseObject(getSessionResponse.getData(), GetSessionResponse.Session.class).getSessionID();
     }
 
     public AddIssueResponse.Issue addIssue(MultiValueMap<String, Object> paramMap) {
         String sessionId = login();
-        HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(paramMap, new HttpHeaders());
         ResponseEntity<String> response = null;
         try {
             String bugCreate = requestUrl.getBugCreate();
             response = restTemplate.exchange(bugCreate + sessionId,
-                    HttpMethod.POST, requestEntity, String.class);
+                    HttpMethod.POST, getHttpEntity(paramMap), String.class);
         } catch (Exception e) {
             LogUtil.error(e.getMessage(), e);
             MSPluginException.throwException(e.getMessage());
@@ -93,10 +105,9 @@ public abstract class ZentaoClient extends BaseClient {
 
     public void updateIssue(String id, MultiValueMap<String, Object> paramMap) {
         String sessionId = login();
-        HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(paramMap, new HttpHeaders());
         try {
             restTemplate.exchange(requestUrl.getBugUpdate(),
-                    HttpMethod.POST, requestEntity, String.class, id, sessionId);
+                    HttpMethod.POST, getHttpEntity(paramMap), String.class, id, sessionId);
         } catch (Exception e) {
             LogUtil.error(e.getMessage(), e);
             MSPluginException.throwException(e.getMessage());
@@ -107,7 +118,7 @@ public abstract class ZentaoClient extends BaseClient {
         String sessionId = login();
         try {
             restTemplate.exchange(requestUrl.getBugDelete(),
-                    HttpMethod.GET, new HttpEntity<>(new HttpHeaders()), String.class, id, sessionId);
+                    HttpMethod.GET, getHttpEntity(), String.class, id, sessionId);
         } catch (Exception e) {
             LogUtil.error(e.getMessage(), e);
             MSPluginException.throwException(e.getMessage());
@@ -118,7 +129,7 @@ public abstract class ZentaoClient extends BaseClient {
         String sessionId = login();
         String bugGet = requestUrl.getBugGet();
         ResponseEntity<String> response = restTemplate.exchange(bugGet,
-                HttpMethod.GET, null, String.class, id, sessionId);
+                HttpMethod.GET, getHttpEntity(), String.class, id, sessionId);
         GetIssueResponse getIssueResponse = (GetIssueResponse) getResultForObject(GetIssueResponse.class, response);
         if(StringUtils.equalsIgnoreCase(getIssueResponse.getStatus(),"fail")){
             GetIssueResponse.Issue issue = new GetIssueResponse.Issue();
@@ -136,7 +147,7 @@ public abstract class ZentaoClient extends BaseClient {
     public GetCreateMetaDataResponse.MetaData getCreateMetaData(String productID) {
         String sessionId = login();
         ResponseEntity<String> response = restTemplate.exchange(requestUrl.getCreateMetaData(),
-                HttpMethod.GET, null, String.class, productID, sessionId);
+                HttpMethod.GET, getHttpEntity(), String.class, productID, sessionId);
         GetCreateMetaDataResponse getCreateMetaDataResponse = (GetCreateMetaDataResponse) getResultForObject(GetCreateMetaDataResponse.class, response);
         return JSON.parseObject(getCreateMetaDataResponse.getData(), GetCreateMetaDataResponse.MetaData.class);
     }
@@ -152,40 +163,38 @@ public abstract class ZentaoClient extends BaseClient {
     public Map<String, Object> getBuilds(String projectId) {
         String sessionId = login();
         ResponseEntity<String> response = restTemplate.exchange(requestUrl.getBuildsGet(),
-                HttpMethod.GET, null, String.class, projectId, sessionId);
+                HttpMethod.GET, getHttpEntity(), String.class, projectId, sessionId);
         return (Map<String, Object>) JSON.parseMap((String) JSON.parseMap(response.getBody()).get("data"));
     }
 
     public Map<String, Object> getUsers() {
         String sessionId = login();
         ResponseEntity<String> response = restTemplate.exchange(requestUrl.getUserGet() + sessionId,
-                HttpMethod.GET, null, String.class);
+                HttpMethod.GET, getHttpEntity(), String.class);
         return (Map<String, Object>) JSON.parseMap(response.getBody());
     }
 
     public Map<String, Object> getDemands(String projectKey) {
         String sessionId = login();
         ResponseEntity<String> response = restTemplate.exchange(requestUrl.getStoryGet() + sessionId,
-                HttpMethod.GET, null, String.class, projectKey);
+                HttpMethod.GET, getHttpEntity(), String.class, projectKey);
         return (Map<String, Object>) JSON.parseMap(response.getBody());
     }
 
     public Map<String, Object> getBuildsV17(String projectId) {
         String sessionId = login();
         ResponseEntity<String> response = restTemplate.exchange(requestUrl.getBuildsGetV17(),
-                HttpMethod.GET, null, String.class, projectId, sessionId);
+                HttpMethod.GET, getHttpEntity(), String.class, projectId, sessionId);
         return (Map<String, Object>) JSON.parseMap(response.getBody()).get("data");
     }
 
     public String uploadFile(File file) {
         String id = "";
         String sessionId = login();
-        HttpHeaders httpHeaders = new HttpHeaders();
         MultiValueMap<String, Object> paramMap = new LinkedMultiValueMap<>();
         paramMap.add("files", new FileSystemResource(file));
-        HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(paramMap, httpHeaders);
         try {
-            ResponseEntity<String> responseEntity = restTemplate.exchange(requestUrl.getFileUpload(), HttpMethod.POST, requestEntity,
+            ResponseEntity<String> responseEntity = restTemplate.exchange(requestUrl.getFileUpload(), HttpMethod.POST, getHttpEntity(paramMap),
                     String.class, null, sessionId);
             String body = responseEntity.getBody();
             Map obj = JSON.parseMap(body);
@@ -204,7 +213,7 @@ public abstract class ZentaoClient extends BaseClient {
     public Map getBugsByProjectId(String projectId, Integer pageNum, Integer pageSize) {
         String sessionId = login();
         ResponseEntity<String> response = restTemplate.exchange(requestUrl.getBugList(),
-                HttpMethod.GET, null, String.class, projectId, 9999999, pageSize, pageNum, sessionId);
+                HttpMethod.GET, getHttpEntity(), String.class, projectId, 9999999, pageSize, pageNum, sessionId);
         try {
             return JSON.parseMap(JSON.parseMap(response.getBody()).get("data").toString());
         } catch (Exception e) {
@@ -248,7 +257,7 @@ public abstract class ZentaoClient extends BaseClient {
     public void checkProjectExist(String relateId) {
         String sessionId = login();
         ResponseEntity<String> response = restTemplate.exchange(requestUrl.getProductGet(),
-                HttpMethod.GET, null, String.class, relateId, sessionId);
+                HttpMethod.GET, getHttpEntity(), String.class, relateId, sessionId);
         try {
             Map data = ((Map) JSON.parseObject(JSON.parseMap(response.getBody()).get("data").toString()));
             if (data.get("id") != null || ((Map) data.get("product")).get("id") != null) {
@@ -262,16 +271,13 @@ public abstract class ZentaoClient extends BaseClient {
 
     public void uploadAttachment(String objectType, String objectId, File file) {
         String sessionId = login();
-        HttpHeaders authHeader = new HttpHeaders();
-        authHeader.setContentType(MediaType.parseMediaType("multipart/form-data; charset=UTF-8"));
-
         MultiValueMap<String, Object> paramMap = new LinkedMultiValueMap<>();
         FileSystemResource fileResource = new FileSystemResource(file);
         paramMap.add("files", fileResource);
-        HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(paramMap, authHeader);
-
+        HttpEntity<MultiValueMap> httpEntity = getHttpEntity(paramMap);
+        httpEntity.getHeaders().setContentType(MediaType.parseMediaType("multipart/form-data; charset=UTF-8"));
         try {
-            restTemplate.exchange(requestUrl.getFileUpload(), HttpMethod.POST, requestEntity,
+            restTemplate.exchange(requestUrl.getFileUpload(), HttpMethod.POST, httpEntity,
                     String.class, objectId, sessionId);
         } catch (Exception e) {
             LogUtil.info("upload zentao attachment error");
@@ -281,7 +287,7 @@ public abstract class ZentaoClient extends BaseClient {
     public void deleteAttachment(String fileId) {
         String sessionId = login();
         try {
-            restTemplate.exchange(requestUrl.getFileDelete(), HttpMethod.GET, null, String.class, fileId, sessionId);
+            restTemplate.exchange(requestUrl.getFileDelete(), HttpMethod.GET, getHttpEntity(), String.class, fileId, sessionId);
         } catch (Exception e) {
             LogUtil.info("delete zentao attachment error");
         }
@@ -292,6 +298,7 @@ public abstract class ZentaoClient extends BaseClient {
         RequestCallback requestCallback = request -> {
             //定义请求头的接收类型
             request.getHeaders().setAccept(Arrays.asList(MediaType.APPLICATION_OCTET_STREAM, MediaType.ALL));
+            request.getHeaders().set(HttpHeaders.ACCEPT_ENCODING, "gzip,x-gzip,deflate");
         };
 
         String sessionId = login();
@@ -306,6 +313,6 @@ public abstract class ZentaoClient extends BaseClient {
         LogUtil.info("zentao proxyForGet: " + path);
         String url = this.ENDPOINT + path;
         validateProxyUrl(url, "/index.php", "/file-read-");
-        return restTemplate.exchange(url, HttpMethod.GET, null, responseEntityClazz);
+        return restTemplate.exchange(url, HttpMethod.GET, getHttpEntity(), responseEntityClazz);
     }
 }
