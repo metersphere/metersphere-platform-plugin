@@ -109,7 +109,7 @@ public abstract class JiraAbstractClient extends BaseClient {
             response = restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), String.class, projectKey);
         } catch (Exception e) {
             LogUtil.error(e.getMessage(), e);
-            MSPluginException.throwException(e.getMessage());
+            return new ArrayList<>();
         }
         return  (List<JiraUser>) getResultForList(JiraUser.class, response);
     }
@@ -126,13 +126,11 @@ public abstract class JiraAbstractClient extends BaseClient {
         } catch (Exception e) {
             try {
                 // 兼容不同版本查询
-                if (StringUtils.isNotBlank(query)) {
-                    url = baseUrl + "&username=" + (StringUtils.isNotBlank(query) ? query : "\"\"");
-                }
+                url = baseUrl + "&username=" + (StringUtils.isNotBlank(query) ? query : "\"\"");
                 response = restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), String.class);
             } catch (Exception ex) {
-                LogUtil.error(e.getMessage(), ex);
-                MSPluginException.throwException(e.getMessage());
+                LogUtil.error(ex);
+                return new ArrayList<>();
             }
         }
         return (List<JiraUser>) getResultForList(JiraUser.class, response);

@@ -866,7 +866,8 @@ public class JiraPlatform extends AbstractPlatform {
             customField.setId(name);
             customField.setCustomData(name);
             customField.setName(item.getName());
-            if (item.getKey().equals("summary")) {
+
+            if (StringUtils.isNotBlank(item.getKey()) && item.getKey().equals("summary")) {
                 customField.setRequired(true);
             } else {
                 customField.setRequired(item.isRequired());
