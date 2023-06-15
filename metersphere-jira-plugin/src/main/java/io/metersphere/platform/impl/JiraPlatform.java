@@ -179,9 +179,11 @@ public class JiraPlatform extends AbstractPlatform {
         for (PlatformCustomFieldItemDTO customFieldItem : customFieldItems) {
             Object value = customFieldItem.getValue();
             try {
-                if (customFieldItem.getInputSearch() && StringUtils.equalsAny(customFieldItem.getOptionMethod(), USER_SEARCH_METHOD, ASSIGNABLE_SEARCH_METHOD)) {
+                if (customFieldItem.getInputSearch() != null
+                        && customFieldItem.getInputSearch()
+                        && StringUtils.equalsAny(customFieldItem.getOptionMethod(), USER_SEARCH_METHOD, ASSIGNABLE_SEARCH_METHOD)) {
                     Object itemFields = fields.get(customFieldItem.getCustomData());
-                    String displayName = StringUtils.EMPTY;
+                    String displayName;
                     if (itemFields instanceof List) {
                         HashMap<String, String> optionLabelMap = new HashMap<>();
                         for (Object item : ((List) itemFields)) {
