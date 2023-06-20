@@ -70,6 +70,10 @@ public abstract class ZentaoClient extends BaseClient {
         return new HttpEntity<>(paramMap, getHeader());
     }
 
+    protected HttpEntity<MultiValueMap> getHttpEntity(MultiValueMap paramMap, MultiValueMap<String, String> headers) {
+        return new HttpEntity<>(paramMap, headers);
+    }
+
     protected HttpHeaders getHeader() {
         HttpHeaders httpHeaders = new HttpHeaders();
         httpHeaders.set(HttpHeaders.ACCEPT_ENCODING, "gzip,x-gzip,deflate");
@@ -274,8 +278,9 @@ public abstract class ZentaoClient extends BaseClient {
         MultiValueMap<String, Object> paramMap = new LinkedMultiValueMap<>();
         FileSystemResource fileResource = new FileSystemResource(file);
         paramMap.add("files", fileResource);
-        HttpEntity<MultiValueMap> httpEntity = getHttpEntity(paramMap);
-        httpEntity.getHeaders().setContentType(MediaType.parseMediaType("multipart/form-data; charset=UTF-8"));
+        HttpHeaders header = getHeader();
+        header.setContentType(MediaType.parseMediaType("multipart/form-data; charset=UTF-8"));
+        HttpEntity<MultiValueMap> httpEntity = getHttpEntity(paramMap, header);
         try {
             restTemplate.exchange(requestUrl.getFileUpload(), HttpMethod.POST, httpEntity,
                     String.class, objectId, sessionId);
