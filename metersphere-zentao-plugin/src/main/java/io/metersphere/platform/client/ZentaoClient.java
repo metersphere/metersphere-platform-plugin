@@ -100,7 +100,13 @@ public abstract class ZentaoClient extends BaseClient {
             MSPluginException.throwException(e.getMessage());
         }
         AddIssueResponse addIssueResponse = (AddIssueResponse) getResultForObject(AddIssueResponse.class, response);
-        AddIssueResponse.Issue issue = JSON.parseObject(addIssueResponse.getData(), AddIssueResponse.Issue.class);
+
+        AddIssueResponse.Issue issue = null;
+        try {
+            issue = JSON.parseObject(addIssueResponse.getData(), AddIssueResponse.Issue.class);
+        } catch (Exception e) {
+            LogUtil.error(e);
+        }
         if (issue == null) {
             MSPluginException.throwException(UnicodeConvertUtils.unicodeToCn(response.getBody()));
         }
@@ -110,8 +116,15 @@ public abstract class ZentaoClient extends BaseClient {
     public void updateIssue(String id, MultiValueMap<String, Object> paramMap) {
         String sessionId = login();
         try {
-            restTemplate.exchange(requestUrl.getBugUpdate(),
+            ResponseEntity<String> response = restTemplate.exchange(requestUrl.getBugUpdate(),
                     HttpMethod.POST, getHttpEntity(paramMap), String.class, id, sessionId);
+            AddIssueResponse addIssueResponse = (AddIssueResponse) getResultForObject(AddIssueResponse.class, response);
+            if (!StringUtils.equalsIgnoreCase(addIssueResponse.getStatus(), "success")
+                    && StringUtils.isNotBlank(addIssueResponse.getData())
+                    && !StringUtils.equals(addIssueResponse.getData(), "[]")) {
+                // 如果没改啥东西保存也会报错，addIssueResponse.getData() 值为 "[]"
+                MSPluginException.throwException(UnicodeConvertUtils.unicodeToCn(response.getBody()));
+            }
         } catch (Exception e) {
             LogUtil.error(e.getMessage(), e);
             MSPluginException.throwException(e.getMessage());
