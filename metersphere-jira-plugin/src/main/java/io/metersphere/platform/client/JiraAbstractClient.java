@@ -99,17 +99,29 @@ public abstract class JiraAbstractClient extends BaseClient {
 
     public List<JiraUser> assignableUserSearch(String projectKey, String query) {
         int startAt = 0;
-        int maxResults = 100;
-        String url = getBaseUrl() + "/user/assignable/search?project={1}&maxResults=" + maxResults + "&startAt=" + startAt;
+        int maxResults = 30;
+        String baseUrl = getBaseUrl() + "/user/assignable/search?project={1}&maxResults=" + maxResults + "&startAt=" + startAt;
+        String url = baseUrl;
+
         if (StringUtils.isNotBlank(query)) {
-            url += "&query=" + query;
+            // cloud 加了 username 会报错，报错就用 query
+            url = baseUrl + "&username=" + query;
         }
-        ResponseEntity<String> response = null;
+
+        ResponseEntity<String> response;
         try {
             response = restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), String.class, projectKey);
         } catch (Exception e) {
-            LogUtil.error(e.getMessage(), e);
-            return new ArrayList<>();
+            try {
+                // 兼容不同版本查询
+                if (StringUtils.isNotBlank(query)) {
+                    url = baseUrl + "&query=" + query;
+                }
+                response = restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), String.class, projectKey);
+            } catch (Exception ex) {
+                LogUtil.error(ex);
+                return new ArrayList<>();
+            }
         }
         return  (List<JiraUser>) getResultForList(JiraUser.class, response);
     }
@@ -117,10 +129,11 @@ public abstract class JiraAbstractClient extends BaseClient {
 
     public List<JiraUser> allUserSearch(String query) {
         int startAt = 0;
-        int maxResults = 100;
+        int maxResults = 30;
         String baseUrl = getBaseUrl() + "/user/search?maxResults=" + maxResults + "&startAt=" + startAt;
+        // server 版本没有username报错，报错则加上username
         String url = baseUrl + "&query=" + (StringUtils.isNotBlank(query) ? query : "");
-        ResponseEntity<String> response = null;
+        ResponseEntity<String> response;
         try {
             response = restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), String.class);
         } catch (Exception e) {
@@ -189,10 +202,10 @@ public abstract class JiraAbstractClient extends BaseClient {
         return sprints;
     }
 
-    public List<JiraEpic> getEpics() {
+    public List<JiraEpic> getEpics(String queryKey) {
 
-        ResponseEntity<String> response = restTemplate.exchange(getGreenhopperV1BaseUrl() + "/epics?maxResults=1000&hideDone=true&_=" + System.currentTimeMillis(),
-                HttpMethod.GET, getAuthHttpEntity(), String.class);
+        ResponseEntity<String> response = restTemplate.exchange(getGreenhopperV1BaseUrl() + "/epics?maxResults=300&searchQuery={0}&hideDone=true&_=" + System.currentTimeMillis(),
+                HttpMethod.GET, getAuthHttpEntity(), String.class, queryKey);
         List<JiraEpicResponse.EpicLists> epicLists = ((JiraEpicResponse) getResultForObject(JiraEpicResponse.class, response)).getEpicLists();
         if (CollectionUtils.isEmpty(epicLists)) {
             return new ArrayList<>();

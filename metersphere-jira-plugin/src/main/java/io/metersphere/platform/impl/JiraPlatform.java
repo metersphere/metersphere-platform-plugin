@@ -928,7 +928,7 @@ public class JiraPlatform extends AbstractPlatform {
                     customField.setInputSearch(true);
                     customField.setOptionMethod("getSprintOptions");
                 } else if (StringUtils.contains(customType, "epic-link")) {
-                    List<JiraEpic> epics = jiraClientV2.getEpics();
+                    List<JiraEpic> epics = jiraClientV2.getEpics(projectConfig.getJiraKey());
                     List<SelectOption> options = new ArrayList<>();
                     epics.forEach(sprint -> options.add(new SelectOption(sprint.getName(), sprint.getKey())));
                     customField.setOptions(JSON.toJSONString(options));
