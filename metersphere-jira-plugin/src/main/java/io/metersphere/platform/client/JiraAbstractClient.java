@@ -5,6 +5,7 @@ import io.metersphere.platform.domain.*;
 import io.metersphere.plugin.exception.MSPluginException;
 import io.metersphere.plugin.utils.JSON;
 import io.metersphere.plugin.utils.LogUtil;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.*;
@@ -164,7 +165,7 @@ public abstract class JiraAbstractClient extends BaseClient {
         return (List<JiraField>) getResultForList(JiraField.class, response);
     }
 
-    public JiraAddIssueResponse addIssue(String body) {
+    public JiraAddIssueResponse addIssue(String body, Map<String, String> filedNameMap) {
         LogUtil.info("addIssue: " + body);
         HttpHeaders headers = getAuthHeader();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -172,11 +173,37 @@ public abstract class JiraAbstractClient extends BaseClient {
         ResponseEntity<String> response = null;
         try {
             response = restTemplate.exchange(getBaseUrl() + "/issue", HttpMethod.POST, requestEntity, String.class);
+        } catch (HttpClientErrorException e) {
+            handleFieldErrorMsg(filedNameMap, e);
         } catch (Exception e) {
             LogUtil.error(e.getMessage(), e);
             MSPluginException.throwException(e.getMessage());
         }
         return (JiraAddIssueResponse) getResultForObject(JiraAddIssueResponse.class, response);
+    }
+
+    /**
+     * 创建或者修改的接口返回参数错误
+     * 将错误中参数id，替换成参数的名称，方便用户定位
+     * @param filedNameMap
+     * @param e
+     */
+    private static void handleFieldErrorMsg(Map<String, String> filedNameMap, HttpClientErrorException e) {
+        if (e.getStatusCode().value() == 400 && filedNameMap != null) {
+            Map<String, String> fieldNameErrorMap = new HashMap<>();
+            try {
+                Map<String, String> fieldErrorMap = (Map) JSON.parseMap(e.getResponseBodyAsString()).get("errors");
+                fieldErrorMap.forEach((id, msg) ->
+                        fieldNameErrorMap.put(filedNameMap.get(id) == null ? id : filedNameMap.get(id), msg));
+            } catch (Exception exception) {
+                LogUtil.error(exception);
+            }
+            if (MapUtils.isNotEmpty(fieldNameErrorMap)) {
+                MSPluginException.throwException(JSON.toJSONString(fieldNameErrorMap));
+            }
+        }
+        LogUtil.error(e);
+        MSPluginException.throwException(e.getMessage());
     }
 
     public List<JiraTransitionsResponse.Transitions> getTransitions(String issueKey) {
@@ -224,13 +251,15 @@ public abstract class JiraAbstractClient extends BaseClient {
         return ENDPOINT + GREENHOPPER_V1_BASE_URL;
     }
 
-    public void updateIssue(String id, String body) {
+    public void updateIssue(String id, String body, Map<String, String> filedNameMap) {
         LogUtil.info("addIssue: " + body);
         HttpHeaders headers = getAuthHeader();
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<String> requestEntity = new HttpEntity<>(body, headers);
         try {
             restTemplate.exchange(getBaseUrl() + "/issue/" + id, HttpMethod.PUT, requestEntity, String.class);
+        } catch (HttpClientErrorException e) {
+            handleFieldErrorMsg(filedNameMap, e);
         } catch (Exception e) {
             LogUtil.error(e.getMessage(), e);
             MSPluginException.throwException(e.getMessage());

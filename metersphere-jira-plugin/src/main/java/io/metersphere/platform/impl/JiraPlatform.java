@@ -482,7 +482,8 @@ public class JiraPlatform extends AbstractPlatform {
         validateIssueType();
 
         Map addJiraIssueParam = buildUpdateParam(request, projectConfig.getJiraIssueTypeId(), projectConfig.getJiraKey());
-        JiraAddIssueResponse result = jiraClientV2.addIssue(JSON.toJSONString(addJiraIssueParam));
+
+        JiraAddIssueResponse result = jiraClientV2.addIssue(JSON.toJSONString(addJiraIssueParam), getFieldNameMap(request));
         JiraIssue jiraIssue = jiraClientV2.getIssues(result.getId());
 
         // 上传富文本中的图片作为附件
@@ -712,7 +713,8 @@ public class JiraPlatform extends AbstractPlatform {
         validateIssueType();
 
         Map param = buildUpdateParam(request, projectConfig.getJiraIssueTypeId(), projectConfig.getJiraKey());
-        jiraClientV2.updateIssue(request.getPlatformId(), JSON.toJSONString(param));
+
+        jiraClientV2.updateIssue(request.getPlatformId(), JSON.toJSONString(param), getFieldNameMap(request));
 
         // 同步Jira富文本有关的附件
         syncJiraRichTextAttachment(request);
@@ -730,6 +732,15 @@ public class JiraPlatform extends AbstractPlatform {
             }
         }
         return request;
+    }
+
+    private static Map<String, String> getFieldNameMap(PlatformIssuesUpdateRequest request) {
+        Map<String, String> filedNameMap = null;
+        if (CollectionUtils.isNotEmpty(request.getCustomFieldList())) {
+            filedNameMap = request.getCustomFieldList().stream()
+                    .collect(Collectors.toMap(PlatformCustomFieldItemDTO::getId, PlatformCustomFieldItemDTO::getName));
+        }
+        return filedNameMap;
     }
 
     @Override
