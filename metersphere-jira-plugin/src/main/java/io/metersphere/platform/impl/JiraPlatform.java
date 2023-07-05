@@ -622,6 +622,7 @@ public class JiraPlatform extends AbstractPlatform {
         customField.setType(CustomFieldType.RICH_TEXT.getValue());
         customField.setCustomData(name);
         customField.setValue(value);
+        customField.setName(name);
         return customField;
     }
 
