@@ -27,7 +27,9 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
@@ -265,10 +267,27 @@ public class JiraPlatform extends AbstractPlatform {
                         customFieldItem.setValue(timeTracking.get(REMAINING_ESTIMATE_TRACKING_FIELD_NAME));
                     }
                 }
+
+                if (StringUtils.equals(customFieldItem.getType(), CustomFieldType.DATETIME.getValue())) {
+                    if (customFieldItem.getValue() != null && customFieldItem.getValue() instanceof String) {
+                        customFieldItem.setValue(convertToUniversalFormat(customFieldItem.getValue().toString()));
+                    }
+                }
             } catch (Exception e) {
                 LogUtil.error(e);
             }
         }
+    }
+
+    public static String convertToUniversalFormat(String input) {
+        if (!input.contains("T")) {
+            return input;
+        }
+        DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
+        DateTimeFormatter outputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+        OffsetDateTime offsetDateTime = OffsetDateTime.parse(input, inputFormatter);
+        return offsetDateTime.format(outputFormatter);
     }
 
     private String parseJira2MsRichText(String text, Map<String, String> fileContentMap) {
@@ -689,6 +708,11 @@ public class JiraPlatform extends AbstractPlatform {
                                 fields.put(fieldName, parseRichTextImageUrlToJira(item.getValue().toString()));
                                 if (fieldName.equals(DESCRIPTION_FIELD_NAME)) {
                                     request.setDescription(item.getValue().toString());
+                                }
+                            } else if (StringUtils.equals(item.getType(), "datetime")) {
+                                if (item.getValue() != null && item.getValue() instanceof String) {
+                                    // 2023-07-12 11:12:46 -> 2021-12-10T11:12:46+08:00
+                                    fields.put(fieldName, ((String) item.getValue()).trim().replace(" ", "T") + "+08:00");
                                 }
                             } else {
                                 fields.put(fieldName, item.getValue());
