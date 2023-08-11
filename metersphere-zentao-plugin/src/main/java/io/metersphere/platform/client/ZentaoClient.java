@@ -9,6 +9,7 @@ import io.metersphere.platform.utils.UnicodeConvertUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.*;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RequestCallback;
@@ -90,10 +91,11 @@ public abstract class ZentaoClient extends BaseClient {
 
     public AddIssueResponse.Issue addIssue(MultiValueMap<String, Object> paramMap) {
         String sessionId = login();
+        String customProject = getCustomProject(paramMap);
         ResponseEntity<String> response = null;
         try {
             String bugCreate = requestUrl.getBugCreate();
-            response = restTemplate.exchange(bugCreate + sessionId,
+            response = restTemplate.exchange(bugCreate + sessionId + (StringUtils.isNotEmpty(customProject) ? "&project=" + customProject : ""),
                     HttpMethod.POST, getHttpEntity(paramMap), String.class);
         } catch (Exception e) {
             LogUtil.error(e.getMessage(), e);
@@ -111,6 +113,13 @@ public abstract class ZentaoClient extends BaseClient {
             MSPluginException.throwException(UnicodeConvertUtils.unicodeToCn(response.getBody()));
         }
         return issue;
+    }
+
+    public String getCustomProject(MultiValueMap<String, Object> param) {
+        if (param.containsKey("project") && !CollectionUtils.isEmpty(param.get("project"))) {
+            return param.get("project").get(0).toString();
+        }
+        return StringUtils.EMPTY;
     }
 
     public void updateIssue(String id, MultiValueMap<String, Object> paramMap) {

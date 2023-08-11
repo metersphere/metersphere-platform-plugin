@@ -243,7 +243,7 @@ public class ZentaoPlatform extends AbstractPlatform {
         List<SelectOption> res = new ArrayList<>();
         if (builds != null) {
             builds.forEach((k, v) -> {
-                if (StringUtils.isNotBlank(k)) {
+                if (StringUtils.isNotBlank(k) && v != null) {
                     res.add(new SelectOption(v.toString(), k));
                 }
             });
