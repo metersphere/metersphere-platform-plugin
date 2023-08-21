@@ -19,6 +19,8 @@ import java.io.File;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -37,6 +39,8 @@ public abstract class JiraAbstractClient extends BaseClient {
     protected  String AUTH_TYPE;
 
     private static final String GREENHOPPER_V1_BASE_URL = "/rest/greenhopper/1.0";
+
+    private static final String ISSUE_RELATE_FILTER_JQL = "project in projectsWhereUserHasPermission(\"Link Issues\") AND (resolution = Unresolved or statusCategory != Done) ORDER BY priority DESC, updated DESC";
 
     public JiraIssue getIssues(String issuesId) {
         LogUtil.info("getIssues: " + issuesId);
@@ -230,7 +234,6 @@ public abstract class JiraAbstractClient extends BaseClient {
     }
 
     public List<JiraEpic> getEpics(String queryKey) {
-
         ResponseEntity<String> response = restTemplate.exchange(getGreenhopperV1BaseUrl() + "/epics?maxResults=300&searchQuery={0}&hideDone=true&_=" + System.currentTimeMillis(),
                 HttpMethod.GET, getAuthHttpEntity(), String.class, queryKey);
         List<JiraEpicResponse.EpicLists> epicLists = ((JiraEpicResponse) getResultForObject(JiraEpicResponse.class, response)).getEpicLists();
@@ -245,6 +248,58 @@ public abstract class JiraAbstractClient extends BaseClient {
             }
         });
         return jiraEpics;
+    }
+
+    public List<JiraIssueLink> getIssueLinks(String currentIssueKey, String query) {
+        String url = getBaseUrl() + "/issue/picker?showSubTaskParent=true&showSubTasks=true"
+                + (StringUtils.isNotEmpty(currentIssueKey) ? "&currentIssueKey=" + currentIssueKey : StringUtils.EMPTY)
+                + (StringUtils.isNotEmpty(query) ? "&query=" + query : StringUtils.EMPTY)
+                + "&currentJQL=" + URLEncoder.encode(ISSUE_RELATE_FILTER_JQL, StandardCharsets.UTF_8);
+        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), String.class);
+        List<JiraIssueLinkResponse.IssueLink> sections = ((JiraIssueLinkResponse) getResultForObject(JiraIssueLinkResponse.class, response)).getSections();
+        if (CollectionUtils.isEmpty(sections)) {
+            return Collections.emptyList();
+        }
+        List<JiraIssueLink> issueLinks = new ArrayList<>();
+        sections.forEach(section -> {
+            List<JiraIssueLink> issues = section.getIssues();
+            if (!CollectionUtils.isEmpty(issues)) {
+                issueLinks.addAll(issues);
+            }
+        });
+        return issueLinks;
+    }
+
+    public List<JiraIssueLinkTypeResponse.IssueLinkType> getIssueLinkType() {
+        ResponseEntity<String> response = restTemplate.exchange(getBaseUrl() + "/issueLinkType", HttpMethod.GET, getAuthHttpEntity(), String.class);
+        List<JiraIssueLinkTypeResponse.IssueLinkType> issueLinkTypes = ((JiraIssueLinkTypeResponse) getResultForObject(JiraIssueLinkTypeResponse.class, response)).getIssueLinkTypes();
+        if (CollectionUtils.isEmpty(issueLinkTypes)) {
+            return Collections.emptyList();
+        }
+        return issueLinkTypes;
+    }
+
+    public void linkIssue(JiraIssueLinkRequest request) {
+        LogUtil.info("linkIssue: " + request);
+        HttpHeaders headers = getAuthHeader();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> requestEntity = new HttpEntity<>(JSON.toJSONString(request), headers);
+        try {
+            restTemplate.exchange(getBaseUrl() + "/issueLink", HttpMethod.POST, requestEntity, String.class);
+        } catch (Exception e) {
+            LogUtil.error(e.getMessage(), e);
+            MSPluginException.throwException(e.getMessage());
+        }
+    }
+
+    public void deleteIssueLink(String linkId) {
+        LogUtil.info("deleteIssueLink: " + linkId);
+        try {
+            restTemplate.exchange(getBaseUrl() + "/issueLink/" + linkId, HttpMethod.DELETE, getAuthHttpEntity(), String.class);
+        } catch (Exception e) {
+            LogUtil.error(e.getMessage(), e);
+            MSPluginException.throwException(e.getMessage());
+        }
     }
 
     public String getGreenhopperV1BaseUrl() {

@@ -55,6 +55,10 @@ public class JiraPlatform extends AbstractPlatform {
     private static final String REMAINING_ESTIMATE_TRACKING_FIELD_NAME = "remainingEstimate";
     private static final String USER_SEARCH_METHOD = "getUserSearchOptions";
     private static final String ASSIGNABLE_SEARCH_METHOD = "getAssignableOptions";
+    private static final String ISSUE_LINKS_SEARCH_METHOD = "getIssueLinkOptions";
+    private static final String ISSUE_LINK = "issuelinks";
+    private static final String ISSUE_LINK_TYPE = "issueLinkTypes";
+    private static final String ISSUE_LINK_TYPE_COLUMN_ZH = "链接事务类型";
 
     public JiraPlatform(PlatformRequest request) {
         super.key = JiraPlatformMetaInfo.KEY;
@@ -273,6 +277,35 @@ public class JiraPlatform extends AbstractPlatform {
                         customFieldItem.setValue(convertToUniversalFormat(customFieldItem.getValue().toString()));
                     }
                 }
+
+                // sync issue link type
+                // 只同步缺陷其中一组事务类型的数据, 不支持多组事务类型, 与新增编辑保持一致
+                if (StringUtils.equals(customFieldItem.getId(), ISSUE_LINK_TYPE)) {
+                    List<Map<String, Object>> issueLinks = (List) fields.get(ISSUE_LINK);
+                    if (CollectionUtils.isNotEmpty(issueLinks)) {
+                        Map<String, Object> firstLink = issueLinks.get(0);
+                        Map<String, Object> linkType = (Map) firstLink.get("type");
+                        boolean isFirstInward = firstLink.containsKey("inwardIssue");
+                        String type = isFirstInward ? linkType.get("inward").toString() : linkType.get("outward").toString();
+                        customFieldItem.setValue(type);
+                        List<String> issueLinkVars = new ArrayList<>();
+                        issueLinks.stream().filter(filterLink -> {
+                            Map<String, Object> filterLinkType = (Map) filterLink.get("type");
+                            return StringUtils.equals(filterLinkType.get("id").toString(), linkType.get("id").toString());
+                        }).filter(filterLink -> isFirstInward ? filterLink.containsKey("inwardIssue") : filterLink.containsKey("outwardIssue"))
+                                .forEach(filterLink -> {
+                                    Map<String, Object> linkIssue;
+                                    if (isFirstInward) {
+                                        linkIssue = (Map) filterLink.get("inwardIssue");
+                                    } else {
+                                        linkIssue = (Map) filterLink.get("outwardIssue");
+                                    }
+                                    issueLinkVars.add(linkIssue.get("key").toString());
+                                });
+                        Optional<PlatformCustomFieldItemDTO> any = customFieldItems.stream().filter(field -> ISSUE_LINK.equals(field.getCustomData())).findAny();
+                        any.ifPresent(platformCustomFieldItemDTO -> platformCustomFieldItemDTO.setValue(issueLinkVars));
+                    }
+                }
             } catch (Exception e) {
                 LogUtil.error(e);
             }
@@ -471,6 +504,30 @@ public class JiraPlatform extends AbstractPlatform {
         return handleOptions(reportOptions);
     }
 
+    public List<SelectOption> getIssueLinkOptions(GetOptionRequest request) {
+        return getIssueLinkOptions("", request.getQuery());
+    }
+
+    public List<SelectOption> getIssueLinkOptions(String currentIssueKey, String query) {
+        return jiraClientV2.getIssueLinks(currentIssueKey, query)
+                .stream()
+                .map(item -> new SelectOption(item.getKey() + StringUtils.SPACE + item.getSummary(), item.getKey())).toList();
+    }
+
+    public List<SelectOption> getIssueLinkTypeOptions() {
+        List<SelectOption> selectOptions = new ArrayList<>();
+        List<JiraIssueLinkTypeResponse.IssueLinkType> issueLinkTypes = jiraClientV2.getIssueLinkType();
+        for (JiraIssueLinkTypeResponse.IssueLinkType issueLinkType : issueLinkTypes) {
+            if (StringUtils.equals(issueLinkType.getInward(), issueLinkType.getOutward())) {
+                selectOptions.add(SelectOption.builder().text(issueLinkType.getInward()).value(issueLinkType.getInward()).build());
+            } else {
+                selectOptions.add(SelectOption.builder().text(issueLinkType.getInward()).value(issueLinkType.getInward()).build());
+                selectOptions.add(SelectOption.builder().text(issueLinkType.getOutward()).value(issueLinkType.getOutward()).build());
+            }
+        }
+        return selectOptions;
+    }
+
     /**
      * 由 getFormOptions 反射调用
      *
@@ -500,7 +557,9 @@ public class JiraPlatform extends AbstractPlatform {
         validateProjectKey(projectConfig.getJiraKey());
         validateIssueType();
 
-        Map addJiraIssueParam = buildUpdateParam(request, projectConfig.getJiraIssueTypeId(), projectConfig.getJiraKey());
+        // 处理Issue Links
+        List<PlatformCustomFieldItemDTO> issueLinkFields = filterIssueLinksField(request);
+        Map<String, Object> addJiraIssueParam = buildUpdateParam(request, projectConfig.getJiraIssueTypeId(), projectConfig.getJiraKey());
 
         JiraAddIssueResponse result = jiraClientV2.addIssue(JSON.toJSONString(addJiraIssueParam), getFieldNameMap(request));
         JiraIssue jiraIssue = jiraClientV2.getIssues(result.getId());
@@ -508,6 +567,10 @@ public class JiraPlatform extends AbstractPlatform {
         // 上传富文本中的图片作为附件
         List<File> imageFiles = getImageFiles(request);
         imageFiles.forEach(img -> jiraClientV2.uploadAttachment(result.getKey(), img));
+        // link issue
+        if (CollectionUtils.isNotEmpty(issueLinkFields)) {
+            linkIssue(issueLinkFields, result.getKey(), jiraClientV2.getIssueLinkType());
+        }
 
         String status = getStatus(jiraIssue.getFields());
         request.setPlatformStatus(status);
@@ -635,6 +698,50 @@ public class JiraPlatform extends AbstractPlatform {
         return addJiraIssueParam;
     }
 
+    private List<PlatformCustomFieldItemDTO> filterIssueLinksField(PlatformIssuesUpdateRequest request) {
+        if (CollectionUtils.isNotEmpty(request.getCustomFieldList())) {
+            // remove and return issue link field
+            List<PlatformCustomFieldItemDTO> issueLinkFields = request.getCustomFieldList().stream()
+                    .filter(item -> StringUtils.equalsAny(item.getCustomData(), ISSUE_LINK_TYPE, ISSUE_LINK)).toList();
+            request.getCustomFieldList().removeAll(issueLinkFields);
+            return issueLinkFields;
+        } else {
+            return new ArrayList<>();
+        }
+    }
+
+    private void linkIssue(List<PlatformCustomFieldItemDTO> issueLinkFields, String issueKey, List<JiraIssueLinkTypeResponse.IssueLinkType> issueLinkTypes) {
+        // 暂时只支持关联一组事务, 前台Form表单对多组事务关联关系的支持麻烦
+        PlatformCustomFieldItemDTO issueLinkType = issueLinkFields.get(0);
+        PlatformCustomFieldItemDTO issueLink = issueLinkFields.get(1);
+        if (issueLinkType.getValue() != null && issueLink.getValue() != null) {
+            String type = issueLinkType.getValue().toString();
+            JiraIssueLinkTypeResponse.IssueLinkType attachType = issueLinkTypes.stream().filter(item -> StringUtils.equalsAny(type, item.getInward(), item.getOutward())).findFirst().get();
+            List<String> linkKeys = JSON.parseArray(issueLink.getValue().toString(), String.class);
+            linkKeys.forEach(linkKey -> {
+                JiraIssueLinkRequest issueLinkRequest = new JiraIssueLinkRequest();
+                issueLinkRequest.setType(JiraIssueLinkRequest.JiraIssueLinkType.builder().id(attachType.getId()).build());
+                if (StringUtils.equals(type, attachType.getInward())) {
+                    issueLinkRequest.setInwardIssue(JiraIssueLinkRequest.JiraIssueLinkKey.builder().key(linkKey).build());
+                    issueLinkRequest.setOutwardIssue(JiraIssueLinkRequest.JiraIssueLinkKey.builder().key(issueKey).build());
+                } else {
+                    issueLinkRequest.setOutwardIssue(JiraIssueLinkRequest.JiraIssueLinkKey.builder().key(linkKey).build());
+                    issueLinkRequest.setInwardIssue(JiraIssueLinkRequest.JiraIssueLinkKey.builder().key(issueKey).build());
+                }
+                jiraClientV2.linkIssue(issueLinkRequest);
+            });
+        }
+    }
+
+    private void deleteIssueLinks(String issueKey) {
+        JiraIssue issue = jiraClientV2.getIssues(issueKey);
+        Map<String, Object> fields = issue.getFields();
+        if (fields.containsKey(ISSUE_LINK)) {
+            List<Map<String, Object>> issueLinks = (List) fields.get(ISSUE_LINK);
+            issueLinks.stream().map(item -> item.get("id").toString()).forEach(jiraClientV2::deleteIssueLink);
+        }
+    }
+
     private PlatformCustomFieldItemDTO getRichTextCustomField(String name, String value) {
         PlatformCustomFieldItemDTO customField = new PlatformCustomFieldItemDTO();
         customField.setId(name);
@@ -737,8 +844,9 @@ public class JiraPlatform extends AbstractPlatform {
         validateProjectKey(projectConfig.getJiraKey());
         validateIssueType();
 
-        Map param = buildUpdateParam(request, projectConfig.getJiraIssueTypeId(), projectConfig.getJiraKey());
-
+        // 过滤 issue link
+        List<PlatformCustomFieldItemDTO> issueLinksField = filterIssueLinksField(request);
+        Map<String, Object> param = buildUpdateParam(request, projectConfig.getJiraIssueTypeId(), projectConfig.getJiraKey());
         jiraClientV2.updateIssue(request.getPlatformId(), JSON.toJSONString(param), getFieldNameMap(request));
 
         // 同步Jira富文本有关的附件
@@ -755,6 +863,11 @@ public class JiraPlatform extends AbstractPlatform {
             } catch (Exception e) {
                 LogUtil.error(e);
             }
+        }
+        if (CollectionUtils.isNotEmpty(issueLinksField)) {
+            // 编辑时, 删除上一次所有的 issue link, 重新关联一组 issue link
+            deleteIssueLinks(request.getPlatformId());
+            linkIssue(issueLinksField, request.getPlatformId(), jiraClientV2.getIssueLinkType());
         }
         return request;
     }
@@ -883,10 +996,12 @@ public class JiraPlatform extends AbstractPlatform {
 
         String assignableOptions = "[]";
         String allUserOptions = "[]";
+        String issueLinkOptions = "[]";
 
         try {
-             assignableOptions = JSON.toJSONString(getAssignableOptions(projectConfig.getJiraKey(), null));
-             allUserOptions = JSON.toJSONString(getUserSearchOptions(StringUtils.EMPTY));
+            assignableOptions = JSON.toJSONString(getAssignableOptions(projectConfig.getJiraKey(), null));
+            allUserOptions = JSON.toJSONString(getUserSearchOptions(StringUtils.EMPTY));
+            issueLinkOptions = JSON.toJSONString(getIssueLinkOptions(null, null));
         } catch (Exception e) {
             LogUtil.error(e);
         }
@@ -910,7 +1025,7 @@ public class JiraPlatform extends AbstractPlatform {
             } else {
                 customField.setRequired(item.isRequired());
             }
-            setCustomFiledType(schema, customField, assignableOptions, allUserOptions);
+            setCustomFiledType(schema, customField, assignableOptions, allUserOptions, issueLinkOptions);
             setCustomFiledDefaultValue(customField, item);
             List options = getAllowedValuesOptions(item.getAllowedValues());
             setSpecialFieldOptions(customField, schema);
@@ -919,6 +1034,18 @@ public class JiraPlatform extends AbstractPlatform {
             }
             fields.add(customField);
             filedKey = handleSpecialField(customField, fields, filedKey);
+            if (ISSUE_LINK.equals(name)) {
+                // 如果是Jira的issue link字段，需要同步添加issue link type字段
+                PlatformCustomFieldItemDTO issueLinkField = new PlatformCustomFieldItemDTO();
+                issueLinkField.setId(ISSUE_LINK_TYPE);
+                issueLinkField.setName(ISSUE_LINK_TYPE_COLUMN_ZH);
+                issueLinkField.setCustomData(ISSUE_LINK_TYPE);
+                issueLinkField.setRequired(false);
+                issueLinkField.setOptions(JSON.toJSONString(getIssueLinkTypeOptions()));
+                issueLinkField.setType(CustomFieldType.SELECT.getValue());
+                issueLinkField.setKey(String.valueOf(filedKey++));
+                fields.add(issueLinkField);
+            }
         }
 
         fields = fields.stream().filter(i -> StringUtils.isNotBlank(i.getType()))
@@ -928,6 +1055,10 @@ public class JiraPlatform extends AbstractPlatform {
         fields.sort((a, b) -> {
             if (a.getType().equals(CustomFieldType.RICH_TEXT.getValue())) return 1;
             if (b.getType().equals(CustomFieldType.RICH_TEXT.getValue())) return -1;
+            if (a.getId().equals(ISSUE_LINK)) return 1;
+            if (b.getId().equals(ISSUE_LINK)) return -1;
+            if (a.getId().equals(ISSUE_LINK_TYPE)) return 1;
+            if (b.getId().equals(ISSUE_LINK_TYPE)) return -1;
             if (a.getId().equals(SUMMARY_FIELD_NAME)) return -1;
             if (b.getId().equals(SUMMARY_FIELD_NAME)) return 1;
             if (a.getType().equals(CustomFieldType.INPUT.getValue())) return -1;
@@ -976,7 +1107,7 @@ public class JiraPlatform extends AbstractPlatform {
     }
 
 
-    private void setCustomFiledType(JiraCreateMetadataResponse.Schema schema, PlatformCustomFieldItemDTO customField, String assignableOptions, String allUserOptions) {
+    private void setCustomFiledType(JiraCreateMetadataResponse.Schema schema, PlatformCustomFieldItemDTO customField, String assignableOptions, String allUserOptions, String issueLinkOptions) {
         Map<String, String> fieldTypeMap = new HashMap() {{
             put(SUMMARY_FIELD_NAME, CustomFieldType.INPUT.getValue());
             put(DESCRIPTION_FIELD_NAME, CustomFieldType.RICH_TEXT.getValue());
@@ -1070,6 +1201,12 @@ public class JiraPlatform extends AbstractPlatform {
                 value = CustomFieldType.DATE.getValue();
             } else if ("datetime".equals(type)) {
                 value = CustomFieldType.DATETIME.getValue();
+            } else if (ISSUE_LINK.equals(schema.getSystem())) {
+                // 关联事务
+                value = CustomFieldType.MULTIPLE_SELECT.getValue();
+                customField.setInputSearch(true);
+                customField.setOptionMethod(ISSUE_LINKS_SEARCH_METHOD);
+                customField.setOptions(issueLinkOptions);
             }
         }
         customField.setType(value);

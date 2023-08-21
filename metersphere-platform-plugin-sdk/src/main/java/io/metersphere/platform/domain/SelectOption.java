@@ -1,17 +1,14 @@
 package io.metersphere.platform.domain;
 
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
 @Getter
 @Setter
 @EqualsAndHashCode
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
 public class SelectOption {
-    public SelectOption(String text, String value) {
-        this.text = text;
-        this.value = value;
-    }
 
     private String text;
     private String value;
