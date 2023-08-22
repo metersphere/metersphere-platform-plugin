@@ -519,10 +519,10 @@ public class JiraPlatform extends AbstractPlatform {
         List<JiraIssueLinkTypeResponse.IssueLinkType> issueLinkTypes = jiraClientV2.getIssueLinkType();
         for (JiraIssueLinkTypeResponse.IssueLinkType issueLinkType : issueLinkTypes) {
             if (StringUtils.equals(issueLinkType.getInward(), issueLinkType.getOutward())) {
-                selectOptions.add(SelectOption.builder().text(issueLinkType.getInward()).value(issueLinkType.getInward()).build());
+                selectOptions.add(new SelectOption(issueLinkType.getInward(), issueLinkType.getInward()));
             } else {
-                selectOptions.add(SelectOption.builder().text(issueLinkType.getInward()).value(issueLinkType.getInward()).build());
-                selectOptions.add(SelectOption.builder().text(issueLinkType.getOutward()).value(issueLinkType.getOutward()).build());
+                selectOptions.add(new SelectOption(issueLinkType.getInward(), issueLinkType.getInward()));
+                selectOptions.add(new SelectOption(issueLinkType.getOutward(), issueLinkType.getOutward()));
             }
         }
         return selectOptions;

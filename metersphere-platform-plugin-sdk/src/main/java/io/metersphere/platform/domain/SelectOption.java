@@ -6,8 +6,6 @@ import lombok.*;
 @Setter
 @EqualsAndHashCode
 @AllArgsConstructor
-@NoArgsConstructor
-@Builder
 public class SelectOption {
 
     private String text;
