@@ -148,6 +148,7 @@ public class JiraPlatform extends AbstractPlatform {
             issue.setPlatform(key);
             issue.setCustomFields(JSON.toJSONString(customFieldItems));
             try {
+                issue.setCreator("admin");
                 issue.setCreateTime(sdfWithZone.parse((String) fields.get("created")).getTime());
                 issue.setUpdateTime(sdfWithZone.parse((String) fields.get("updated")).getTime());
             } catch (Exception e) {
