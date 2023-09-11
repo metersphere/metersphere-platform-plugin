@@ -715,10 +715,13 @@ public class JiraPlatform extends AbstractPlatform {
         // 暂时只支持关联一组事务, 前台Form表单对多组事务关联关系的支持麻烦
         PlatformCustomFieldItemDTO issueLinkType = issueLinkFields.get(0);
         PlatformCustomFieldItemDTO issueLink = issueLinkFields.get(1);
-        if (issueLinkType.getValue() != null && issueLink.getValue() != null) {
+        if (issueLinkType.getValue() != null && issueLink.getValue() != null && StringUtils.isNotEmpty(issueLinkType.getValue().toString())) {
             String type = issueLinkType.getValue().toString();
             JiraIssueLinkTypeResponse.IssueLinkType attachType = issueLinkTypes.stream().filter(item -> StringUtils.equalsAny(type, item.getInward(), item.getOutward())).findFirst().get();
             List<String> linkKeys = JSON.parseArray(issueLink.getValue().toString(), String.class);
+            if (CollectionUtils.isEmpty(linkKeys)) {
+                return;
+            }
             linkKeys.forEach(linkKey -> {
                 JiraIssueLinkRequest issueLinkRequest = new JiraIssueLinkRequest();
                 issueLinkRequest.setType(JiraIssueLinkRequest.JiraIssueLinkType.builder().id(attachType.getId()).build());
