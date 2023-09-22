@@ -12,7 +12,7 @@ public class ZentaoPlatformMetaInfo extends AbstractPlatformMetaInfo {
 
     @Override
     public String getVersion() {
-        return "2.10.3";
+        return "2.10.7";
     }
 
     @Override
