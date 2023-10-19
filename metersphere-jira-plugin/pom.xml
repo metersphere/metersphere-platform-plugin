@@ -4,58 +4,20 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>io.metersphere</groupId>
+    <parent>
+        <groupId>io.metersphere</groupId>
+        <artifactId>metersphere-platform-plugin</artifactId>
+        <version>${revision}</version>
+    </parent>
+
     <artifactId>metersphere-jira-plugin</artifactId>
-    <!--
-        插件的版本与 Metersphere 版本相对应
-        例如：现有 Jira 插件 v2.4.0 与 v2.6.0(最新版本)，则
-        Jira v2.4.0 插件支持 v2.4.0 ~ v2.6.0 版本的 Metersphere
-        Jira v2.6.0 插件支持 v2.6.0 至最新版本的 Metersphere，直到有新的 Jira 插件发布
-     -->
-    <version>2.10.5</version>
 
     <properties>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
+        <!-- 打包时将这些参数写入 MANIFEST.MF， 供 pf4j 识别 -->
+        <plugin.id>jira</plugin.id>
+        <plugin.class>io.metersphere.plugin.jira.impl.JiraPlugin</plugin.class>
+        <plugin.provider>fit2cloud</plugin.provider>
+        <plugin.dependencies/>
     </properties>
-
-    <dependencies>
-        <dependency>
-            <groupId>io.metersphere</groupId>
-            <artifactId>metersphere-platform-plugin-sdk</artifactId>
-            <version>1.6.0</version>
-            <!-- 打包进去会冲突 -->
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>4.12</version>
-            <scope>test</scope>
-        </dependency>
-    </dependencies>
-
-    <build>
-        <plugins>
-            <plugin>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <version>3.1.0</version>
-                <configuration>
-                    <descriptorRefs>
-                        <descriptorRef>jar-with-dependencies</descriptorRef>
-                    </descriptorRefs>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>make-assembly</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>single</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-        </plugins>
-    </build>
 
 </project>

@@ -1,0 +1,98 @@
+{
+  "id": "integration",
+  "name": "服务集成",
+  "script": [
+    {
+      "type": "input",
+      "field": "address",
+      "title": "JIRA地址",
+      "value": "",
+      "validate": [
+        {
+          "type": "string",
+          "required": true,
+          "message": "JIRA地址不能为空"
+        }
+      ]
+    },
+    {
+      "type": "radio",
+      "title": "认证方式",
+      "field": "authType",
+      "value": "basic",
+      "options": [
+        {
+          "value": "basic",
+          "label": "Basic Auth"
+        },
+        {
+          "value": "bearer",
+          "label": "Bearer Token"
+        }
+      ],
+      "props": {
+        "type": "button"
+      },
+      "wrap": {
+        "tooltip": "私有化部署选择 Basic Auth 填写账号密码，选择 Bearer Token 填写 Token\nSaaS 版本只能选择 Basic Auth，填写（账号+令牌）(账户设置-安全-创建API令牌)"
+      },
+      "control": [
+        {
+          "value": "basic",
+          "rule": [
+            {
+              "type": "input",
+              "field": "account",
+              "title": "JIRA-账号",
+              "value": "",
+              "validate": [
+                {
+                  "type": "string",
+                  "required": true,
+                  "message": "JIRA账号不能为空"
+                }
+              ],
+              "wrap": {}
+            },
+            {
+              "type": "PassWord",
+              "field": "password",
+              "title": "JIRA密码",
+              "value": "",
+              "validate": [
+                {
+                  "type": "string",
+                  "required": true,
+                  "message": "JIRA密码不能为空"
+                }
+              ],
+              "props": {
+                "placeholder": ""
+              },
+              "wrap": {}
+            }
+          ]
+        },
+        {
+          "value": "bearer",
+          "rule": [
+            {
+              "type": "input",
+              "field": "token",
+              "title": "Token",
+              "value": "token 账号",
+              "validate": [
+                {
+                  "type": "string",
+                  "required": true,
+                  "message": "JIRA账号不能为空"
+                }
+              ],
+              "wrap": {}
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

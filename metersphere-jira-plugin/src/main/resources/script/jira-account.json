@@ -1,0 +1,68 @@
+{
+  "id": "account",
+  "name": "个人信息账号配置",
+  "script": {
+    "label": "organization.integration.jira_information",
+    "instructionsInfo": "organization.integration.jira_prompt_information",
+    "i18n": true,
+    "formItems": [
+      {
+        "name": "authType",
+        "type": "select",
+        "defaultValue": "basic",
+        "required": false,
+        "i18n": true,
+        "options": [
+          {
+            "text": "Basic Auth",
+            "value": "basic"
+          },
+          {
+            "text": "Bearer Token",
+            "value": "bearer"
+          }
+        ],
+        "label": "api_test.definition.request.verification_method"
+      },
+      {
+        "name": "jiraAccount",
+        "type": "input",
+        "defaultValue": "",
+        "required": false,
+        "i18n": true,
+        "displayConditions": {
+          "field": "authType",
+          "value": "basic"
+        },
+        "label": "organization.integration.account",
+        "message": "organization.integration.input_api_account"
+      },
+      {
+        "name": "jiraPassword",
+        "type": "password",
+        "defaultValue": "",
+        "required": false,
+        "i18n": true,
+        "displayConditions": {
+          "field": "authType",
+          "value": "basic"
+        },
+        "label": "organization.integration.password",
+        "message": "organization.integration.input_api_password"
+      },
+      {
+        "name": "token",
+        "type": "password",
+        "defaultValue": "",
+        "required": false,
+        "i18n": true,
+        "displayConditions": {
+          "field": "authType",
+          "value": "bearer"
+        },
+        "label": "Token",
+        "message": "organization.integration.input_token"
+      }
+    ]
+  }
+}

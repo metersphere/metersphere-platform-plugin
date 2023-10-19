@@ -1,0 +1,38 @@
+{
+  "id": "project",
+  "name": "项目配置",
+  "script": {
+    "formItems": [
+      {
+        "name": "jiraKey",
+        "type": "input",
+        "defaultValue": "",
+        "required": true,
+        "i18n": true,
+        "label": "project.jira_key",
+        "withProjectCheck": true,
+        "instructionsIcon": "/static/jira-key.png"
+      },
+      {
+        "name": "jiraIssueTypeId",
+        "type": "select",
+        "defaultValue": "",
+        "required": true,
+        "i18n": true,
+        "cascade": "jiraKey",
+        "optionMethod": "getIssueTypes",
+        "label": "organization.integration.jira_issuetype"
+      },
+      {
+        "name": "jiraStoryTypeId",
+        "type": "select",
+        "defaultValue": "",
+        "required": true,
+        "i18n": true,
+        "cascade": "jiraKey",
+        "optionMethod": "getIssueTypes",
+        "label": "organization.integration.jira_storytype"
+      }
+    ]
+  }
+}
