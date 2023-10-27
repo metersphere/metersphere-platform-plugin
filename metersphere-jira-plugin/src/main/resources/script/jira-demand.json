@@ -1,0 +1,30 @@
+{
+  "id": "project",
+  "name": "项目配置",
+  "script": {
+    "formItems": [
+      {
+        "name": "jiraKey",
+        "type": "input",
+        "label": "project.jira_key",
+        "value": "",
+        "required": true,
+        "subDesc": "如何获取JIRA项目key 预览",
+        "inputSearch": true,
+        "instructionsIcon": "/static/jira-key.png",
+        "optionMethod": "getBugType"
+      },
+      {
+        "name": "jiraStoryTypeId",
+        "type": "select",
+        "label": "organization.integration.jira_issuetype",
+        "value": "",
+        "required": true,
+        "couplingConfig": {
+          "type": "initOptions",
+          "cascade": "jiraKey"
+        }
+      }
+    ]
+  }
+}
