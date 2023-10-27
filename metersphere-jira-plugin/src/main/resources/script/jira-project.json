@@ -6,32 +6,24 @@
       {
         "name": "jiraKey",
         "type": "input",
-        "defaultValue": "",
-        "required": true,
-        "i18n": true,
         "label": "project.jira_key",
-        "withProjectCheck": true,
-        "instructionsIcon": "/static/jira-key.png"
+        "value": "",
+        "required": true,
+        "subDesc": "如何获取JIRA项目key 预览",
+        "inputSearch": true,
+        "instructionsIcon": "/static/jira-key.png",
+        "optionMethod": "getBugType"
       },
       {
         "name": "jiraIssueTypeId",
         "type": "select",
-        "defaultValue": "",
+        "label": "organization.integration.jira_issuetype",
+        "value": "",
         "required": true,
-        "i18n": true,
-        "cascade": "jiraKey",
-        "optionMethod": "getIssueTypes",
-        "label": "organization.integration.jira_issuetype"
-      },
-      {
-        "name": "jiraStoryTypeId",
-        "type": "select",
-        "defaultValue": "",
-        "required": true,
-        "i18n": true,
-        "cascade": "jiraKey",
-        "optionMethod": "getIssueTypes",
-        "label": "organization.integration.jira_storytype"
+        "couplingConfig": {
+          "type": "initOptions",
+          "cascade": "jiraKey"
+        }
       }
     ]
   }
