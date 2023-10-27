@@ -61,11 +61,6 @@ public class JiraPlatform extends AbstractPlatform {
         return null;
     }
 
-    @Override
-    public List<SelectOption> getPluginOptions(PluginOptionsRequest request) {
-        return getFormOptions(this, request);
-    }
-
 
     /**
      * 由 getFormOptions 反射调用
