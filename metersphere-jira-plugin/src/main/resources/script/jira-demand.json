@@ -1,6 +1,6 @@
 {
-  "id": "project",
-  "name": "项目配置",
+  "id": "demand",
+  "name": "需求管理",
   "script": {
     "formItems": [
       {

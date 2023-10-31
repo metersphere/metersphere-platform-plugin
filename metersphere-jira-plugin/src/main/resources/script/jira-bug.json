@@ -1,6 +1,6 @@
 {
-  "id": "project",
-  "name": "项目配置",
+  "id": "bug",
+  "name": "缺陷管理",
   "script": {
     "formItems": [
       {
