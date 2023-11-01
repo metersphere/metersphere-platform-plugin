@@ -1,5 +1,5 @@
 {
-  "id": "bug",
+  "id": "project_bug",
   "name": "缺陷管理",
   "script": {
     "formItems": [

@@ -1,5 +1,5 @@
 {
-  "id": "demand",
+  "id": "project_demand",
   "name": "需求管理",
   "script": {
     "formItems": [

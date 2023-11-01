@@ -5,10 +5,7 @@ import io.metersphere.plugin.jira.client.JiraDefaultClient;
 import io.metersphere.plugin.jira.domain.JiraIntegrationConfig;
 import io.metersphere.plugin.jira.domain.JiraIssueProject;
 import io.metersphere.plugin.jira.domain.JiraProjectConfig;
-import io.metersphere.plugin.platform.dto.PlatformCustomFieldItemDTO;
-import io.metersphere.plugin.platform.dto.PlatformRequest;
-import io.metersphere.plugin.platform.dto.PluginOptionsRequest;
-import io.metersphere.plugin.platform.dto.SelectOption;
+import io.metersphere.plugin.platform.dto.*;
 import io.metersphere.plugin.platform.spi.AbstractPlatform;
 import io.metersphere.plugin.sdk.util.MSPluginException;
 import io.metersphere.plugin.sdk.util.PluginUtils;
@@ -58,6 +55,46 @@ public class JiraPlatform extends AbstractPlatform {
 
     @Override
     public List<PlatformCustomFieldItemDTO> getThirdPartCustomField(String projectConfig) {
+        return null;
+    }
+
+    @Override
+    public String addBug(PlatformBugUpdateRequest request) {
+        return null;
+    }
+
+    @Override
+    public void updateBug(PlatformBugUpdateRequest request) {
+
+    }
+
+    @Override
+    public void deleteBug(String platformBugId) {
+
+    }
+
+    @Override
+    public boolean isAttachmentUploadSupport() {
+        return false;
+    }
+
+    @Override
+    public void syncAttachmentToPlatform(SyncAttachmentToPlatformRequest request) {
+
+    }
+
+    @Override
+    public void syncPartIssues() {
+
+    }
+
+    @Override
+    public void syncAllIssues() {
+
+    }
+
+    @Override
+    public List<PlatformStatusDTO> getStatusList() {
         return null;
     }
 
