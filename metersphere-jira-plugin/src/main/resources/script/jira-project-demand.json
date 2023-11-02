@@ -10,21 +10,25 @@
         "value": "",
         "required": true,
         "subDesc": "如何获取JIRA项目key 预览",
-        "inputSearch": true,
-        "instructionsIcon": "/static/jira-key.png",
-        "optionMethod": "getBugType"
+        "inputSearch": false,
+        "instructionsIcon": "static/jira-key.png",
+        "optionMethod": "",
+        "couplingConfig": {}
       },
       {
         "name": "jiraDemandTypeId",
-        "type": "select",
+        "type": "SELECT",
         "label": "project.menu.demandType",
         "value": "",
         "required": true,
+        "inputSearch": true,
+        "optionMethod": "getBugType",
         "couplingConfig": {
           "type": "initOptions",
           "cascade": "jiraKey"
         }
       }
-    ]
+    ],
+    "optionMethod": "getBugType"
   }
 }
