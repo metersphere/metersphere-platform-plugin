@@ -5,8 +5,8 @@
     "formItems": [
       {
         "name": "jiraKey",
-        "type": "input",
-        "label": "project.jira_key",
+        "type": "JIRAKEY",
+        "label": "project.menu.projectKey",
         "value": "",
         "required": true,
         "subDesc": "如何获取JIRA项目key 预览",
@@ -15,9 +15,9 @@
         "optionMethod": "getBugType"
       },
       {
-        "name": "jiraIssueTypeId",
+        "name": "jiraBugTypeId",
         "type": "select",
-        "label": "organization.integration.jira_issuetype",
+        "label": "project.menu.defectType",
         "value": "",
         "required": true,
         "couplingConfig": {
