@@ -1,10 +1,10 @@
 package io.metersphere.platform.api;
 
+import io.metersphere.platform.constants.CustomFieldType;
+import io.metersphere.platform.domain.*;
 import io.metersphere.plugin.exception.MSPluginException;
 import io.metersphere.plugin.utils.JSON;
 import io.metersphere.plugin.utils.LogUtil;
-import io.metersphere.platform.constants.CustomFieldType;
-import io.metersphere.platform.domain.*;
 import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -32,6 +32,7 @@ public abstract class AbstractPlatform implements Platform {
     protected String defaultCustomFields;
 
     public static final String MD_IMAGE_DIR = "/opt/metersphere/data/image/markdown";
+    public static final String MD_IMAGE_TEMP_DIR = "/opt/metersphere/data/image/markdown/temp";
     public static final String PROXY_PATH = "/resource/md/get/path?platform=%s&workspaceId=%s&path=%s";
     public static final String ID_FIELD_NAME = "id";
     public static final String MARKDOWN_IMAGE_REGULAR = "(\\!\\[.*?\\]\\((.*?)\\))";
@@ -230,7 +231,7 @@ public abstract class AbstractPlatform implements Platform {
                         files.add(new File(MD_IMAGE_DIR + "/" + name));
                     } else if (path.contains("/resource/md/get")) { // 新数据走这里
                         String name = path.substring(path.indexOf("/resource/md/get") + 26);
-                        files.add(new File(MD_IMAGE_DIR + "/" + URLDecoder.decode(name, StandardCharsets.UTF_8.name())));
+                        files.add(getRealMdFile(name));
                     }
                 }
             } catch (Exception e) {
@@ -322,6 +323,17 @@ public abstract class AbstractPlatform implements Platform {
                     }
                 }
             });
+        }
+    }
+
+    private File getRealMdFile(String fileName) throws Exception{
+        // 先从临时目录找
+        File file = new File(MD_IMAGE_TEMP_DIR + "/" + URLDecoder.decode(fileName, StandardCharsets.UTF_8.name()));
+        if (file.exists()) {
+           return file;
+        } else {
+            // 否则直接返回外部目录
+            return new File(MD_IMAGE_DIR + "/" + URLDecoder.decode(fileName, StandardCharsets.UTF_8.name()));
         }
     }
 
