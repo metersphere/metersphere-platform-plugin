@@ -326,7 +326,7 @@ public abstract class AbstractPlatform implements Platform {
         }
     }
 
-    private File getRealMdFile(String fileName) throws Exception{
+    public File getRealMdFile(String fileName) throws Exception {
         // 先从临时目录找
         File file = new File(MD_IMAGE_TEMP_DIR + "/" + URLDecoder.decode(fileName, StandardCharsets.UTF_8.name()));
         if (file.exists()) {

@@ -505,15 +505,19 @@ public class ZentaoPlatform extends AbstractPlatform {
             } else {
                 String fileName = originSubUrl.substring(10);
                 // upload zentao
-                String id = zentaoClient.uploadFile(new File(MD_IMAGE_DIR + "/" + fileName));
-                // todo delete local file
-                int index = fileName.lastIndexOf(".");
-                String suffix = "";
-                if (index != -1) {
-                    suffix = fileName.substring(index);
+                try {
+                    String id = zentaoClient.uploadFile(getRealMdFile(fileName));
+                    // todo delete local file
+                    int index = fileName.lastIndexOf(".");
+                    String suffix = "";
+                    if (index != -1) {
+                        suffix = fileName.substring(index);
+                    }
+                    // replace id
+                    zentaoSteps = zentaoSteps.replaceAll(Pattern.quote(originSubUrl), id + suffix);
+                } catch (Exception e) {
+                    LogUtil.error(e);
                 }
-                // replace id
-                zentaoSteps = zentaoSteps.replaceAll(Pattern.quote(originSubUrl), id + suffix);
             }
         }
         // image link
