@@ -1,0 +1,17 @@
+{
+  "id": "inject_field",
+  "name": "内置平台字段",
+  "script": {
+    "injectFields": [
+      {
+        "id": "assignee",
+        "name": "Jira-处理人",
+        "type": "select",
+        "defaultValue": "",
+        "required": false,
+        "supportSearch": true,
+        "optionMethod": "getAssignableOptions"
+      }
+    ]
+  }
+}

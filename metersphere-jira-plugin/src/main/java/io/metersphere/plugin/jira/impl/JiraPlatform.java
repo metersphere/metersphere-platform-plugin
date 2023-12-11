@@ -9,24 +9,42 @@ import io.metersphere.plugin.jira.constants.JiraMetadataSpecialSystemField;
 import io.metersphere.plugin.jira.domain.*;
 import io.metersphere.plugin.jira.enums.JiraMetadataFieldType;
 import io.metersphere.plugin.jira.enums.JiraOptionKey;
-import io.metersphere.plugin.platform.dto.*;
+import io.metersphere.plugin.platform.dto.PlatformAttachment;
+import io.metersphere.plugin.platform.dto.SelectOption;
+import io.metersphere.plugin.platform.dto.SyncBugResult;
+import io.metersphere.plugin.platform.dto.reponse.DemandDTO;
+import io.metersphere.plugin.platform.dto.reponse.PlatformBugDTO;
+import io.metersphere.plugin.platform.dto.reponse.PlatformBugUpdateDTO;
+import io.metersphere.plugin.platform.dto.reponse.PlatformCustomFieldItemDTO;
+import io.metersphere.plugin.platform.dto.request.*;
 import io.metersphere.plugin.platform.enums.PlatformCustomFieldType;
 import io.metersphere.plugin.platform.enums.SyncAttachmentType;
 import io.metersphere.plugin.platform.spi.AbstractPlatform;
+import io.metersphere.plugin.platform.utils.PluginPager;
 import io.metersphere.plugin.sdk.util.MSPluginException;
 import io.metersphere.plugin.sdk.util.PluginLogUtils;
 import io.metersphere.plugin.sdk.util.PluginUtils;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.SerializationUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.pf4j.Extension;
 import org.springframework.beans.BeanUtils;
+import org.springframework.http.HttpStatus;
 import org.springframework.util.CollectionUtils;
+import org.springframework.web.client.HttpClientErrorException;
 
 import java.io.File;
+import java.io.InputStream;
+import java.lang.reflect.InvocationTargetException;
+import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
@@ -38,6 +56,8 @@ public class JiraPlatform extends AbstractPlatform {
     protected JiraDefaultClient jiraClient;
 
     protected JiraProjectConfig projectConfig;
+
+    protected SimpleDateFormat sdfWithZone = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
 
     public JiraPlatform(PlatformRequest request) {
         super(request);
@@ -60,7 +80,6 @@ public class JiraPlatform extends AbstractPlatform {
      */
     @Override
     public void validateProjectConfig(String projectConfigStr) {
-        // TODO 平台key校验
         try {
             JiraProjectConfig projectConfig = getProjectConfig(projectConfigStr);
             JiraIssueProject project = jiraClient.getProject(projectConfig.getJiraKey());
@@ -72,27 +91,46 @@ public class JiraPlatform extends AbstractPlatform {
         }
     }
 
+    /**
+     * 设置用户平台配置
+     *
+     * @param userPlatformConfig 用户平台配置
+     */
     public void setUserConfig(String userPlatformConfig) {
         JiraIntegrationConfig config = getIntegrationConfig(userPlatformConfig, JiraIntegrationConfig.class);
         validateAndSetConfig(config);
     }
 
+    /**
+     * 校验并设置集成配置
+     *
+     * @param config 集成配置
+     */
     private void validateAndSetConfig(JiraIntegrationConfig config) {
         jiraClient.initConfig(config);
     }
 
-    public void validateStoryType() {
+    /**
+     * 校验需求类型配置
+     */
+    public void validateDemandType() {
         if (StringUtils.isBlank(projectConfig.getJiraDemandTypeId())) {
             throw new MSPluginException("请在项目中配置 Jira 需求类型!");
         }
     }
 
+    /**
+     * 校验缺陷类型配置
+     */
     public void validateIssueType() {
         if (StringUtils.isBlank(projectConfig.getJiraBugTypeId())) {
             throw new MSPluginException("请在项目中配置 Jira 缺陷类型!");
         }
     }
 
+    /**
+     * 校验项目Key配置
+     */
     public void validateProjectKey(String projectId) {
         if (StringUtils.isBlank(projectId)) {
             throw new MSPluginException("请在项目设置配置 Jira 项目ID");
@@ -105,7 +143,7 @@ public class JiraPlatform extends AbstractPlatform {
      * @return 支持第三方模板的平台才会在MS平台存在默认模板
      */
     @Override
-    public boolean isThirdPartTemplateSupport() {
+    public boolean isSupportDefaultTemplate() {
         // Jira 支持第三方默认模板
         return true;
     }
@@ -117,7 +155,7 @@ public class JiraPlatform extends AbstractPlatform {
      * @return 自定义字段集合
      */
     @Override
-    public List<PlatformCustomFieldItemDTO> getThirdPartCustomField(String projectConfigStr) {
+    public List<PlatformCustomFieldItemDTO> getDefaultTemplateCustomField(String projectConfigStr) {
         projectConfig = getProjectConfig(projectConfigStr);
         Map<String, String> optionData = prepareOptionData();
         Map<String, JiraCreateMetadataResponse.Field> createMetadata = jiraClient.getCreateMetadata(projectConfig.getJiraKey(),
@@ -145,47 +183,221 @@ public class JiraPlatform extends AbstractPlatform {
         return sortCustomField(fields);
     }
 
+    /**
+     * 获取表单项
+     *
+     * @param request 表单项请求参数
+     * @return 下拉项
+     */
     @Override
-    public String addBug(PlatformBugUpdateRequest request) {
-        // 校验服务集成配置
+    public List<SelectOption> getFormOptions(GetOptionRequest request) {
+        String method = request.getOptionMethod();
+        try {
+            // 这里反射调用 getIssueTypes 等方法，获取下拉框选项
+            // noinspection unchecked
+            return (List<SelectOption>) this.getClass().getMethod(method, request.getClass()).invoke(this, request);
+        } catch (InvocationTargetException e) {
+            PluginLogUtils.error(e.getTargetException());
+            throw new MSPluginException(e.getTargetException());
+        } catch (Exception e) {
+            PluginLogUtils.error(e);
+            throw new MSPluginException(e);
+        }
+    }
+
+    /**
+     * 获取第三方平台状态列表
+     *
+     * @param projectConfig 项目配置信息
+     * @param issueKey      缺陷ID
+     * @return 状态列表
+     */
+    @Override
+    public List<SelectOption> getStatusTransitions(String projectConfig, String issueKey) {
+        JiraProjectConfig config = getProjectConfig(projectConfig);
+        List<SelectOption> statusOptions = new ArrayList<>();
+        if (StringUtils.isBlank(issueKey)) {
+            // 缺陷ID为空时, 获取所有状态列表
+            List<JiraStatusResponse> statusResponseList = jiraClient.getStatus(config.getJiraKey());
+            List<List<JiraStatusResponse.Statuses>> issueTypeStatus = statusResponseList.stream().filter(statusResponse -> StringUtils.equals(config.getJiraBugTypeId(), statusResponse.getId()))
+                    .map(JiraStatusResponse::getStatuses).toList();
+            if (!CollectionUtils.isEmpty(issueTypeStatus)) {
+                issueTypeStatus.forEach(item -> item.forEach(statuses -> {
+                    SelectOption option = new SelectOption();
+                    option.setText(statuses.getName());
+                    option.setValue(statuses.getId());
+                    statusOptions.add(option);
+                }));
+            }
+        } else {
+            // 缺陷ID不为空时, 获取状态流
+            List<JiraTransitionsResponse.Transitions> transitions = jiraClient.getTransitions(issueKey);
+            if (!CollectionUtils.isEmpty(transitions)) {
+                transitions.forEach(item -> {
+                    SelectOption option = new SelectOption();
+                    option.setText(item.getTo().getName());
+                    option.setValue(item.getId());
+                    statusOptions.add(option);
+                });
+            }
+        }
+        return statusOptions;
+    }
+
+    /**
+     * 分页获取Jira需求
+     *
+     * @param request 需求请求参数
+     * @return 插件分页返回
+     */
+    @Override
+    public PluginPager<List<DemandDTO>> pageDemand(DemandPageRequest request) {
+        projectConfig = getProjectConfig(request.getProjectConfig());
+        validateDemandType();
+        return jiraClient.pageDemand(projectConfig.getJiraKey(), projectConfig.getJiraDemandTypeId(), request.getStartPage(), request.getPageSize(), request.getQuery());
+    }
+
+    /**
+     * 获取需求列表
+     *
+     * @param request 需求关联请求参数
+     * @return 需求列表
+     */
+    @Override
+    public List<DemandDTO> getDemands(DemandRelateQueryRequest request) {
+        JiraProjectConfig config = getProjectConfig(request.getProjectConfig());
+        return jiraClient.getDemands(config.getJiraKey(), config.getJiraDemandTypeId(), 0, Integer.MAX_VALUE, request.getRelateDemandIds());
+    }
+
+    /**
+     * 新增缺陷
+     *
+     * @param request 缺陷请求参数
+     * @return 平台缺陷返回信息
+     */
+    @Override
+    public PlatformBugUpdateDTO addBug(PlatformBugUpdateRequest request) {
+        // validate config
         validateConfig(request.getUserPlatformConfig(), request.getProjectConfig());
 
-        // 过滤出链接事务字段
+        // prepare and init jira param
+        PlatformBugUpdateDTO platformBug = new PlatformBugUpdateDTO();
+        // filter issue link field param
         List<PlatformCustomFieldItemDTO> issueLinkFields = filterIssueLinksField(request);
-        // 处理字段参数, 构建Jira创建缺陷参数
-        Map<String, Object> paramMap = buildParamMap(request, projectConfig.getJiraBugTypeId(), projectConfig.getJiraKey());
+        // filter issue status transition field param
+        PlatformCustomFieldItemDTO statusField = filterStatusTransition(request);
+        // filter issue custom field param
+        Map<String, Object> paramMap = buildParamMap(request, projectConfig.getJiraBugTypeId(), projectConfig.getJiraKey(), platformBug);
+
+        // add issue
         JiraAddIssueResponse result = jiraClient.addIssue(PluginUtils.toJSONString(paramMap), getFieldNameMap(request));
 
-
-        // 上传富文本中的图片作为附件
-        // List<File> imageFiles = getImageFiles(request);
-        // imageFiles.forEach(img -> jiraClient.uploadAttachment(result.getKey(), img));
         // link issue
         if (!CollectionUtils.isEmpty(issueLinkFields)) {
             linkIssue(issueLinkFields, result.getKey(), jiraClient.getIssueLinkType());
         }
+        // do transition
+        if (statusField != null) {
+            Map<String, Object> transitionMap = new HashMap<>();
+            List<JiraTransitionsResponse.Transitions> transitions = jiraClient.getTransitions(result.getKey());
+            if (!CollectionUtils.isEmpty(transitions)) {
+                JiraTransitionsResponse.Transitions transition = transitions.stream().filter(item -> StringUtils.equals(item.getTo().getId(),
+                        statusField.getValue().toString())).findFirst().orElse(null);
+                if (transition != null) {
+                    Map<String, String> status = new HashMap<>();
+                    status.put("id", transition.getId());
+                    transitionMap.put("transition", status);
+                    jiraClient.doTransitions(PluginUtils.toJSONString(transitionMap), result.getKey());
+                    platformBug.setPlatformStatus(status.get("id"));
+                }
+            }
+        }
 
-        return result.getKey();
+        // TODO: Jira的富文本字段图片处理
+        // List<File> imageFiles = getImageFiles(request);
+        // imageFiles.forEach(img -> jiraClient.uploadAttachment(result.getKey(), img));
+
+        // return result
+        platformBug.setPlatformBugKey(result.getKey());
+        return platformBug;
     }
 
+    /**
+     * 修改缺陷
+     *
+     * @param request 缺陷请求参数
+     * @return 平台缺陷更新返回信息
+     */
     @Override
-    public void updateBug(PlatformBugUpdateRequest request) {
+    public PlatformBugUpdateDTO updateBug(PlatformBugUpdateRequest request) {
+        // validate config
+        validateConfig(request.getUserPlatformConfig(), request.getProjectConfig());
 
+        // prepare and init jira param
+        PlatformBugUpdateDTO platformBug = new PlatformBugUpdateDTO();
+        // filter issue link field param
+        List<PlatformCustomFieldItemDTO> issueLinkFields = filterIssueLinksField(request);
+        // filter issue status transition field param
+        PlatformCustomFieldItemDTO statusField = filterStatusTransition(request);
+        // filter issue custom field param
+        Map<String, Object> param = buildParamMap(request, projectConfig.getJiraBugTypeId(), projectConfig.getJiraKey(), platformBug);
+
+        // update issue
+        jiraClient.updateIssue(request.getPlatformBugId(), PluginUtils.toJSONString(param), getFieldNameMap(request));
+
+        // link or unlink issue
+        if (!CollectionUtils.isEmpty(issueLinkFields)) {
+            // 编辑时, 删除上一次所有的 issue link, 重新关联一组 issue link
+            unLinkIssue(request.getPlatformBugId());
+            linkIssue(issueLinkFields, request.getPlatformBugId(), jiraClient.getIssueLinkType());
+        }
+        // do transition
+        if (statusField != null && statusField.getValue() != null) {
+            Map<String, Object> transitionMap = new HashMap<>();
+            Map<String, String> status = new HashMap<>();
+            status.put("id", statusField.getValue().toString());
+            transitionMap.put("transition", status);
+            jiraClient.doTransitions(PluginUtils.toJSONString(transitionMap), request.getPlatformBugId());
+        }
+
+        // TODO: Jira的富文本字段图片处理
+
+        // return result
+        platformBug.setPlatformBugKey(request.getPlatformBugId());
+        return platformBug;
     }
 
+    /**
+     * 删除缺陷
+     *
+     * @param platformBugId 缺陷ID
+     */
     @Override
     public void deleteBug(String platformBugId) {
-
+        jiraClient.deleteIssue(platformBugId);
     }
 
+    /**
+     * 是否支持附件
+     *
+     * @return {true: 支持}
+     */
     @Override
-    public boolean isAttachmentSupport() {
-        // Jira 支持附件操作
+    public boolean isSupportAttachment() {
+        // Jira 支持附件API
         return true;
     }
 
+    /**
+     * 同步附件至平台
+     *
+     * @param request 同步附件请求参数
+     */
     @Override
     public void syncAttachmentToPlatform(SyncAttachmentToPlatformRequest request) {
+        if (!isSupportAttachment()) {
+            return;
+        }
         String syncType = request.getSyncType();
         File file = request.getFile();
         if (StringUtils.equals(SyncAttachmentType.UPLOAD.syncOperateType(), syncType)) {
@@ -208,56 +420,118 @@ public class JiraPlatform extends AbstractPlatform {
         }
     }
 
+    /**
+     * 同步缺陷(存量)
+     *
+     * @param request 同步缺陷请求参数
+     * @return 同步缺陷结果
+     */
     @Override
-    public void syncBugs() {
-
-    }
-
-    @Override
-    public void syncAllBugs() {
-
+    public SyncBugResult syncBugs(SyncBugRequest request) {
+        SyncBugResult syncResult = new SyncBugResult();
+        projectConfig = getProjectConfig(request.getProjectConfig());
+        // 获取默认的模板字段
+        List<PlatformCustomFieldItemDTO> defaultTemplateCustomField = getDefaultTemplateCustomField(request.getProjectConfig());
+        List<PlatformBugDTO> syncBugs = request.getBugs();
+        syncBugs.forEach(syncBug -> {
+            try {
+                JiraIssue jiraIssue = jiraClient.getIssues(syncBug.getPlatformBugId());
+                syncJiraFieldToMsBug(syncBug, jiraIssue, defaultTemplateCustomField);
+                parseAttachmentToMsBug(syncResult, syncBug, jiraIssue);
+                // 同步的缺陷待更新
+                syncResult.getUpdateBug().add(syncBug);
+            } catch (HttpClientErrorException e) {
+                if (HttpStatus.NOT_FOUND.isSameCodeAs(e.getStatusCode())) {
+                    // 缺陷未找到, 同步删除
+                    syncResult.getDeleteBugIds().add(syncBug.getId());
+                }
+            } catch (Exception e) {
+                PluginLogUtils.error(e);
+            }
+        });
+        return syncResult;
     }
 
     /**
-     * 获取第三方平台状态列表
+     * 同步缺陷(全量)
      *
-     * @param projectConfig 项目配置信息
-     * @param issueKey      缺陷ID
-     * @return 状态列表
+     * @param request 同步全量缺陷请求参数
      */
     @Override
-    public List<PlatformStatusDTO> getStatusList(String projectConfig, String issueKey) {
-        JiraProjectConfig config = getProjectConfig(projectConfig);
-        List<PlatformStatusDTO> platformStatusDTOS = new ArrayList<>();
-        if (StringUtils.isBlank(issueKey)) {
-            // 缺陷ID为空时, 获取所有状态列表
-            List<JiraStatusResponse> statusResponseList = jiraClient.getStatus(config.getJiraKey());
-            List<List<JiraStatusResponse.Statuses>> issueTypeStatus = statusResponseList.stream().filter(statusResponse -> StringUtils.equals(config.getJiraBugTypeId(), statusResponse.getId()))
-                    .map(JiraStatusResponse::getStatuses).toList();
-            if (!CollectionUtils.isEmpty(issueTypeStatus)) {
-                issueTypeStatus.forEach(item -> {
-                    item.forEach(statuses -> {
-                        PlatformStatusDTO platformStatusDTO = new PlatformStatusDTO();
-                        platformStatusDTO.setId(statuses.getName());
-                        platformStatusDTO.setName(statuses.getName());
-                        platformStatusDTOS.add(platformStatusDTO);
-                    });
+    public void syncAllBugs(SyncAllBugRequest request) {
+        // validate config
+        projectConfig = getProjectConfig(request.getProjectConfig());
+        validateProjectKey(projectConfig.getJiraKey());
+        validateIssueType();
 
-                });
+        // prepare page param
+        int startAt = 0, maxResults = 100, currentSize = 0;
+        // default template field
+        List<PlatformCustomFieldItemDTO> defaultTemplateCustomField = getDefaultTemplateCustomField(request.getProjectConfig());
+        do {
+            // prepare post process func param
+            List<PlatformBugDTO> needSyncBugs = new ArrayList<>();
+            SyncBugResult syncBugResult = new SyncBugResult();
+
+            // query jira bug by page
+            JiraIssueListResponse result = jiraClient.getProjectIssues(startAt, maxResults, projectConfig.getJiraKey(), projectConfig.getJiraBugTypeId(), request);
+            List<JiraIssue> jiraIssues = result.getIssues();
+            currentSize = jiraIssues.size();
+            if (!CollectionUtils.isEmpty(jiraIssues)) {
+                // jira attachment field
+                Map<String, Object> attachmentFieldMap = new HashMap<>();
+                if (!jiraIssues.get(0).getFields().containsKey(JiraMetadataField.ATTACHMENT_NAME)) {
+                    // if jira not support attachment field, query attachment by issue key
+                    try {
+                        JiraIssueListResponse response = jiraClient.getProjectIssuesAttachment(startAt, maxResults, projectConfig.getJiraKey(),
+                                projectConfig.getJiraBugTypeId(), request);
+                        List<JiraIssue> jiraIssuesWithAttachmentField = response.getIssues();
+                        attachmentFieldMap = jiraIssuesWithAttachmentField.stream().collect(Collectors.toMap(JiraIssue::getKey, i -> i.getFields().get(JiraMetadataField.ATTACHMENT_NAME)));
+                    } catch (Exception e) {
+                        PluginLogUtils.error(e);
+                    }
+                }
+                // jira status transition
+                List<JiraTransitionsResponse.Transitions> transitions = jiraClient.getTransitions(jiraIssues.get(0).getKey());
+
+                for (JiraIssue jiraIssue : jiraIssues) {
+                    // transfer jira bug field to ms
+                    PlatformBugDTO msBug = new PlatformBugDTO();
+                    msBug.setId(UUID.randomUUID().toString());
+                    msBug.setPlatformDefaultTemplate(true);
+                    msBug.setPlatformBugId(jiraIssue.getKey());
+                    syncJiraFieldToMsBug(msBug, jiraIssue, defaultTemplateCustomField);
+                    // parse transition status
+                    msBug.setStatus(parseTransitionStatus(transitions, msBug.getStatus()));
+                    needSyncBugs.add(msBug);
+                    // handle attachment
+                    if (attachmentFieldMap.containsKey(jiraIssue.getKey())) {
+                        // set jira attachment field when jira issue not contain attachment field
+                        jiraIssue.getFields().put(JiraMetadataField.ATTACHMENT_NAME, attachmentFieldMap.get(jiraIssue.getKey()));
+                    }
+                    parseAttachmentToMsBug(syncBugResult, msBug, jiraIssue);
+                }
             }
-        } else {
-            // 缺陷ID不为空时, 获取状态流
-            List<JiraTransitionsResponse.Transitions> transitions = jiraClient.getTransitions(issueKey);
-            if (!CollectionUtils.isEmpty(transitions)) {
-                transitions.forEach(item -> {
-                    PlatformStatusDTO platformStatusDTO = new PlatformStatusDTO();
-                    platformStatusDTO.setId(item.getTo().getName());
-                    platformStatusDTO.setName(item.getTo().getName());
-                    platformStatusDTOS.add(platformStatusDTO);
-                });
-            }
-        }
-        return platformStatusDTOS;
+
+            // set post process func param
+            // common sync post param {syncBugs: all need sync bugs, attachmentMap: all bug attachment}
+            SyncPostParamRequest syncPostParamRequest = new SyncPostParamRequest();
+            syncPostParamRequest.setNeedSyncBugs(needSyncBugs);
+            syncPostParamRequest.setAttachmentMap(syncBugResult.getAttachmentMap());
+            request.getSyncPostProcessFunc().accept(syncPostParamRequest);
+            startAt += maxResults;
+        } while (currentSize >= maxResults);
+    }
+
+    /**
+     * 获取附件内容
+     *
+     * @param fileKey            附件ID
+     * @param inputStreamHandler 处理方法
+     */
+    @Override
+    public void getAttachmentContent(String fileKey, Consumer<InputStream> inputStreamHandler) {
+        jiraClient.getAttachmentContent(fileKey, inputStreamHandler);
     }
 
     /**
@@ -362,8 +636,8 @@ public class JiraPlatform extends AbstractPlatform {
     /**
      * 获取Jira缺陷类型
      *
-     * @param request
-     * @return
+     * @param request 插件下拉值请求参数
+     * @return 下拉选项
      */
     public List<SelectOption> getBugType(PluginOptionsRequest request) {
         JiraProjectConfig projectConfig = getProjectConfig(request.getProjectConfig());
@@ -386,19 +660,23 @@ public class JiraPlatform extends AbstractPlatform {
         return PluginUtils.parseObject(configStr, JiraProjectConfig.class);
     }
 
+    /**
+     * 设置基础自定义字段属性
+     *
+     * @param item        字段项
+     * @param customField 自定义字段
+     * @param name        名称
+     * @param filedKey    唯一KEY
+     */
     private void setCustomFieldBaseProperty(JiraCreateMetadataResponse.Field item, PlatformCustomFieldItemDTO customField, String name, Character filedKey) {
         customField.setId(name);
         customField.setName(item.getName());
         customField.setKey(String.valueOf(filedKey++));
         customField.setCustomData(name);
         if (StringUtils.equals(JiraMetadataField.SUMMARY_FIELD_NAME, item.getKey())) {
-            customField.setName(JiraMetadataField.SUMMARY_FIELD_NAME_MS_ZH);
             customField.setRequired(true);
         } else {
             customField.setRequired(item.isRequired());
-        }
-        if (StringUtils.equals(JiraMetadataField.DESCRIPTION_FIELD_NAME, item.getKey())) {
-            customField.setName(JiraMetadataField.DESCRIPTION_FIELD_NAME_MS_ZH);
         }
     }
 
@@ -721,13 +999,25 @@ public class JiraPlatform extends AbstractPlatform {
         return allowedValueOptions;
     }
 
+    /**
+     * 校验配置
+     *
+     * @param userPlatformConfig 用户平台配置
+     * @param projectConfig      项目配置
+     */
     private void validateConfig(String userPlatformConfig, String projectConfig) {
         setUserConfig(userPlatformConfig);
-        JiraProjectConfig jiraProjectConfig = getProjectConfig(projectConfig);
-        validateProjectKey(jiraProjectConfig.getJiraKey());
+        this.projectConfig = getProjectConfig(projectConfig);
+        validateProjectKey(this.projectConfig.getJiraKey());
         validateIssueType();
     }
 
+    /**
+     * 过滤issue-link字段
+     *
+     * @param request 请求参数
+     * @return issue-link自定义字段
+     */
     private List<PlatformCustomFieldItemDTO> filterIssueLinksField(PlatformBugUpdateRequest request) {
         if (!CollectionUtils.isEmpty(request.getCustomFieldList())) {
             // remove and return issue link field
@@ -740,7 +1030,35 @@ public class JiraPlatform extends AbstractPlatform {
         }
     }
 
-    private Map<String, Object> buildParamMap(PlatformBugUpdateRequest request, String issueTypeId, String jiraKey) {
+    /**
+     * 过滤状态Transition字段
+     *
+     * @param request 请求参数
+     * @return 状态自定义字段
+     */
+    private PlatformCustomFieldItemDTO filterStatusTransition(PlatformBugUpdateRequest request) {
+        if (!CollectionUtils.isEmpty(request.getCustomFieldList())) {
+            // remove and return issue status
+            List<PlatformCustomFieldItemDTO> statusList = request.getCustomFieldList().stream().filter(item ->
+                    StringUtils.equals(item.getCustomData(), "status")).toList();
+            request.getCustomFieldList().removeAll(statusList);
+            return statusList.get(0);
+        } else {
+            return null;
+        }
+    }
+
+    /**
+     * 构建参数Map{新增, 修改缺陷}
+     *
+     * @param request     请求参数
+     * @param issueTypeId 缺陷类型
+     * @param jiraKey     缺陷唯一KEY
+     * @param platformBug 平台缺陷
+     * @return 参数Map
+     */
+    private Map<String, Object> buildParamMap(PlatformBugUpdateRequest request, String issueTypeId, String jiraKey,
+                                              PlatformBugUpdateDTO platformBug) {
         Map<String, Object> issuetype = new LinkedHashMap<>();
         issuetype.put("id", issueTypeId);
         Map<String, Object> project = new LinkedHashMap<>();
@@ -753,90 +1071,116 @@ public class JiraPlatform extends AbstractPlatform {
         Map<String, Object> param = new LinkedHashMap<>();
         param.put("fields", fields);
 
-        parseField(getThirdPartCustomField(request.getProjectConfig()), request, fields);
+        parseField(request, fields, platformBug);
         setSpecialParam(fields);
         return param;
     }
 
-    private void parseField(List<PlatformCustomFieldItemDTO> allFields, PlatformBugUpdateRequest request, Map<String, Object> fields) {
+    /**
+     * 解析自定义字段
+     *
+     * @param request     请求参数
+     * @param fields      字段集合
+     * @param platformBug 平台缺陷
+     */
+    private void parseField(PlatformBugUpdateRequest request, Map<String, Object> fields, PlatformBugUpdateDTO platformBug) {
         List<PlatformCustomFieldItemDTO> customFields = request.getCustomFieldList();
+        if (CollectionUtils.isEmpty(customFields)) {
+            PluginLogUtils.error("Jira缺陷字段为空, 请检查参数!");
+            throw new MSPluginException("Jira缺陷字段为空, 请检查参数!");
+        }
 
-        if (!CollectionUtils.isEmpty(customFields)) {
-            customFields.forEach(item -> {
-                String fieldName = item.getCustomData();
-                if (StringUtils.isNotBlank(fieldName)) {
-                    if (ObjectUtils.isNotEmpty(item.getValue())) {
-                        if (StringUtils.isNotBlank(item.getType())) {
-                            if (StringUtils.equalsAny(item.getType(), "select", "radio", "member")) {
-                                Map param = new LinkedHashMap<>();
-                                param.put("id", item.getValue());
-                                fields.put(fieldName, param);
-                            } else if (StringUtils.equalsAny(item.getType(), "multipleSelect", "checkbox", "multipleMember")) {
-                                List attrs = new ArrayList();
-                                if (item.getValue() != null) {
-                                    List values = PluginUtils.parseArray((String) item.getValue());
-                                    values.forEach(v -> {
-                                        Map param = new LinkedHashMap<>();
-                                        param.put("id", v);
-                                        attrs.add(param);
-                                    });
-                                }
-                                fields.put(fieldName, attrs);
-                            } else if (StringUtils.equalsAny(item.getType(), "cascadingSelect")) {
-                                if (item.getValue() != null) {
-                                    Map attr = new LinkedHashMap<>();
-                                    List values = PluginUtils.parseArray((String) item.getValue());
-                                    if (!CollectionUtils.isEmpty(values)) {
-                                        if (values.size() > 0) {
-                                            attr.put("id", values.get(0));
-                                        }
-                                        if (values.size() > 1) {
-                                            Map param = new LinkedHashMap<>();
-                                            param.put("id", values.get(1));
-                                            attr.put("child", param);
-                                        }
-                                    } else {
-                                        attr.put("id", item.getValue());
-                                    }
-                                    fields.put(fieldName, attr);
-                                }
-                            } else if (StringUtils.equalsAny(item.getType(), "richText")) {
-                                // fields.put(fieldName, parseRichTextImageUrlToJira(item.getValue().toString()));
-                                if (fieldName.equals(JiraMetadataField.DESCRIPTION_FIELD_NAME)) {
-                                    request.setDescription(item.getValue().toString());
-                                }
-                            } else if (StringUtils.equals(item.getType(), "datetime")) {
-                                if (item.getValue() != null && item.getValue() instanceof String) {
-                                    // 2023-07-12 11:12:46 -> 2021-12-10T11:12:46+08:00
-                                    fields.put(fieldName, ((String) item.getValue()).trim().replace(" ", "T") + "+08:00");
-                                }
-                            } else {
-                                fields.put(fieldName, item.getValue());
-                            }
+        for (PlatformCustomFieldItemDTO item : customFields) {
+            String fieldName = item.getCustomData();
+            if (StringUtils.isEmpty(item.getCustomData()) || StringUtils.isEmpty(item.getType()) || ObjectUtils.isEmpty(item.getValue())) {
+                continue;
+            }
+            // 把不同字段类型, 解析成Jira保存缺陷数据时的结构
+            if (StringUtils.equalsAnyIgnoreCase(item.getType(), PlatformCustomFieldType.SELECT.getType(),
+                    PlatformCustomFieldType.RADIO.getType(), PlatformCustomFieldType.MEMBER.getType())) {
+                if (StringUtils.equals(fieldName, JiraMetadataSpecialSystemField.ASSIGNEE)) {
+                    platformBug.setPlatformHandleUser(item.getValue().toString());
+                }
+                Map<String, Object> param = new LinkedHashMap<>();
+                param.put("id", item.getValue());
+                fields.put(fieldName, param);
+            } else if (StringUtils.equalsAnyIgnoreCase(item.getType(), PlatformCustomFieldType.MULTIPLE_SELECT.getType(),
+                    PlatformCustomFieldType.CHECKBOX.getType(), PlatformCustomFieldType.MULTIPLE_MEMBER.getType())) {
+                List<Map<String, Object>> attrs = new ArrayList<>();
+                List<Object> values = PluginUtils.parseArray((String) item.getValue(), Object.class);
+                values.forEach(v -> {
+                    Map<String, Object> param = new LinkedHashMap<>();
+                    param.put("id", v);
+                    attrs.add(param);
+                });
+                fields.put(fieldName, attrs);
+            } else if (StringUtils.equalsIgnoreCase(item.getType(), PlatformCustomFieldType.CASCADE_SELECT.getType())) {
+                // 级联类型, 通常默认为["父级", "子级"]这样的结构处理
+                Map<String, Object> attr = new LinkedHashMap<>();
+                List<Object> values = PluginUtils.parseArray((String) item.getValue(), Object.class);
+                if (CollectionUtils.isEmpty(values)) {
+                    attr.put("id", item.getValue());
+                } else {
+                    // 父级
+                    attr.put("id", values.get(0));
+                    // 子级
+                    if (values.size() > 1) {
+                        for (int i = 1; i < values.size(); i++) {
+                            Map<String, Object> param = new LinkedHashMap<>();
+                            param.put("id", values.get(i));
+                            attr.put("child", param);
                         }
-
                     }
                 }
-            });
+                fields.put(fieldName, attr);
+            } else if (StringUtils.equalsIgnoreCase(item.getType(), PlatformCustomFieldType.RICH_TEXT.getType())) {
+                // fields.put(fieldName, parseRichTextImageUrlToJira(item.getValue().toString()));
+                if (fieldName.equals(JiraMetadataField.DESCRIPTION_FIELD_NAME)) {
+                    platformBug.setPlatformDescription(item.getValue().toString());
+                }
+                fields.put(fieldName, item.getValue());
+            } else if (StringUtils.equalsIgnoreCase(item.getType(), PlatformCustomFieldType.DATETIME.getType())) {
+                if (item.getValue() instanceof String) {
+                    // 日期时间类型处理成Jira可解析{2023-07-12 11:12:46 -> 2021-12-10T11:12:46+08:00}
+                    fields.put(fieldName, ((String) item.getValue()).trim().replace(" ", "T") + "+08:00");
+                }
+            } else if (StringUtils.equalsIgnoreCase(item.getType(), PlatformCustomFieldType.MULTIPLE_INPUT.getType())) {
+                List<Object> values = PluginUtils.parseArray((String) item.getValue(), Object.class);
+                fields.put(fieldName, values);
+            } else {
+                if (StringUtils.equalsIgnoreCase(fieldName, JiraMetadataField.SUMMARY_FIELD_NAME)) {
+                    // summary -> ms_title
+                    platformBug.setPlatformTitle(item.getValue().toString());
+                }
+                fields.put(fieldName, item.getValue());
+            }
+        }
+
+        // 如果平台自定义字段中不包含Jira的Summary事务, 手动插入
+        if (!fields.containsKey(JiraMetadataField.SUMMARY_FIELD_NAME)) {
+            fields.put(JiraMetadataField.SUMMARY_FIELD_NAME, request.getTitle());
+        }
+
+        // 如果平台自定义字段中不包含Jira的描述字段, 手动插入
+        if (!fields.containsKey(JiraMetadataField.DESCRIPTION_FIELD_NAME)) {
+            fields.put(JiraMetadataField.DESCRIPTION_FIELD_NAME, request.getDescription());
         }
     }
 
     /**
-     * 参数比较特殊，需要特别处理
+     * 处理特殊字段
      *
-     * @param fields
+     * @param fields 字段集合
      */
-    private void setSpecialParam(Map fields) {
-
+    private void setSpecialParam(Map<String, Object> fields) {
         try {
             Map<String, JiraCreateMetadataResponse.Field> createMetadata = jiraClient.getCreateMetadata(projectConfig.getJiraKey(), projectConfig.getJiraBugTypeId());
-
             for (String key : createMetadata.keySet()) {
                 JiraCreateMetadataResponse.Field item = createMetadata.get(key);
                 JiraCreateMetadataResponse.Schema schema = item.getSchema();
 
                 if (StringUtils.equals(key, JiraMetadataSpecialSystemField.TIME_TRACKING)) {
-                    Map newField = new LinkedHashMap<>();
+                    Map<String, Object> newField = new LinkedHashMap<>();
                     // originalEstimate -> 2d 转成 timetracking : { originalEstimate: 2d}
                     newField.put(JiraMetadataField.ORIGINAL_ESTIMATE_TRACKING_FIELD_ID, fields.get(JiraMetadataField.ORIGINAL_ESTIMATE_TRACKING_FIELD_ID));
                     newField.put(JiraMetadataField.REMAINING_ESTIMATE_TRACKING_FIELD_ID, fields.get(JiraMetadataField.REMAINING_ESTIMATE_TRACKING_FIELD_ID));
@@ -844,11 +1188,9 @@ public class JiraPlatform extends AbstractPlatform {
                     fields.remove(JiraMetadataField.ORIGINAL_ESTIMATE_TRACKING_FIELD_ID);
                     fields.remove(JiraMetadataField.REMAINING_ESTIMATE_TRACKING_FIELD_ID);
                 }
-
                 if (schema == null || fields.get(key) == null) {
                     continue;
                 }
-
                 if (schema.getCustom() != null) {
                     if (schema.getCustom().endsWith(JiraMetadataSpecialCustomField.SPRINT_FIELD_NAME)) {
                         Map field = (Map) fields.get(key);
@@ -858,9 +1200,11 @@ public class JiraPlatform extends AbstractPlatform {
                             fields.put(key, Integer.parseInt(id.toString()));
                         }
                     } else if (schema.getCustom().endsWith("pic-link")) {
+                        // 特殊Link
                         Map field = (Map) fields.get(key);
                         fields.put(key, field.get("id"));
-                    } else if (schema.getCustom().endsWith("multiuserpicker")) { // 多选用户列表
+                    } else if (schema.getCustom().endsWith("multiuserpicker")) {
+                        // 多选用户列表
                         List<Map> userItems = (List) fields.get(key);
                         userItems.forEach(i -> {
                             i.put("name", i.get("id"));
@@ -868,7 +1212,6 @@ public class JiraPlatform extends AbstractPlatform {
                         });
                     }
                 }
-
                 if (schema.getType() != null) {
                     if (schema.getType().endsWith("user")) {
                         Map field = (Map) fields.get(key);
@@ -884,14 +1227,21 @@ public class JiraPlatform extends AbstractPlatform {
             }
         } catch (Exception e) {
             PluginLogUtils.error(e);
+            throw new MSPluginException("解析Jira特殊参数失败, 请检查参数: " + e.getMessage());
         }
     }
 
+    /**
+     * 获取字段名称集合{错误信息展示需要}
+     *
+     * @param request 请求参数
+     * @return 字段名称集合
+     */
     private static Map<String, String> getFieldNameMap(PlatformBugUpdateRequest request) {
         Map<String, String> filedNameMap = null;
         if (!CollectionUtils.isEmpty(request.getCustomFieldList())) {
             filedNameMap = request.getCustomFieldList().stream()
-                    .collect(Collectors.toMap(PlatformCustomFieldItemDTO::getId, PlatformCustomFieldItemDTO::getName));
+                    .collect(Collectors.toMap(PlatformCustomFieldItemDTO::getCustomData, PlatformCustomFieldItemDTO::getName));
         }
         return filedNameMap;
     }
@@ -899,8 +1249,8 @@ public class JiraPlatform extends AbstractPlatform {
     /**
      * 根据字段类型, 匹配具体的字段集合
      *
-     * @param specialFields
-     * @param type
+     * @param specialFields 特殊字段集合
+     * @param type          字段类型
      * @return true: 匹配到特殊字段, false: 未匹配到特殊字段
      */
     private static boolean mappingSpecialField(Set<String> specialFields, String type) {
@@ -930,6 +1280,13 @@ public class JiraPlatform extends AbstractPlatform {
     //     return files;
     // }
 
+    /**
+     * link jira issue
+     *
+     * @param issueLinkFields [0] issue link type, [1] issue link
+     * @param issueKey        issue key
+     * @param issueLinkTypes  issue link types
+     */
     private void linkIssue(List<PlatformCustomFieldItemDTO> issueLinkFields, String issueKey, List<JiraIssueLinkTypeResponse.IssueLinkType> issueLinkTypes) {
         // 暂时只支持关联一组事务, 前台Form表单对多组事务关联关系的支持麻烦
         PlatformCustomFieldItemDTO issueLinkType = issueLinkFields.get(0);
@@ -957,9 +1314,23 @@ public class JiraPlatform extends AbstractPlatform {
     }
 
     /**
+     * un-link jira issue
+     *
+     * @param issueKey issue-key
+     */
+    private void unLinkIssue(String issueKey) {
+        JiraIssue issue = jiraClient.getIssues(issueKey);
+        Map<String, Object> fields = issue.getFields();
+        if (fields.containsKey(JiraMetadataSpecialSystemField.ISSUE_LINKS)) {
+            List<Map<String, Object>> issueLinks = (List) fields.get(JiraMetadataSpecialSystemField.ISSUE_LINKS);
+            issueLinks.stream().map(item -> item.get("id").toString()).forEach(jiraClient::unLinkIssue);
+        }
+    }
+
+    /**
      * 准备特定的选项数据, 防止多次网络请求
      *
-     * @return
+     * @return 选项数据映射集合
      */
     private Map<String, String> prepareOptionData() {
         Map<String, String> optionData = new HashMap<>();
@@ -981,5 +1352,339 @@ public class JiraPlatform extends AbstractPlatform {
         optionData.put(JiraOptionKey.ISSUE_LINK.name(), PluginUtils.toJSONString(getIssueLinkOptions(null, null)));
         optionData.put(JiraOptionKey.ISSUE_LINK_TYPE.name(), PluginUtils.toJSONString(getIssueLinkTypeOptions()));
         return optionData;
+    }
+
+    /**
+     * 同步Jira字段到平台缺陷字段
+     *
+     * @param msBug                 平台缺陷
+     * @param jiraIssue             jira缺陷
+     * @param defaultTemplateFields 默认模板字段集合
+     */
+    private void syncJiraFieldToMsBug(PlatformBugDTO msBug, JiraIssue jiraIssue, List<PlatformCustomFieldItemDTO> defaultTemplateFields) {
+        try {
+            // 处理基础字段
+            parseBaseFieldToMsBug(msBug, jiraIssue.getFields());
+            // 处理自定义字段
+            parseCustomFieldToMsBug(msBug, jiraIssue.getFields(), defaultTemplateFields);
+        } catch (Exception e) {
+            PluginLogUtils.error(e);
+        }
+    }
+
+    /**
+     * 解析基础字段到平台缺陷字段
+     *
+     * @param msBug        平台缺陷
+     * @param jiraFieldMap jira字段集合
+     * @throws Exception 解析异常
+     */
+    private void parseBaseFieldToMsBug(PlatformBugDTO msBug, Map jiraFieldMap) throws Exception {
+        // 处理基础字段(TITLE, DESCRIPTION, HANDLE_USER, STATUS)
+        msBug.setTitle(jiraFieldMap.get(JiraMetadataField.SUMMARY_FIELD_NAME).toString());
+        msBug.setDescription(jiraFieldMap.get(JiraMetadataField.DESCRIPTION_FIELD_NAME) != null ? jiraFieldMap.get(JiraMetadataField.DESCRIPTION_FIELD_NAME).toString() : null);
+        Map<String, Object> assignMap = (Map) jiraFieldMap.get(JiraMetadataSpecialSystemField.ASSIGNEE);
+        if (assignMap == null) {
+            msBug.setHandleUser(StringUtils.EMPTY);
+        } else {
+            String assignUser = assignMap.get("accountId").toString();
+            if (!StringUtils.equals(msBug.getHandleUser(), assignUser)) {
+                msBug.setHandleUser(assignUser);
+                msBug.setHandleUsers(StringUtils.isBlank(msBug.getHandleUsers()) ? assignUser : msBug.getHandleUsers() + "," + assignUser);
+            }
+        }
+        msBug.setStatus(getFieldStatus(jiraFieldMap));
+        msBug.setCreateUser("admin");
+        msBug.setUpdateUser("admin");
+        msBug.setCreateTime(sdfWithZone.parse((String) jiraFieldMap.get("created")).getTime());
+        msBug.setUpdateTime(sdfWithZone.parse((String) jiraFieldMap.get("updated")).getTime());
+    }
+
+    /**
+     * 解析自定义字段到平台缺陷字段
+     *
+     * @param msBug                 平台缺陷
+     * @param jiraFieldMap          jira字段集合
+     * @param defaultTemplateFields 默认模板字段集合
+     */
+    private void parseCustomFieldToMsBug(PlatformBugDTO msBug, Map jiraFieldMap, List<PlatformCustomFieldItemDTO> defaultTemplateFields) {
+        List<PlatformCustomFieldItemDTO> needSyncCustomFields = new ArrayList<>();
+        if (isSupportDefaultTemplate() && msBug.getPlatformDefaultTemplate()) {
+            // 缺陷使用的平台默认模板, 使用平台默认模板字段
+            for (PlatformCustomFieldItemDTO field : defaultTemplateFields) {
+                needSyncCustomFields.add(SerializationUtils.clone(field));
+            }
+        } else {
+            // 缺陷使用的非平台默认模板, 使用模板中配置的映射字段
+            List<PlatformCustomFieldItemDTO> needSyncFields = defaultTemplateFields.stream().filter(field -> msBug.getNeedSyncCustomFields().contains(field.getCustomData())).toList();
+            for (PlatformCustomFieldItemDTO field : needSyncFields) {
+                needSyncCustomFields.add(SerializationUtils.clone(field));
+            }
+        }
+        if (CollectionUtils.isEmpty(needSyncCustomFields)) {
+            return;
+        }
+        needSyncCustomFields.forEach(fieldItem -> {
+            Object value = jiraFieldMap.get(fieldItem.getCustomData());
+            if (value != null) {
+                if (value instanceof Map) {
+                    fieldItem.setValue(getSyncJsonParamValue(value));
+                } else if (value instanceof List) {
+                    if (CollectionUtils.isEmpty((List) value)) {
+                        fieldItem.setValue(null);
+                    } else {
+                        if (StringUtils.equals(fieldItem.getType(), PlatformCustomFieldType.SELECT.getType())) {
+                            fieldItem.setValue(getSyncJsonParamValue(((List) value).get(0)));
+                        } else {
+                            List<Object> values = new ArrayList<>();
+                            ((List) value).forEach(attr -> {
+                                if (attr instanceof Map) {
+                                    values.add(getSyncJsonParamValue(attr));
+                                } else {
+                                    values.add(attr);
+                                }
+                            });
+                            fieldItem.setValue(PluginUtils.toJSONString(values));
+                        }
+                    }
+                } else {
+                    fieldItem.setValue(value.toString());
+                }
+            } else {
+                fieldItem.setValue(null);
+            }
+        });
+        parseSpecialFieldToMsBug(jiraFieldMap, needSyncCustomFields);
+        msBug.setCustomFieldList(needSyncCustomFields);
+    }
+
+    /**
+     * 只处理需要同步的特殊字段
+     *
+     * @param jiraFieldMap         jira缺陷字段集合
+     * @param needSyncCustomFields 需要同步的自定义字段
+     */
+    private void parseSpecialFieldToMsBug(Map jiraFieldMap, List<PlatformCustomFieldItemDTO> needSyncCustomFields) {
+        needSyncCustomFields.forEach(fieldItem -> {
+            Object value = jiraFieldMap.get(fieldItem.getCustomData());
+            // user select
+            if (BooleanUtils.isTrue(fieldItem.getSupportSearch()) && StringUtils.equalsAny(fieldItem.getSearchMethod(),
+                    JiraMetadataFieldSearchMethod.GET_USER, JiraMetadataFieldSearchMethod.GET_ASSIGNABLE)) {
+                if (value == null) {
+                    fieldItem.setValue(null);
+                } else {
+                    if (value instanceof List) {
+                        List<String> values = new ArrayList<>();
+                        for (Object item : ((List) value)) {
+                            Map itemMap = (Map) item;
+                            String val;
+                            Object accountId = itemMap.get("accountId");
+                            if (accountId != null && StringUtils.isNotBlank(accountId.toString())) {
+                                val = accountId.toString();
+                            } else {
+                                val = itemMap.get("name").toString();
+                            }
+                            values.add(val);
+                        }
+                        fieldItem.setValue(PluginUtils.toJSONString(values));
+                    } else {
+                        Map itemMap = (Map) value;
+                        Object accountId = itemMap.get("accountId");
+                        if (accountId != null && StringUtils.isNotBlank(accountId.toString())) {
+                            fieldItem.setValue(accountId.toString());
+                        } else {
+                            fieldItem.setValue(itemMap.get("name").toString());
+                        }
+                    }
+                }
+            }
+            // datetime
+            if (StringUtils.equals(fieldItem.getType(), PlatformCustomFieldType.DATETIME.getType())) {
+                if (value != null && value instanceof String) {
+                    fieldItem.setValue(convertToUniversalFormat(value.toString()));
+                } else {
+                    fieldItem.setValue(null);
+                }
+            }
+            // time tracking
+            if (StringUtils.equals(fieldItem.getId(), JiraMetadataField.REMAINING_ESTIMATE_TRACKING_FIELD_ID)) {
+                Map timeTracking = (Map) jiraFieldMap.get(JiraMetadataSpecialSystemField.TIME_TRACKING);
+                if (!CollectionUtils.isEmpty(timeTracking)) {
+                    fieldItem.setValue(timeTracking.get(JiraMetadataField.REMAINING_ESTIMATE_TRACKING_FIELD_ID).toString());
+                }
+            }
+            if (StringUtils.equals(fieldItem.getId(), JiraMetadataField.ORIGINAL_ESTIMATE_TRACKING_FIELD_ID)) {
+                Map timeTracking = (Map) jiraFieldMap.get(JiraMetadataSpecialSystemField.TIME_TRACKING);
+                if (!CollectionUtils.isEmpty(timeTracking)) {
+                    fieldItem.setValue(timeTracking.get(JiraMetadataField.ORIGINAL_ESTIMATE_TRACKING_FIELD_ID).toString());
+                }
+            }
+            // issue link
+            if (StringUtils.equals(fieldItem.getId(), JiraMetadataField.ISSUE_LINK_TYPE)) {
+                Map<String, String> linkIssueMap = parseIssueLink(jiraFieldMap.get(JiraMetadataSpecialSystemField.ISSUE_LINKS));
+                if (!CollectionUtils.isEmpty(linkIssueMap)) {
+                    fieldItem.setValue(linkIssueMap.get(JiraMetadataField.ISSUE_LINK_TYPE));
+                    Optional<PlatformCustomFieldItemDTO> any = needSyncCustomFields.stream().filter(field -> StringUtils.equals(field.getId(), JiraMetadataSpecialSystemField.ISSUE_LINKS)).findAny();
+                    any.ifPresent(platformCustomFieldItemDTO -> platformCustomFieldItemDTO.setValue(linkIssueMap.get(JiraMetadataSpecialSystemField.ISSUE_LINKS)));
+                }
+            }
+        });
+    }
+
+    /**
+     * 解析附件到平台缺陷
+     *
+     * @param result    同步缺陷结果
+     * @param msBug     平台缺陷
+     * @param jiraIssue jira缺陷
+     */
+    private void parseAttachmentToMsBug(SyncBugResult result, PlatformBugDTO msBug, JiraIssue jiraIssue) {
+        try {
+            List attachments = (List) jiraIssue.getFields().get(JiraMetadataField.ATTACHMENT_NAME);
+            // handle bug attachment
+            if (!CollectionUtils.isEmpty(attachments)) {
+                Map<String, List<PlatformAttachment>> attachmentMap = result.getAttachmentMap();
+                attachmentMap.put(msBug.getId(), new ArrayList<>());
+                for (Object o : attachments) {
+                    Map attachment = (Map) o;
+                    String filename = attachment.get("filename").toString();
+                    if ((msBug.getDescription() == null || !msBug.getDescription().contains(filename))) {
+                        PlatformAttachment syncAttachment = new PlatformAttachment();
+                        // name 用于查重
+                        syncAttachment.setFileName(filename);
+                        // key 用于获取附件内容
+                        syncAttachment.setFileKey(attachment.get("content").toString());
+                        attachmentMap.get(msBug.getId()).add(syncAttachment);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            PluginLogUtils.error(e);
+            throw new MSPluginException(e);
+        }
+    }
+
+    /**
+     * 获取字段状态
+     *
+     * @param fields 字段集合
+     * @return 状态
+     */
+    private String getFieldStatus(Map fields) {
+        Map statusObj = (Map) fields.get("status");
+        if (statusObj != null) {
+            Map statusCategory = (Map) statusObj.get("statusCategory");
+            return statusObj.get("id").toString() == null ? statusCategory.get("id").toString() : statusObj.get("id").toString();
+        }
+        return "";
+    }
+
+    /**
+     * 获取同步的JSON值
+     *
+     * @param value 对象值
+     * @return JSON字符串
+     */
+    private String getSyncJsonParamValue(Object value) {
+        Map valObj = ((Map) value);
+        Map child = (Map) valObj.get("child");
+        String idValue = Optional.ofNullable(valObj.get("id")).orElse(StringUtils.EMPTY).toString();
+
+        if (child != null) {// 级联框
+            return PluginUtils.toJSONString(getCascadeValues(idValue, child));
+        } else {
+            if (StringUtils.isNotBlank(idValue)) {
+                return idValue;
+            } else {
+                return valObj.get("key") == null ? null : valObj.get("key").toString();
+            }
+        }
+    }
+
+    /**
+     * 获取级联框的值
+     *
+     * @param idValue id值
+     * @param child   子级元素值
+     * @return 级联框的值
+     */
+    private List<Object> getCascadeValues(String idValue, Map child) {
+        List<Object> values = new ArrayList<>();
+        if (StringUtils.isNotBlank(idValue)) {
+            values.add(idValue);
+        }
+        if (child.get("id") != null && StringUtils.isNotBlank(child.get("id").toString())) {
+            values.add(child.get("id"));
+        }
+        return values;
+    }
+
+    /**
+     * 转换日期至成通用的日期格式
+     *
+     * @param input 日期字符串
+     * @return 通用的日期
+     */
+    private static String convertToUniversalFormat(String input) {
+        if (!input.contains("T")) {
+            return input;
+        }
+        DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
+        DateTimeFormatter outputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+        OffsetDateTime offsetDateTime = OffsetDateTime.parse(input, inputFormatter);
+        return offsetDateTime.format(outputFormatter);
+    }
+
+    /**
+     * 解析 issue-link
+     *
+     * @param value 对象值
+     * @return issue-link
+     */
+    private Map<String, String> parseIssueLink(Object value) {
+        Map<String, String> linkIssueResultMap = new HashMap<>();
+        List<Map<String, Object>> issueLinks = (List) value;
+        if (!CollectionUtils.isEmpty(issueLinks)) {
+            Map<String, Object> firstLink = issueLinks.get(0);
+            Map<String, Object> linkType = (Map) firstLink.get("type");
+            boolean isFirstInward = firstLink.containsKey("inwardIssue");
+            String type = isFirstInward ? linkType.get("inward").toString() : linkType.get("outward").toString();
+            linkIssueResultMap.put(JiraMetadataField.ISSUE_LINK_TYPE, type);
+            List<String> issueLinkVars = new ArrayList<>();
+            issueLinks.stream().filter(filterLink -> {
+                        Map<String, Object> filterLinkType = (Map) filterLink.get("type");
+                        return StringUtils.equals(filterLinkType.get("id").toString(), linkType.get("id").toString());
+                    }).filter(filterLink -> isFirstInward ? filterLink.containsKey("inwardIssue") : filterLink.containsKey("outwardIssue"))
+                    .forEach(filterLink -> {
+                        Map<String, Object> linkIssue;
+                        if (isFirstInward) {
+                            linkIssue = (Map) filterLink.get("inwardIssue");
+                        } else {
+                            linkIssue = (Map) filterLink.get("outwardIssue");
+                        }
+                        issueLinkVars.add(linkIssue.get("key").toString());
+                    });
+            linkIssueResultMap.put(JiraMetadataSpecialSystemField.ISSUE_LINKS, PluginUtils.toJSONString(issueLinkVars));
+        }
+        return linkIssueResultMap;
+    }
+
+    /**
+     * 解析状态Transition值
+     *
+     * @param transitions 状态Transition集合
+     * @param status      状态值
+     * @return 状态值
+     */
+    private String parseTransitionStatus(List<JiraTransitionsResponse.Transitions> transitions, String status) {
+        if (!CollectionUtils.isEmpty(transitions)) {
+            JiraTransitionsResponse.Transitions transition = transitions.stream().filter(item -> StringUtils.equals(item.getTo().getId(),
+                    status)).findFirst().orElse(null);
+            if (transition != null) {
+                return transition.getId();
+            }
+        }
+        return status;
     }
 }

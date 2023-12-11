@@ -11,6 +11,4 @@ public class JiraMetadataField {
     public static final String REMAINING_ESTIMATE_TRACKING_FIELD_NAME = "Remaining Estimate";
     public static final String ISSUE_LINK_TYPE = "issueLinkTypes";
     public static final String ISSUE_LINK_TYPE_COLUMN_ZH = "链接事务类型";
-    public static final String SUMMARY_FIELD_NAME_MS_ZH = "标题";
-    public static final String DESCRIPTION_FIELD_NAME_MS_ZH = "缺陷内容";
 }

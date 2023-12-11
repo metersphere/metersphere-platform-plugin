@@ -2,12 +2,17 @@ package io.metersphere.plugin.jira.client;
 
 
 import io.metersphere.plugin.jira.constants.JiraApiUrl;
+import io.metersphere.plugin.jira.constants.JiraMetadataField;
 import io.metersphere.plugin.jira.domain.*;
+import io.metersphere.plugin.platform.dto.reponse.DemandDTO;
+import io.metersphere.plugin.platform.dto.request.SyncAllBugRequest;
 import io.metersphere.plugin.platform.spi.BaseClient;
+import io.metersphere.plugin.platform.utils.PluginPager;
 import io.metersphere.plugin.sdk.util.MSPluginException;
 import io.metersphere.plugin.sdk.util.PluginLogUtils;
 import io.metersphere.plugin.sdk.util.PluginUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.time.DateFormatUtils;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.*;
 import org.springframework.util.CollectionUtils;
@@ -27,15 +32,15 @@ import java.util.function.Consumer;
 
 public class JiraDefaultClient extends BaseClient {
 
-    protected String ENDPOINT;
+    protected static String ENDPOINT;
 
-    protected String USER_NAME;
+    protected static String USER_NAME;
 
-    protected String PASSWD;
+    protected static String PASSWD;
 
-    protected String TOKEN;
+    protected static String TOKEN;
 
-    protected String AUTH_TYPE;
+    protected static String AUTH_TYPE;
 
     public static final String AUTH_HEADER_TYPE = "bearer";
 
@@ -61,7 +66,7 @@ public class JiraDefaultClient extends BaseClient {
         PluginLogUtils.info("getIssues: " + issuesId);
         ResponseEntity<String> responseEntity;
         responseEntity = restTemplate.exchange(getBaseUrl() + "/issue/" + issuesId, HttpMethod.GET, getAuthHttpEntity(), String.class);
-        return (JiraIssue) getResultForObject(JiraIssue.class, responseEntity);
+        return getResultForObject(JiraIssue.class, responseEntity);
     }
 
     /**
@@ -82,8 +87,7 @@ public class JiraDefaultClient extends BaseClient {
             throw new MSPluginException(e.getMessage());
         }
         try {
-            fields = ((JiraCreateMetadataResponse) getResultForObject(JiraCreateMetadataResponse.class, response))
-                    .getProjects().get(0).getIssuetypes().get(0).getFields();
+            fields = getResultForObject(JiraCreateMetadataResponse.class, response).getProjects().get(0).getIssuetypes().get(0).getFields();
         } catch (Exception e) {
             PluginLogUtils.error(e);
             throw new MSPluginException("请检查服务集成信息或Jira项目ID");
@@ -116,8 +120,7 @@ public class JiraDefaultClient extends BaseClient {
             PluginLogUtils.error(e.getMessage(), e);
             throw new MSPluginException(e.getMessage());
         }
-        // noinspection unchecked
-        return (List<JiraIssueType>) getResultForList(JiraIssueType.class, response);
+        return getResultForList(JiraIssueType.class, response);
     }
 
     /**
@@ -135,7 +138,7 @@ public class JiraDefaultClient extends BaseClient {
             PluginLogUtils.error(e.getMessage(), e);
             throw new MSPluginException(e.getMessage());
         }
-        return (JiraIssueProject) getResultForObject(JiraIssueProject.class, response);
+        return getResultForObject(JiraIssueProject.class, response);
     }
 
     /**
@@ -170,8 +173,7 @@ public class JiraDefaultClient extends BaseClient {
                 return new ArrayList<>();
             }
         }
-        // noinspection unchecked
-        return (List<JiraUser>) getResultForList(JiraUser.class, response);
+        return getResultForList(JiraUser.class, response);
     }
 
 
@@ -200,12 +202,11 @@ public class JiraDefaultClient extends BaseClient {
                 return new ArrayList<>();
             }
         }
-        // noinspection unchecked
-        return (List<JiraUser>) getResultForList(JiraUser.class, response);
+        return getResultForList(JiraUser.class, response);
     }
 
     /**
-     * 获取需求
+     * 分页获取需求列表
      *
      * @param projectKey 项目Key
      * @param issueType  缺陷类型
@@ -213,23 +214,61 @@ public class JiraDefaultClient extends BaseClient {
      * @param maxResults 数据大小
      * @return 需求列表
      */
-    public List getDemands(String projectKey, String issueType, int startAt, int maxResults) {
-        String jql = getBaseUrl() + "/search?jql=project=" + projectKey + "+AND+issuetype=" + issueType
+    public PluginPager<List<DemandDTO>> pageDemand(String projectKey, String issueType, int startAt, int maxResults, String query) {
+        List<DemandDTO> demands = new ArrayList<>();
+        String jql = getBaseUrl() + "/search?jql=project=" + projectKey + "+AND+issuetype=" + issueType + "+AND+summary~\"" + query + "\""
                 + "&maxResults=" + maxResults + "&startAt=" + startAt + "&fields=summary,issuetype";
         ResponseEntity<String> responseEntity = restTemplate.exchange(jql, HttpMethod.GET, getAuthHttpEntity(), String.class);
-        Map jsonObject = PluginUtils.parseMap(responseEntity.getBody());
-        return (List) jsonObject.get("issues");
+        // noinspection unchecked
+        Map<String, Object> bodyMap = PluginUtils.parseMap(responseEntity.getBody());
+        // noinspection unchecked
+        List<Map<String, Object>> issues = (List<Map<String, Object>>) bodyMap.get("issues");
+        issues.forEach(issue -> {
+            // 只展示第一层级的需求
+            DemandDTO demand = new DemandDTO();
+            demand.setId(issue.get("id").toString());
+            // noinspection unchecked
+            Map<String, Object> fieldMap = (Map<String, Object>) issue.get("fields");
+            demand.setName(fieldMap.get("summary").toString());
+            demands.add(demand);
+        });
+        PluginPager<List<DemandDTO>> demandPageData = new PluginPager<>();
+        demandPageData.setTotal((Integer) bodyMap.get("total"));
+        demandPageData.setCurrent(startAt);
+        demandPageData.setPageSize(maxResults);
+        demandPageData.setList(demands);
+        return demandPageData;
     }
 
     /**
-     * 获取所有字段
+     * 获取需求列表
      *
-     * @return 返回所有字段
+     * @param projectKey      项目KEY
+     * @param issueType       需求类型
+     * @param startAt         开始页
+     * @param maxResults      每页最大数
+     * @param filterDemandIds 过滤的需求ID
+     * @return
      */
-    public List<JiraField> getFields() {
-        ResponseEntity<String> response = restTemplate.exchange(getBaseUrl() + "/field", HttpMethod.GET, getAuthHttpEntity(), String.class);
+    public List<DemandDTO> getDemands(String projectKey, String issueType, int startAt, int maxResults, List<String> filterDemandIds) {
+        List<DemandDTO> demands = new ArrayList<>();
+        String jql = getBaseUrl() + "/search?jql=project=" + projectKey + "+AND+issuetype=" + issueType + "+AND+id IN(" + String.join(",", filterDemandIds) +
+                ")&maxResults=" + maxResults + "&startAt=" + startAt + "&fields=summary,issuetype";
+        ResponseEntity<String> responseEntity = restTemplate.exchange(jql, HttpMethod.GET, getAuthHttpEntity(), String.class);
         // noinspection unchecked
-        return (List<JiraField>) getResultForList(JiraField.class, response);
+        Map<String, Object> bodyMap = PluginUtils.parseMap(responseEntity.getBody());
+        // noinspection unchecked
+        List<Map<String, Object>> issues = (List<Map<String, Object>>) bodyMap.get("issues");
+        issues.forEach(issue -> {
+            // 只展示第一层级的需求
+            DemandDTO demand = new DemandDTO();
+            demand.setId(issue.get("id").toString());
+            // noinspection unchecked
+            Map<String, Object> fieldMap = (Map<String, Object>) issue.get("fields");
+            demand.setName(fieldMap.get("summary").toString());
+            demands.add(demand);
+        });
+        return demands;
     }
 
     /**
@@ -240,7 +279,7 @@ public class JiraDefaultClient extends BaseClient {
      * @return 返回缺陷
      */
     public JiraAddIssueResponse addIssue(String body, Map<String, String> fieldNameMap) {
-        PluginLogUtils.info("addIssue: " + body);
+        PluginLogUtils.info("Add Jira Bug Param:" + body);
         HttpHeaders headers = getAuthHeader();
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<String> requestEntity = new HttpEntity<>(body, headers);
@@ -253,7 +292,7 @@ public class JiraDefaultClient extends BaseClient {
             PluginLogUtils.error(e.getMessage(), e);
             throw new MSPluginException(e.getMessage());
         }
-        return (JiraAddIssueResponse) getResultForObject(JiraAddIssueResponse.class, response);
+        return getResultForObject(JiraAddIssueResponse.class, response);
     }
 
     /**
@@ -288,7 +327,25 @@ public class JiraDefaultClient extends BaseClient {
      */
     public List<JiraTransitionsResponse.Transitions> getTransitions(String issueKey) {
         ResponseEntity<String> response = restTemplate.exchange(getBaseUrl() + "/issue/{1}/transitions", HttpMethod.GET, getAuthHttpEntity(), String.class, issueKey);
-        return ((JiraTransitionsResponse) getResultForObject(JiraTransitionsResponse.class, response)).getTransitions();
+        return getResultForObject(JiraTransitionsResponse.class, response).getTransitions();
+    }
+
+    /**
+     * 修改Transition值
+     *
+     * @param param    参数
+     * @param issueKey 缺陷Key
+     */
+    public void doTransitions(String param, String issueKey) {
+        PluginLogUtils.info("doTransitions: " + param);
+        HttpHeaders headers = getAuthHeader();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<String> requestEntity = new HttpEntity<>(param, headers);
+        try {
+            restTemplate.exchange(getBaseUrl() + "/issue/{1}/transitions", HttpMethod.POST, requestEntity, String.class, issueKey);
+        } catch (Exception e) {
+            PluginLogUtils.error(e.getMessage(), e);
+        }
     }
 
     /**
@@ -304,7 +361,7 @@ public class JiraDefaultClient extends BaseClient {
         }
         ResponseEntity<String> response = restTemplate.exchange(url,
                 HttpMethod.GET, getAuthHttpEntity(), String.class);
-        JiraSprintResponse jiraSprintResponse = ((JiraSprintResponse) getResultForObject(JiraSprintResponse.class, response));
+        JiraSprintResponse jiraSprintResponse = getResultForObject(JiraSprintResponse.class, response);
         List<JiraSprint> sprints = new ArrayList<>();
         if (!CollectionUtils.isEmpty(jiraSprintResponse.getSuggestions())) {
             sprints = jiraSprintResponse.getSuggestions();
@@ -324,7 +381,7 @@ public class JiraDefaultClient extends BaseClient {
     public List<JiraEpic> getEpics(String queryKey) {
         ResponseEntity<String> response = restTemplate.exchange(getGreenhopperV1BaseUrl() + "/epics?maxResults=300&searchQuery={0}&hideDone=true&_=" + System.currentTimeMillis(),
                 HttpMethod.GET, getAuthHttpEntity(), String.class, queryKey);
-        List<JiraEpicResponse.EpicLists> epicLists = ((JiraEpicResponse) getResultForObject(JiraEpicResponse.class, response)).getEpicLists();
+        List<JiraEpicResponse.EpicLists> epicLists = getResultForObject(JiraEpicResponse.class, response).getEpicLists();
         if (CollectionUtils.isEmpty(epicLists)) {
             return new ArrayList<>();
         }
@@ -355,7 +412,7 @@ public class JiraDefaultClient extends BaseClient {
      * @param fieldNameMap 参数字段Map
      */
     public void updateIssue(String id, String body, Map<String, String> fieldNameMap) {
-        PluginLogUtils.info("addIssue: " + body);
+        PluginLogUtils.info("updateIssue: " + body);
         HttpHeaders headers = getAuthHeader();
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<String> requestEntity = new HttpEntity<>(body, headers);
@@ -537,8 +594,8 @@ public class JiraDefaultClient extends BaseClient {
      * @param issueType  缺陷类型
      * @return 缺陷集合
      */
-    public JiraIssueListResponse getProjectIssues(Integer startAt, Integer maxResults, String projectKey, String issueType) {
-        return getProjectIssues(startAt, maxResults, projectKey, issueType, null);
+    public JiraIssueListResponse getProjectIssues(Integer startAt, Integer maxResults, String projectKey, String issueType, SyncAllBugRequest syncRequest) {
+        return getProjectIssues(startAt, maxResults, projectKey, issueType, syncRequest, null);
     }
 
     /**
@@ -548,18 +605,30 @@ public class JiraDefaultClient extends BaseClient {
      * @param maxResults 每页大小
      * @param projectKey 项目key
      * @param issueType  缺陷类型
-     * @param fields     过滤字段
+     * @param fields     过滤字段 {
+     *                   *all - include all fields
+     *                   *navigable - include just navigable fields
+     *                   summary,comment - include just the summary and comments
+     *                   -description - include navigable fields except the description (the default is *navigable for search)
+     *                   *all,-comment - include everything except comments
+     *                   }
      * @return 缺陷集合
      */
-    public JiraIssueListResponse getProjectIssues(Integer startAt, Integer maxResults, String projectKey, String issueType, String fields) {
+    public JiraIssueListResponse getProjectIssues(Integer startAt, Integer maxResults, String projectKey, String issueType, SyncAllBugRequest syncRequest, String fields) {
         ResponseEntity<String> responseEntity;
         String url = getBaseUrl() + "/search?startAt={1}&maxResults={2}&jql=project={3}+AND+issuetype={4}";
+        if (syncRequest != null) {
+            url = url + "+AND+created" + (syncRequest.isPre() ? "<=" : ">=") + "\"" + DateFormatUtils.format(syncRequest.getCreateTime(), "yyyy-MM-dd HH:mm") + "\"";
+        }
         if (StringUtils.isNotBlank(fields)) {
             url = url + "&fields=" + fields;
+        } else {
+            // 字段参数默认不传的话使用*all,-comment
+            url = url + "&fields=*all,-comment";
         }
         responseEntity = restTemplate.exchange(url,
                 HttpMethod.GET, getAuthHttpEntity(), String.class, startAt, maxResults, projectKey, issueType);
-        return (JiraIssueListResponse) getResultForObject(JiraIssueListResponse.class, responseEntity);
+        return getResultForObject(JiraIssueListResponse.class, responseEntity);
     }
 
     /**
@@ -584,33 +653,15 @@ public class JiraDefaultClient extends BaseClient {
     /**
      * 获取项目缺陷附件 (分页)
      *
-     * @param startAt    开始页
-     * @param maxResults 每页大小
-     * @param projectKey 项目key
-     * @param issueType  缺陷类型
+     * @param startAt     开始页
+     * @param maxResults  每页大小
+     * @param projectKey  项目key
+     * @param issueType   缺陷类型
+     * @param syncRequest 同步参数
      * @return 返回缺陷附件集合
      */
-    public JiraIssueListResponse getProjectIssuesAttachment(Integer startAt, Integer maxResults, String projectKey, String issueType) {
-        return getProjectIssues(startAt, maxResults, projectKey, issueType, "attachment");
-    }
-
-    /**
-     * 设置Transitions
-     *
-     * @param jiraKey     缺陷Key
-     * @param transitions transitions参数
-     */
-    public void setTransitions(String jiraKey, JiraTransitionsResponse.Transitions transitions) {
-        PluginLogUtils.info("setTransitions: " + transitions);
-        Map<String, Object> paramMap = new LinkedHashMap<>();
-        paramMap.put("transition", transitions);
-        HttpEntity<String> requestEntity = new HttpEntity<>(PluginUtils.toJSONString(paramMap), getAuthJsonHeader());
-        try {
-            restTemplate.exchange(getBaseUrl() + "/issue/{1}/transitions", HttpMethod.POST, requestEntity, String.class, jiraKey);
-        } catch (Exception e) {
-            PluginLogUtils.error(e.getMessage(), e);
-            throw new MSPluginException(e.getMessage());
-        }
+    public JiraIssueListResponse getProjectIssuesAttachment(Integer startAt, Integer maxResults, String projectKey, String issueType, SyncAllBugRequest syncRequest) {
+        return getProjectIssues(startAt, maxResults, projectKey, issueType, syncRequest, JiraMetadataField.ATTACHMENT_NAME);
     }
 
     /**
@@ -622,11 +673,11 @@ public class JiraDefaultClient extends BaseClient {
      */
     public ResponseEntity<?> proxyForGet(String path, Class<?> responseEntityClazz) {
         PluginLogUtils.info("jira proxyForGet: " + path);
-        String endpoint = this.ENDPOINT;
+        String endpoint = ENDPOINT;
         try {
             // ENDPOINT 可能会带有前缀，比如 http://xxxx/jira
             // 这里去掉 /jira，再拼接图片路径path
-            URI uri = new URI(this.ENDPOINT);
+            URI uri = new URI(ENDPOINT);
             endpoint = uri.getScheme() + "://" + uri.getHost() + ":" + uri.getPort();
         } catch (URISyntaxException e) {
             PluginLogUtils.error(e);
@@ -644,17 +695,23 @@ public class JiraDefaultClient extends BaseClient {
      */
     public List<JiraStatusResponse> getStatus(String jiraKey) {
         ResponseEntity<String> response = restTemplate.exchange(getBaseUrl() + "/project/" + jiraKey + "/statuses", HttpMethod.GET, getAuthHttpEntity(), String.class);
-        // noinspection unchecked
-        return (List<JiraStatusResponse>) getResultForList(JiraStatusResponse.class, response);
+        return getResultForList(JiraStatusResponse.class, response);
     }
 
+    /**
+     * 获取issue-link
+     *
+     * @param currentIssueKey 当前缺陷key
+     * @param query           查询参数
+     * @return 返回issue-link集合
+     */
     public List<JiraIssueLink> getIssueLinks(String currentIssueKey, String query) {
         String url = getBaseUrl() + "/issue/picker?showSubTaskParent=true&showSubTasks=true"
                 + (StringUtils.isNotEmpty(currentIssueKey) ? "&currentIssueKey=" + currentIssueKey : StringUtils.EMPTY)
                 + (StringUtils.isNotEmpty(query) ? "&query=" + query : StringUtils.EMPTY)
                 + "&currentJQL=" + URLEncoder.encode(ISSUE_RELATE_FILTER_JQL, StandardCharsets.UTF_8);
         ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), String.class);
-        List<JiraIssueLinkResponse.IssueLink> sections = ((JiraIssueLinkResponse) getResultForObject(JiraIssueLinkResponse.class, response)).getSections();
+        List<JiraIssueLinkResponse.IssueLink> sections = getResultForObject(JiraIssueLinkResponse.class, response).getSections();
         if (CollectionUtils.isEmpty(sections)) {
             return Collections.emptyList();
         }
@@ -668,15 +725,25 @@ public class JiraDefaultClient extends BaseClient {
         return issueLinks;
     }
 
+    /**
+     * 获取issue-link-type
+     *
+     * @return 返回issue-link-type集合
+     */
     public List<JiraIssueLinkTypeResponse.IssueLinkType> getIssueLinkType() {
         ResponseEntity<String> response = restTemplate.exchange(getBaseUrl() + "/issueLinkType", HttpMethod.GET, getAuthHttpEntity(), String.class);
-        List<JiraIssueLinkTypeResponse.IssueLinkType> issueLinkTypes = ((JiraIssueLinkTypeResponse) getResultForObject(JiraIssueLinkTypeResponse.class, response)).getIssueLinkTypes();
+        List<JiraIssueLinkTypeResponse.IssueLinkType> issueLinkTypes = getResultForObject(JiraIssueLinkTypeResponse.class, response).getIssueLinkTypes();
         if (CollectionUtils.isEmpty(issueLinkTypes)) {
             return Collections.emptyList();
         }
         return issueLinkTypes;
     }
 
+    /**
+     * 关联issue
+     *
+     * @param request link-issue请求参数
+     */
     public void linkIssue(JiraIssueLinkRequest request) {
         PluginLogUtils.info("linkIssue: " + request);
         HttpHeaders headers = getAuthHeader();
@@ -690,7 +757,12 @@ public class JiraDefaultClient extends BaseClient {
         }
     }
 
-    public void deleteIssueLink(String linkId) {
+    /**
+     * un-link-issue
+     *
+     * @param linkId 关联ID
+     */
+    public void unLinkIssue(String linkId) {
         PluginLogUtils.info("deleteIssueLink: " + linkId);
         try {
             restTemplate.exchange(getBaseUrl() + "/issueLink/" + linkId, HttpMethod.DELETE, getAuthHttpEntity(), String.class);
