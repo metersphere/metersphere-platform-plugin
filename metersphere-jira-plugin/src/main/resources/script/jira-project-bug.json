@@ -5,11 +5,11 @@
     "formItems": [
       {
         "name": "jiraKey",
-        "type": "JIRAKEY",
+        "type": "INPUT",
         "label": "project.menu.projectKey",
         "value": "",
         "required": true,
-        "subDesc": "如何获取JIRA项目key 预览",
+        "subDesc": "如何获取JIRA项目key",
         "inputSearch": false,
         "instructionsIcon": "static/jira-key.png",
         "optionMethod": "",

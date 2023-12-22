@@ -8,7 +8,7 @@
     "formItems": [
       {
         "name": "authType",
-        "type": "select",
+        "type": "SELECT",
         "defaultValue": "basic",
         "required": false,
         "i18n": true,
@@ -26,7 +26,7 @@
       },
       {
         "name": "jiraAccount",
-        "type": "input",
+        "type": "INPUT",
         "defaultValue": "",
         "required": false,
         "i18n": true,
@@ -39,7 +39,7 @@
       },
       {
         "name": "jiraPassword",
-        "type": "password",
+        "type": "PASSWORD",
         "defaultValue": "",
         "required": false,
         "i18n": true,
@@ -52,7 +52,7 @@
       },
       {
         "name": "token",
-        "type": "password",
+        "type": "PASSWORD",
         "defaultValue": "",
         "required": false,
         "i18n": true,

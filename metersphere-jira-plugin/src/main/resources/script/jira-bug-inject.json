@@ -6,7 +6,7 @@
       {
         "id": "assignee",
         "name": "Jira-处理人",
-        "type": "select",
+        "type": "SELECT",
         "defaultValue": "",
         "required": false,
         "supportSearch": true,
