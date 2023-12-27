@@ -1,0 +1,20 @@
+{
+  "id": "project_demand",
+  "name": "需求管理",
+  "script": {
+    "formItems": [
+      {
+        "name": "zentaoId",
+        "type": "INPUT",
+        "label": "project.menu.projectKey",
+        "value": "",
+        "required": true,
+        "subDesc": "如何获取禅道项目key",
+        "inputSearch": false,
+        "instructionsIcon": "static/zentao-key.png",
+        "optionMethod": "",
+        "couplingConfig": {}
+      }
+    ]
+  }
+}

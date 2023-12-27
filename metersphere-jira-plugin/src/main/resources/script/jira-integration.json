@@ -1,63 +1,63 @@
 {
-  "id":"integration",
-  "name":"服务集成",
-  "script":[
+  "id": "integration",
+  "name": "服务集成",
+  "script": [
     {
-      "name":"address",
-      "type":"INPUT",
-      "label":"JIRA地址",
-      "value":"",
-      "required":true
+      "name": "address",
+      "type": "INPUT",
+      "label": "JIRA地址",
+      "value": "",
+      "required": true
     },
     {
-      "name":"authType",
-      "type":"RADIO",
-      "label":"认证方式",
-      "value":"basic",
-      "required":true,
-      "tooltip":"私有化部署选择 Basic Auth 填写账号密码，选择 Bearer Token 填写 Token\\nSaaS 版本只能选择 Basic Auth，填写（账号+令牌）(账户设置-安全-创建API令牌)",
-      "options":[
+      "name": "authType",
+      "type": "RADIO",
+      "label": "认证方式",
+      "value": "basic",
+      "required": true,
+      "tooltip": "私有化部署选择 Basic Auth 填写账号密码，选择 Bearer Token 填写 Token\\nSaaS 版本只能选择 Basic Auth，填写（账号+令牌）(账户设置-安全-创建API令牌)",
+      "options": [
         {
-          "value":"basic",
-          "text":"Basic Auth"
+          "value": "basic",
+          "text": "Basic Auth"
         },
         {
-          "value":"bearer",
-          "text":"Bearer Token"
+          "value": "bearer",
+          "text": "Bearer Token"
         }
       ]
     },
     {
-      "name":"account",
-      "type":"INPUT",
-      "label":"JIRA-账号",
-      "value":"",
-      "required":true,
-      "displayConditions":{
-        "field":"authType",
-        "value":"basic"
+      "name": "account",
+      "type": "INPUT",
+      "label": "JIRA账号",
+      "value": "",
+      "required": true,
+      "displayConditions": {
+        "field": "authType",
+        "value": "basic"
       }
     },
     {
-      "name":"password",
-      "type":"PASSWORD",
-      "label":"JIRA密码",
-      "value":"",
-      "required":true,
-      "displayConditions":{
-        "field":"authType",
-        "value":"basic"
+      "name": "password",
+      "type": "PASSWORD",
+      "label": "JIRA密码",
+      "value": "",
+      "required": true,
+      "displayConditions": {
+        "field": "authType",
+        "value": "basic"
       }
     },
     {
-      "name":"token",
-      "type":"INPUT",
-      "label":"Token",
-      "value":"",
-      "required":true,
-      "displayConditions":{
-        "field":"authType",
-        "value":"bearer"
+      "name": "token",
+      "type": "INPUT",
+      "label": "Token",
+      "value": "",
+      "required": true,
+      "displayConditions": {
+        "field": "authType",
+        "value": "bearer"
       }
     }
   ]

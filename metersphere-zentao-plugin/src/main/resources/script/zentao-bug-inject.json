@@ -4,13 +4,13 @@
   "script": {
     "injectFields": [
       {
-        "id": "assignee",
-        "name": "Jira处理人",
+        "id": "assignedTo",
+        "name": "禅道指派人",
         "type": "SELECT",
         "defaultValue": "",
         "required": false,
         "supportSearch": true,
-        "optionMethod": "getAssignableOptions"
+        "optionMethod": "getAssignUsers"
       }
     ]
   }

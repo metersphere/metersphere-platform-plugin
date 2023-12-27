@@ -11,6 +11,7 @@
 
     <modules>
         <module>metersphere-jira-plugin</module>
+        <module>metersphere-zentao-plugin</module>
     </modules>
 
     <properties>
