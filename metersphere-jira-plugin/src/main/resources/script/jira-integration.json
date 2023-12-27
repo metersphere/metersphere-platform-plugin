@@ -19,11 +19,11 @@
       "options":[
         {
           "value":"basic",
-          "label":"Basic Auth"
+          "text":"Basic Auth"
         },
         {
           "value":"bearer",
-          "label":"Bearer Token"
+          "text":"Bearer Token"
         }
       ]
     },
