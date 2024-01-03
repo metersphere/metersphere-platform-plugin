@@ -5,7 +5,7 @@
     "injectFields": [
       {
         "id": "assignedTo",
-        "name": "禅道指派人",
+        "name": "处理人(禅道指派人)",
         "type": "SELECT",
         "defaultValue": "",
         "required": false,

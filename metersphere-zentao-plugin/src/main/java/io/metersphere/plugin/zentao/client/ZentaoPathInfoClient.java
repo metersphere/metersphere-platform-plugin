@@ -28,6 +28,7 @@ public class ZentaoPathInfoClient extends ZentaoClient {
     private static final Pattern IMG_PATTERN = Pattern.compile("file-read-(.*?)\"/>");
     private static final String PRODUCT_GET = "/product-view-{0}.json?zentaosid={1}";
     private static final String BUG_LIST_URL = "/bug-browse-{1}-0-all-0--{2}-{3}-{4}.json?&zentaosid={5}";
+    private static final String PRODUCT_PLAN = "/productplan-browse-{1}--0--0-0.json?&zentaosid={2}";
 
     public ZentaoPathInfoClient(String url) {
         super(url);
@@ -54,6 +55,7 @@ public class ZentaoPathInfoClient extends ZentaoClient {
         request.setProductGet(getUrl(PRODUCT_GET));
         request.setFileDelete(getUrl(FILE_DELETE));
         request.setFileDownload(getUrl(FILE_DOWNLOAD));
+        request.setProductPlanUrl(getUrl(PRODUCT_PLAN));
         requestUrl = request;
     }
 

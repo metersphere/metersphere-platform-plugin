@@ -13,10 +13,9 @@ public class ZentaoBugResponse extends ZentaoResponse {
         private String steps;
         private String status;
         private String openedBy;
-        //        private String openedDate;
+        private String openedDate;
         private String deleted;
-//        private String product;
-//        private String openedBuild;
-//        private String assignedTo;
+        private String lastEditedDate;
+        private String assignedTo;
     }
 }

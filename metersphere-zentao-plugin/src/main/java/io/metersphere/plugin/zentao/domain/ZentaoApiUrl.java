@@ -24,4 +24,5 @@ public class ZentaoApiUrl {
     private String replaceImgUrl;
     private String productGet;
     private Pattern imgPattern;
+    private String productPlanUrl;
 }

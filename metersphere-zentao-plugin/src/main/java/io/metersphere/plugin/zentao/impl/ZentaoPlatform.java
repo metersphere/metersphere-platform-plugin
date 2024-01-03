@@ -3,7 +3,7 @@ package io.metersphere.plugin.zentao.impl;
 import io.metersphere.plugin.platform.dto.PlatformAttachment;
 import io.metersphere.plugin.platform.dto.SelectOption;
 import io.metersphere.plugin.platform.dto.SyncBugResult;
-import io.metersphere.plugin.platform.dto.reponse.DemandDTO;
+import io.metersphere.plugin.platform.dto.reponse.DemandRelatePageResponse;
 import io.metersphere.plugin.platform.dto.reponse.PlatformBugDTO;
 import io.metersphere.plugin.platform.dto.reponse.PlatformBugUpdateDTO;
 import io.metersphere.plugin.platform.dto.reponse.PlatformCustomFieldItemDTO;
@@ -16,10 +16,13 @@ import io.metersphere.plugin.sdk.util.PluginLogUtils;
 import io.metersphere.plugin.sdk.util.PluginUtils;
 import io.metersphere.plugin.zentao.client.ZentaoClient;
 import io.metersphere.plugin.zentao.client.ZentaoFactory;
+import io.metersphere.plugin.zentao.constants.ZentaoDemandCustomField;
 import io.metersphere.plugin.zentao.domain.ZentaoAddBugResponse;
+import io.metersphere.plugin.zentao.domain.ZentaoBugResponse;
 import io.metersphere.plugin.zentao.domain.ZentaoIntegrationConfig;
 import io.metersphere.plugin.zentao.domain.ZentaoProjectConfig;
 import io.metersphere.plugin.zentao.enums.ZentaoBugPlatformStatus;
+import org.apache.commons.lang3.SerializationUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.pf4j.Extension;
 import org.springframework.util.CollectionUtils;
@@ -30,10 +33,7 @@ import java.io.File;
 import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -44,12 +44,15 @@ public class ZentaoPlatform extends AbstractPlatform {
 
     protected ZentaoProjectConfig projectConfig;
 
-    protected SimpleDateFormat sdfWithZone = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+    protected SimpleDateFormat sdfWithZone = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
+    protected static final String DATE_PREFIX = "0000-00-00";
 
     public ZentaoPlatform(PlatformRequest request) {
         super(request);
         ZentaoIntegrationConfig zentaoConfig = getIntegrationConfig(request.getIntegrationConfig(), ZentaoIntegrationConfig.class);
         zentaoClient = ZentaoFactory.getInstance(zentaoConfig.getAddress(), zentaoConfig.getRequestType());
+        setUserConfig(request.getIntegrationConfig());
     }
 
     /**
@@ -122,6 +125,7 @@ public class ZentaoPlatform extends AbstractPlatform {
      */
     @Override
     public boolean isSupportDefaultTemplate() {
+        // Zentao don't Support Default Template
         return false;
     }
 
@@ -133,7 +137,7 @@ public class ZentaoPlatform extends AbstractPlatform {
      */
     @Override
     public List<PlatformCustomFieldItemDTO> getDefaultTemplateCustomField(String projectConfigStr) {
-        // isSupportDefaultTemplate 方法返回为True时, 实现;
+        // when isSupportDefaultTemplate get true, implement this method;
         return null;
     }
 
@@ -147,7 +151,7 @@ public class ZentaoPlatform extends AbstractPlatform {
     public List<SelectOption> getFormOptions(GetOptionRequest request) {
         String method = request.getOptionMethod();
         try {
-            // 这里反射调用 getIssueTypes 等方法，获取下拉框选项
+            // get form option by reflection
             // noinspection unchecked
             return (List<SelectOption>) this.getClass().getMethod(method, request.getClass()).invoke(this, request);
         } catch (InvocationTargetException e) {
@@ -168,7 +172,7 @@ public class ZentaoPlatform extends AbstractPlatform {
      */
     @Override
     public List<SelectOption> getStatusTransitions(String projectConfig, String issueKey) {
-        // 禅道没有状态流, 每次查询全部下拉状态选项
+        // Zentao don't support status flow, query all status item and return
         List<SelectOption> statusOptions = new ArrayList<>();
         for (ZentaoBugPlatformStatus status : ZentaoBugPlatformStatus.values()) {
             SelectOption option = new SelectOption();
@@ -186,88 +190,94 @@ public class ZentaoPlatform extends AbstractPlatform {
      * @return 需求分页集合
      */
     @Override
-    public PluginPager<List<DemandDTO>> pageDemand(DemandPageRequest request) {
+    public PluginPager<DemandRelatePageResponse> pageDemand(DemandPageRequest request) {
+        // validate demand config
         projectConfig = getProjectConfig(request.getProjectConfig());
         validateProjectKey();
-        return null;
-    }
-
-    /**
-     * 获取关联的需求
-     *
-     * @param request 关联需求查询参数
-     * @return 需求集合
-     */
-    @Override
-    public List<DemandDTO> getDemands(DemandRelateQueryRequest request) {
-        List<DemandDTO> list = new ArrayList<>();
-        try {
-            projectConfig = getProjectConfig(request.getProjectConfig());
-            Map<String, Object> demandMap = zentaoClient.getDemands(projectConfig.getZentaoId());
-            if (CollectionUtils.isEmpty(demandMap)) {
-                return list;
-            }
-            String demandStr = demandMap.get("data").toString();
-            if (StringUtils.isBlank(demandStr)) {
-                return list;
-            }
-
-            // TODO: 组装需求数据返回
-            // 兼容处理11.5版本格式 [{obj},{obj}]
-            // if (data.charAt(0) == '[') {
-            //     List array = JSON.parseArray(data);
-            //     for (int i = 0; i < array.size(); i++) {
-            //         Map o = (Map) array.get(i);
-            //         DemandDTO demandDTO = new DemandDTO();
-            //         demandDTO.setId(o.get("id").toString());
-            //         demandDTO.setName(o.get("title").toString());
-            //         demandDTO.setPlatform(key);
-            //         list.add(demandDTO);
-            //     }
-            // }
-            // // {"5": {"children": {"51": {}}}, "6": {}}
-            // else if (data.startsWith("{\"")) {
-            //     Map<String, Map<String, String>> dataMap = JSON.parseMap(data);
-            //     Collection<Map<String, String>> values = dataMap.values();
-            //     values.forEach(v -> {
-            //         Map jsonObject = JSON.parseMap(JSON.toJSONString(v));
-            //         DemandDTO demandDTO = new DemandDTO();
-            //         demandDTO.setId(jsonObject.get("id").toString());
-            //         demandDTO.setName(jsonObject.get("title").toString());
-            //         demandDTO.setPlatform(key);
-            //         list.add(demandDTO);
-            //         if (jsonObject.get("children") != null) {
-            //             LinkedHashMap<String, Map<String, String>> children = (LinkedHashMap<String, Map<String, String>>) jsonObject.get("children");
-            //             Collection<Map<String, String>> childrenMap = children.values();
-            //             childrenMap.forEach(ch -> {
-            //                 DemandDTO dto = new DemandDTO();
-            //                 dto.setId(ch.get("id"));
-            //                 dto.setName(ch.get("title"));
-            //                 dto.setPlatform(key);
-            //                 list.add(dto);
-            //             });
-            //         }
-            //     });
-            // }
-            // // 处理格式 {{"id": {obj}},{"id",{obj}}}
-            // else if (data.charAt(0) == '{') {
-            //     Map dataObject = (Map) obj.get("data");
-            //     String s = JSON.toJSONString(dataObject);
-            //     Map<String, Object> map = JSON.parseMap(s);
-            //     Collection<Object> values = map.values();
-            //     values.forEach(v -> {
-            //         Map jsonObject = JSON.parseMap(JSON.toJSONString(v));
-            //         DemandDTO demandDTO = new DemandDTO();
-            //         demandDTO.setId(jsonObject.get("id").toString());
-            //         demandDTO.setName(jsonObject.get("title").toString());
-            //         demandDTO.setPlatform(key);
-            //         list.add(demandDTO);
-            //     });
-            // }
-        } catch (Exception e) {
-            PluginLogUtils.error("get zentao related demands fail: ", e);
+        // query demand list
+        Map<String, Object> demandMapResponse = zentaoClient.pageDemands(projectConfig.getZentaoId(),
+                request.getStartPage(), request.getPageSize(), request.getQuery(), request.getFilter());
+        // handle empty data
+        if (demandMapResponse == null) {
+            return new PluginPager<>(request.getStartPage(), request.getPageSize());
         }
-        return list;
+        String demandData = demandMapResponse.get("data").toString();
+        if (StringUtils.isBlank(demandData)) {
+            return new PluginPager<>(request.getStartPage(), request.getPageSize());
+        }
+
+        // prepare custom headers
+        List<PlatformCustomFieldItemDTO> customHeaders = new ArrayList<>();
+        // set plan to custom headers, and support search
+        PlatformCustomFieldItemDTO iterationField = new PlatformCustomFieldItemDTO();
+        iterationField.setId(ZentaoDemandCustomField.PLAN_FIELD_ID);
+        iterationField.setName(ZentaoDemandCustomField.PLAN_FIELD_NAME);
+        iterationField.setSupportSearch(true);
+        iterationField.setOptions(PluginUtils.toJSONString(zentaoClient.getProductPlanOption(projectConfig.getZentaoId())));
+        customHeaders.add(iterationField);
+        // prepare demand list
+        List<DemandRelatePageResponse.Demand> demands = new ArrayList<>();
+        // noinspection unchecked
+        Map<String, Map<String, String>> demandMap = PluginUtils.parseMap(demandData);
+        Collection<Map<String, String>> values = demandMap.values();
+        values.forEach(v -> {
+            // noinspection unchecked
+            Map<String, Object> demandObj = PluginUtils.parseMap(PluginUtils.toJSONString(v));
+            DemandRelatePageResponse.Demand demand = new DemandRelatePageResponse.Demand();
+            demand.setDemandId(demandObj.get("id").toString());
+            demand.setDemandName(demandObj.get("title").toString());
+            demand.setDemandUrl(zentaoClient.getBaseUrl() + "/story-view-" + demand.getDemandId() + ".html");
+            // add plan to custom fields
+            Map<String, Object> customFields = new HashMap<>(1);
+            customFields.put(ZentaoDemandCustomField.PLAN_FIELD_ID, demandObj.get("plan").toString());
+            demand.setCustomFields(customFields);
+            demands.add(demand);
+            if (demandObj.get("children") != null) {
+                // handle children demand list
+                // noinspection unchecked
+                LinkedHashMap<String, Map<String, String>> children = (LinkedHashMap<String, Map<String, String>>) demandObj.get("children");
+                Collection<Map<String, String>> childrenMap = children.values();
+                childrenMap.forEach(childrenDemandObj -> {
+                    DemandRelatePageResponse.Demand childDemand = new DemandRelatePageResponse.Demand();
+                    childDemand.setDemandId(childrenDemandObj.get("id"));
+                    childDemand.setDemandName(childrenDemandObj.get("title"));
+                    childDemand.setDemandUrl(zentaoClient.getBaseUrl() + "/story-view-" + childDemand.getDemandId() + ".html");
+                    childDemand.setParent(demand.getDemandId());
+                    // add plan to custom fields
+                    Map<String, Object> childCustomFields = new HashMap<>(1);
+                    childCustomFields.put(ZentaoDemandCustomField.PLAN_FIELD_ID, demandObj.get("plan").toString());
+                    childDemand.setCustomFields(childCustomFields);
+                    demands.add(childDemand);
+                });
+            }
+        });
+        // sort by demand id
+        demands.sort(Comparator.comparing(DemandRelatePageResponse.Demand::getDemandId));
+        // filter by condition
+        List<DemandRelatePageResponse.Demand> filterDemands = demands;
+        // filter by query
+        if (StringUtils.isNotBlank(request.getQuery())) {
+            filterDemands = filterDemands.stream().filter(demand -> demand.getDemandName().contains(request.getQuery())).collect(Collectors.toList());
+        }
+        if (!CollectionUtils.isEmpty(request.getFilter())) {
+            filterDemands = filterDemands.stream().filter(demand -> {
+                boolean pass = true;
+                for (String key : request.getFilter().keySet()) {
+                    if (demand.getCustomFields().get(key) == null || !StringUtils.equals(demand.getCustomFields().get(key).toString(), request.getFilter().get(key).toString())) {
+                        pass = false;
+                        break;
+                    }
+                }
+                return pass;
+            }).collect(Collectors.toList());
+        }
+        // pager
+        filterDemands = filterDemands.stream().skip((long) (request.getStartPage() - 1) * request.getPageSize()).limit(request.getPageSize()).collect(Collectors.toList());
+        // set demand response
+        DemandRelatePageResponse demandRelatePageData = new DemandRelatePageResponse();
+        demandRelatePageData.setDemandList(filterDemands);
+        demandRelatePageData.setCustomHeaders(customHeaders);
+        return new PluginPager<>(demandRelatePageData, demands.size(), request.getPageSize(), request.getStartPage());
     }
 
     /**
@@ -286,12 +296,12 @@ public class ZentaoPlatform extends AbstractPlatform {
         // filter status field
         PlatformCustomFieldItemDTO statusField = filterStatusTransition(request);
         // set param
-        MultiValueMap<String, Object> param = buildUpdateParam(request, statusField == null ? null : statusField.getValue().toString());
+        MultiValueMap<String, Object> param = buildUpdateParam(request, statusField == null ? null : statusField.getValue().toString(), platformBug);
         ZentaoAddBugResponse.Bug bug = zentaoClient.addBug(param);
         if (StringUtils.isNotBlank(bug.getId())) {
             platformBug.setPlatformBugKey(bug.getId());
         } else {
-            throw new MSPluginException("禅道BUG同步失败, 请确认该集成账号是否开启超级model权限!");
+            throw new MSPluginException("禅道BUG同步新增失败, 请确认该集成账号是否开启超级model权限!");
         }
         return platformBug;
     }
@@ -312,9 +322,10 @@ public class ZentaoPlatform extends AbstractPlatform {
         // filter status field
         PlatformCustomFieldItemDTO statusField = filterStatusTransition(request);
         // set param
-        MultiValueMap<String, Object> param = buildUpdateParam(request, statusField == null ? null : statusField.getValue().toString());
+        MultiValueMap<String, Object> param = buildUpdateParam(request, statusField == null ? null : statusField.getValue().toString(), platformBug);
 
         zentaoClient.updateBug(request.getPlatformBugId(), param);
+        platformBug.setPlatformBugKey(request.getPlatformBugId());
         return platformBug;
     }
 
@@ -335,7 +346,7 @@ public class ZentaoPlatform extends AbstractPlatform {
      */
     @Override
     public boolean isSupportAttachment() {
-        // Zentao支持附件API
+        // Zentao JSON-API Support Attachment
         return true;
     }
 
@@ -352,10 +363,10 @@ public class ZentaoPlatform extends AbstractPlatform {
         String syncType = request.getSyncType();
         File file = request.getFile();
         if (StringUtils.equals(SyncAttachmentType.UPLOAD.syncOperateType(), syncType)) {
-            // 上传附件
+            // upload attachment
             zentaoClient.uploadAttachment("bug", request.getPlatformKey(), file);
         } else if (StringUtils.equals(SyncAttachmentType.DELETE.syncOperateType(), syncType)) {
-            // 删除附件
+            // delete attachment
             Map<String, Object> bugInfo = zentaoClient.getBugById(request.getPlatformKey());
             // noinspection unchecked
             Map<String, Object> zenFiles = (Map<String, Object>) bugInfo.get("files");
@@ -382,12 +393,12 @@ public class ZentaoPlatform extends AbstractPlatform {
         List<PlatformBugDTO> bugs = request.getBugs();
         bugs.forEach(bug -> {
             Map<String, Object> zenBugInfo = zentaoClient.getBugById(bug.getPlatformBugId());
-            // 缺陷未找到, 同步删除
             if (!StringUtils.equals(zenBugInfo.get("deleted").toString(), "1")) {
-                syncZentaoFieldToMsBug(bug, zenBugInfo);
-                parseAttachmentToMsBug(syncResult, bug, zenBugInfo);
+                syncZentaoFieldToMsBug(bug, zenBugInfo, false);
+                parseAttachmentToMsBug(syncResult, bug);
                 syncResult.getUpdateBug().add(bug);
             } else {
+                // not found, delete it
                 syncResult.getDeleteBugIds().add(bug.getId());
             }
         });
@@ -417,11 +428,13 @@ public class ZentaoPlatform extends AbstractPlatform {
                     for (Object bugObj : zentaoBugs) {
                         // transfer zentao bug field to ms
                         // noinspection unchecked
-                        Map<String, Object> bugInfo = (Map<String, Object>) bugObj;
+                        Map<String, Object> zenBugInfo = (Map<String, Object>) bugObj;
                         PlatformBugDTO bug = new PlatformBugDTO();
-                        bug.setPlatformBugId(bugInfo.get("id").toString());
-                        syncZentaoFieldToMsBug(bug, bugInfo);
-                        parseAttachmentToMsBug(syncBugResult, bug, bugInfo);
+                        bug.setId(UUID.randomUUID().toString());
+                        bug.setPlatformBugId(zenBugInfo.get("id").toString());
+                        syncZentaoFieldToMsBug(bug, zenBugInfo, true);
+                        // handle attachment
+                        parseAttachmentToMsBug(syncBugResult, bug);
                         needSyncBugs.add(bug);
                     }
                 }
@@ -433,12 +446,12 @@ public class ZentaoPlatform extends AbstractPlatform {
                 syncPostParamRequest.setAttachmentMap(syncBugResult.getAttachmentMap());
                 request.getSyncPostProcessFunc().accept(syncPostParamRequest);
 
-                // 下一页
+                // next page
                 pageNum++;
                 // noinspection unchecked
                 Map<String, Object> pagerMap = (Map<String, Object>) bugResponseMap.get("pager");
                 if (pageNum > (Integer) (pagerMap).get("pageTotal")) {
-                    // 禅道分页的页码超过总页数, 结束循环, 不然会一直死循环;
+                    // if page num > page total, break loop; avoid loop forever
                     break;
                 }
             } while (currentSize >= pageSize);
@@ -488,56 +501,155 @@ public class ZentaoPlatform extends AbstractPlatform {
     /**
      * 同步禅道平台字段到MS缺陷
      *
-     * @param msBug  平台缺陷
-     * @param zenBug 禅道缺陷
+     * @param msBug      平台缺陷
+     * @param zenBugInfo 禅道缺陷
      */
-    private void syncZentaoFieldToMsBug(PlatformBugDTO msBug, Map<String, Object> zenBug) {
-        // TODO: 同步禅道字段到MS缺陷
-        // ZentaoBugResponse.Bug bug = PluginUtils.parseObject(PluginUtils.toJSONString(zenBug), ZentaoBugResponse.Bug.class);
-        // String description = bug.getSteps();
-        // String steps = description;
-        // try {
-        //     steps = htmlDesc2MsDesc(zentao2MsDescription(description));
-        // } catch (Exception e) {
-        //     LogUtil.error(e.getMessage(), e);
-        // }
-        // if (issue == null) {
-        //     issue = new PlatformIssuesDTO();
-        //     if (StringUtils.isNotBlank(defaultCustomFields)) {
-        //         issue.setCustomFieldList(JSON.parseArray(defaultCustomFields, PlatformCustomFieldItemDTO.class));
-        //     } else {
-        //         issue.setCustomFieldList(new ArrayList<>());
-        //     }
-        // } else {
-        //     mergeCustomField(issue, defaultCustomFields);
-        // }
-        // issue.setPlatformStatus(bugObj.getStatus());
-        // if (StringUtils.equals(bugObj.getDeleted(), "1")) {
-        //     issue.setPlatformStatus("DELETE");
-        // }
-        // issue.setTitle(bugObj.getTitle());
-        // issue.setDescription(steps);
-        // issue.setReporter(bugObj.getOpenedBy());
-        // issue.setPlatform(key);
-        // try {
-        //     String openedDate = bug.get("openedDate").toString();
-        //     String lastEditedDate = bug.get("lastEditedDate").toString();
-        //     if (StringUtils.isNotBlank(openedDate) && !openedDate.startsWith("0000-00-00"))
-        //         issue.setCreateTime(DateUtils.getTime(openedDate).getTime());
-        //     if (StringUtils.isNotBlank(lastEditedDate) && !lastEditedDate.startsWith("0000-00-00"))
-        //         issue.setUpdateTime(DateUtils.getTime(lastEditedDate).getTime());
-        // } catch (Exception e) {
-        //     LogUtil.error("update zentao time" + e.getMessage());
-        // }
-        // if (issue.getUpdateTime() == null) {
-        //     issue.setUpdateTime(System.currentTimeMillis());
-        // }
-        // List<PlatformCustomFieldItemDTO> customFieldList = syncIssueCustomFieldList(issue.getCustomFieldList(), bug);
-        // handleSpecialField(customFieldList);
-        // issue.setCustomFields(JSON.toJSONString(customFieldList));
-        // return issue;
+    private void syncZentaoFieldToMsBug(PlatformBugDTO msBug, Map<String, Object> zenBugInfo, boolean useCustomAllFields) {
+        try {
+            // 处理基础字段
+            parseBaseFieldToMsBug(msBug, zenBugInfo);
+            // 处理自定义字段
+            parseCustomFieldToMsBug(msBug, zenBugInfo, useCustomAllFields);
+        } catch (Exception e) {
+            PluginLogUtils.error(e);
+        }
     }
 
+    /**
+     * 解析基础字段到平台缺陷字段
+     *
+     * @param msBug      平台缺陷
+     * @param zenBugInfo 禅道字段集合
+     */
+    private void parseBaseFieldToMsBug(PlatformBugDTO msBug, Map<String, Object> zenBugInfo) {
+        ZentaoBugResponse.Bug zenBug = PluginUtils.parseObject(PluginUtils.toJSONString(zenBugInfo), ZentaoBugResponse.Bug.class);
+        // 处理基础字段(TITLE, DESCRIPTION, HANDLE_USER, STATUS)
+        msBug.setTitle(zenBug.getTitle());
+        // TODO: 描述中图片文本暂时未处理
+        msBug.setDescription(zenBug.getSteps());
+        if (StringUtils.isEmpty(zenBug.getAssignedTo())) {
+            msBug.setHandleUser(StringUtils.EMPTY);
+        } else {
+            if (!StringUtils.equals(msBug.getHandleUser(), zenBug.getAssignedTo())) {
+                msBug.setHandleUser(zenBug.getAssignedTo());
+                msBug.setHandleUsers(StringUtils.isBlank(msBug.getHandleUsers()) ? zenBug.getAssignedTo() : msBug.getHandleUsers() + "," + zenBug.getAssignedTo());
+            }
+        }
+        msBug.setStatus(zenBug.getStatus());
+        msBug.setCreateUser("admin");
+        msBug.setUpdateUser("admin");
+        try {
+            String openedDate = zenBugInfo.get("openedDate").toString();
+            String lastEditedDate = zenBugInfo.get("lastEditedDate").toString();
+            if (StringUtils.isNotBlank(openedDate) && !openedDate.startsWith(DATE_PREFIX)) {
+                msBug.setCreateTime(sdfWithZone.parse(openedDate).getTime());
+            } else {
+                msBug.setCreateTime(System.currentTimeMillis());
+            }
+            if (StringUtils.isNotBlank(lastEditedDate) && !lastEditedDate.startsWith(DATE_PREFIX)) {
+                msBug.setUpdateTime(sdfWithZone.parse(openedDate).getTime());
+            } else {
+                msBug.setUpdateTime(System.currentTimeMillis());
+            }
+        } catch (Exception e) {
+            PluginLogUtils.error("parse zentao bug time error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 解析自定义字段到平台缺陷字段
+     *
+     * @param msBug  平台缺陷
+     * @param zenBug 禅道字段集合
+     */
+    private void parseCustomFieldToMsBug(PlatformBugDTO msBug, Map<String, Object> zenBug, boolean useCustomAllFields) {
+        List<PlatformCustomFieldItemDTO> needSyncCustomFields = new ArrayList<>();
+        if (useCustomAllFields) {
+            // 同步全量的时候, 需要同步所有自定义字段
+            zenBug.keySet().forEach(fieldKey -> {
+                PlatformCustomFieldItemDTO field = new PlatformCustomFieldItemDTO();
+                field.setId(fieldKey);
+                field.setValue(zenBug.get(fieldKey));
+                needSyncCustomFields.add(field);
+            });
+        } else {
+            // 同步存量缺陷时, 只需同步MS配置的API自定义字段
+            for (PlatformCustomFieldItemDTO field : msBug.getNeedSyncCustomFields()) {
+                needSyncCustomFields.add(SerializationUtils.clone(field));
+            }
+            if (CollectionUtils.isEmpty(needSyncCustomFields)) {
+                return;
+            }
+            needSyncCustomFields.forEach(field -> {
+                Object value = zenBug.get(field.getCustomData());
+                if (value != null) {
+                    if (value instanceof Map) {
+                        field.setValue(getSyncJsonParamValue(value));
+                    } else if (value instanceof List) {
+                        if (CollectionUtils.isEmpty((List) value)) {
+                            field.setValue(null);
+                        } else {
+                            List<Object> values = new ArrayList<>();
+                            // noinspection unchecked
+                            ((List) value).forEach(attr -> {
+                                if (attr instanceof Map) {
+                                    values.add(getSyncJsonParamValue(attr));
+                                } else {
+                                    values.add(attr);
+                                }
+                            });
+                            field.setValue(values);
+                        }
+                    } else {
+                        field.setValue(value.toString());
+                    }
+                } else {
+                    field.setValue(null);
+                }
+            });
+        }
+        msBug.setCustomFieldList(needSyncCustomFields);
+    }
+
+    /**
+     * 获取同步的JSON值
+     *
+     * @param value 对象值
+     * @return JSON字符串
+     */
+    private String getSyncJsonParamValue(Object value) {
+        Map valObj = ((Map) value);
+        Map child = (Map) valObj.get("child");
+        String idValue = Optional.ofNullable(valObj.get("id")).orElse(StringUtils.EMPTY).toString();
+
+        if (child != null) {// 级联框
+            return PluginUtils.toJSONString(getCascadeValues(idValue, child));
+        } else {
+            if (StringUtils.isNotBlank(idValue)) {
+                return idValue;
+            } else {
+                return valObj.get("key") == null ? null : valObj.get("key").toString();
+            }
+        }
+    }
+
+    /**
+     * 获取级联框的值
+     *
+     * @param idValue id值
+     * @param child   子级元素值
+     * @return 级联框的值
+     */
+    private List<Object> getCascadeValues(String idValue, Map child) {
+        List<Object> values = new ArrayList<>();
+        if (StringUtils.isNotBlank(idValue)) {
+            values.add(idValue);
+        }
+        if (child.get("id") != null && StringUtils.isNotBlank(child.get("id").toString())) {
+            values.add(child.get("id"));
+        }
+        return values;
+    }
 
     private List<?> filterBySyncCondition(List<?> zentaoBugs, SyncAllBugRequest request) {
         if (request.getCreateTime() == null) {
@@ -567,10 +679,10 @@ public class ZentaoPlatform extends AbstractPlatform {
      *
      * @param syncResult 同步结果
      * @param bug        缺陷
-     * @param zenBugInfo 禅道缺陷
      */
-    public void parseAttachmentToMsBug(SyncBugResult syncResult, PlatformBugDTO bug, Map<String, Object> zenBugInfo) {
+    public void parseAttachmentToMsBug(SyncBugResult syncResult, PlatformBugDTO bug) {
         try {
+            Map<String, Object> zenBugInfo = zentaoClient.getBugById(bug.getPlatformBugId());
             Object files = zenBugInfo.get("files");
             Map<String, Object> zenFiles;
             if (files instanceof List && ((List<?>) files).isEmpty()) {
@@ -587,9 +699,9 @@ public class ZentaoPlatform extends AbstractPlatform {
                     Map<String, Object> fileInfo = (Map<String, Object>) zenFiles.get(fileId);
                     String filename = fileInfo.get("title").toString();
                     PlatformAttachment syncAttachment = new PlatformAttachment();
-                    // name 用于查重
+                    // name for check
                     syncAttachment.setFileName(filename);
-                    // key 用于获取附件内容
+                    // key for get attachment content
                     syncAttachment.setFileKey(fileId);
                     attachmentMap.get(bug.getId()).add(syncAttachment);
                 }
@@ -606,7 +718,7 @@ public class ZentaoPlatform extends AbstractPlatform {
      * @param status  状态
      * @return 参数
      */
-    private MultiValueMap<String, Object> buildUpdateParam(PlatformBugUpdateRequest request, String status) {
+    private MultiValueMap<String, Object> buildUpdateParam(PlatformBugUpdateRequest request, String status, PlatformBugUpdateDTO platformBug) {
         MultiValueMap<String, Object> paramMap = new LinkedMultiValueMap<>();
         paramMap.add("product", this.projectConfig.getZentaoId());
         paramMap.add("title", request.getTitle());
@@ -617,7 +729,7 @@ public class ZentaoPlatform extends AbstractPlatform {
         }
         // TODO: 处理缺陷中的富文本图片
         paramMap.add("steps", request.getDescription());
-        parseCustomFields(request, paramMap);
+        parseCustomFields(request, paramMap, platformBug);
         setSpecialField(paramMap);
         return paramMap;
     }
@@ -628,18 +740,25 @@ public class ZentaoPlatform extends AbstractPlatform {
      * @param request  请求参数
      * @param paramMap 参数
      */
-    protected void parseCustomFields(PlatformBugUpdateRequest request, MultiValueMap<String, Object> paramMap) {
+    protected void parseCustomFields(PlatformBugUpdateRequest request, MultiValueMap<String, Object> paramMap, PlatformBugUpdateDTO platformBug) {
         List<PlatformCustomFieldItemDTO> customFields = request.getCustomFieldList();
         if (!CollectionUtils.isEmpty(customFields)) {
-            customFields.forEach(item -> {
+            Iterator<PlatformCustomFieldItemDTO> iterator = customFields.iterator();
+            while (iterator.hasNext()) {
+                PlatformCustomFieldItemDTO item = iterator.next();
                 if (StringUtils.isNotBlank(item.getCustomData())) {
+                    if (StringUtils.equals(item.getCustomData(), "assignedTo")) {
+                        // 默认将禅道指派人设置到MS处理人, 并移除平台缺陷中的指派人字段
+                        platformBug.setPlatformHandleUser(item.getValue().toString());
+                        iterator.remove();
+                    }
                     if (item.getValue() instanceof String) {
                         paramMap.add(item.getCustomData(), ((String) item.getValue()).trim());
                     } else {
                         paramMap.add(item.getCustomData(), item.getValue());
                     }
                 }
-            });
+            }
         }
     }
 
@@ -676,7 +795,7 @@ public class ZentaoPlatform extends AbstractPlatform {
      */
     private PlatformCustomFieldItemDTO filterStatusTransition(PlatformBugUpdateRequest request) {
         if (!CollectionUtils.isEmpty(request.getCustomFieldList())) {
-            // remove and return issue status
+            // filter and return bug status by custom fields, then remove it;
             List<PlatformCustomFieldItemDTO> statusList = request.getCustomFieldList().stream().filter(item ->
                     StringUtils.equals(item.getCustomData(), "status")).toList();
             request.getCustomFieldList().removeAll(statusList);
@@ -708,7 +827,7 @@ public class ZentaoPlatform extends AbstractPlatform {
             } else if (StringUtils.equals(str, "closed")) {
                 param.add("closedDate", format.format(new Date()));
                 if (!param.containsKey("resolution")) {
-                    // 解决方案默认为已解决
+                    // set resolution fixed
                     param.add("resolution", "fixed");
                 }
             }

@@ -4,10 +4,8 @@ package io.metersphere.plugin.jira.client;
 import io.metersphere.plugin.jira.constants.JiraApiUrl;
 import io.metersphere.plugin.jira.constants.JiraMetadataField;
 import io.metersphere.plugin.jira.domain.*;
-import io.metersphere.plugin.platform.dto.reponse.DemandDTO;
 import io.metersphere.plugin.platform.dto.request.SyncAllBugRequest;
 import io.metersphere.plugin.platform.spi.BaseClient;
-import io.metersphere.plugin.platform.utils.PluginPager;
 import io.metersphere.plugin.sdk.util.MSPluginException;
 import io.metersphere.plugin.sdk.util.PluginLogUtils;
 import io.metersphere.plugin.sdk.util.PluginUtils;
@@ -214,61 +212,13 @@ public class JiraDefaultClient extends BaseClient {
      * @param maxResults 数据大小
      * @return 需求列表
      */
-    public PluginPager<List<DemandDTO>> pageDemand(String projectKey, String issueType, int startAt, int maxResults, String query) {
-        List<DemandDTO> demands = new ArrayList<>();
-        String jql = getBaseUrl() + "/search?jql=project=" + projectKey + "+AND+issuetype=" + issueType + "+AND+summary~\"" + query + "\""
-                + "&maxResults=" + maxResults + "&startAt=" + startAt + "&fields=summary,issuetype";
+    public Map<String, Object> pageDemand(String projectKey, String issueType, int startAt, int maxResults, String query) {
+        String jql = getBaseUrl() + "/search?jql=project=" + projectKey + "+AND+issuetype=" + issueType +
+                (StringUtils.isNotBlank(query) ? "+AND+summary~\"" + query + "\"" : StringUtils.EMPTY) +
+                "&maxResults=" + maxResults + "&startAt=" + startAt + "&fields=summary,issuetype";
         ResponseEntity<String> responseEntity = restTemplate.exchange(jql, HttpMethod.GET, getAuthHttpEntity(), String.class);
         // noinspection unchecked
-        Map<String, Object> bodyMap = PluginUtils.parseMap(responseEntity.getBody());
-        // noinspection unchecked
-        List<Map<String, Object>> issues = (List<Map<String, Object>>) bodyMap.get("issues");
-        issues.forEach(issue -> {
-            // 只展示第一层级的需求
-            DemandDTO demand = new DemandDTO();
-            demand.setId(issue.get("id").toString());
-            // noinspection unchecked
-            Map<String, Object> fieldMap = (Map<String, Object>) issue.get("fields");
-            demand.setName(fieldMap.get("summary").toString());
-            demands.add(demand);
-        });
-        PluginPager<List<DemandDTO>> demandPageData = new PluginPager<>();
-        demandPageData.setTotal((Integer) bodyMap.get("total"));
-        demandPageData.setCurrent(startAt);
-        demandPageData.setPageSize(maxResults);
-        demandPageData.setList(demands);
-        return demandPageData;
-    }
-
-    /**
-     * 获取需求列表
-     *
-     * @param projectKey      项目KEY
-     * @param issueType       需求类型
-     * @param startAt         开始页
-     * @param maxResults      每页最大数
-     * @param filterDemandIds 过滤的需求ID
-     * @return
-     */
-    public List<DemandDTO> getDemands(String projectKey, String issueType, int startAt, int maxResults, List<String> filterDemandIds) {
-        List<DemandDTO> demands = new ArrayList<>();
-        String jql = getBaseUrl() + "/search?jql=project=" + projectKey + "+AND+issuetype=" + issueType + "+AND+id IN(" + String.join(",", filterDemandIds) +
-                ")&maxResults=" + maxResults + "&startAt=" + startAt + "&fields=summary,issuetype";
-        ResponseEntity<String> responseEntity = restTemplate.exchange(jql, HttpMethod.GET, getAuthHttpEntity(), String.class);
-        // noinspection unchecked
-        Map<String, Object> bodyMap = PluginUtils.parseMap(responseEntity.getBody());
-        // noinspection unchecked
-        List<Map<String, Object>> issues = (List<Map<String, Object>>) bodyMap.get("issues");
-        issues.forEach(issue -> {
-            // 只展示第一层级的需求
-            DemandDTO demand = new DemandDTO();
-            demand.setId(issue.get("id").toString());
-            // noinspection unchecked
-            Map<String, Object> fieldMap = (Map<String, Object>) issue.get("fields");
-            demand.setName(fieldMap.get("summary").toString());
-            demands.add(demand);
-        });
-        return demands;
+        return PluginUtils.parseMap(responseEntity.getBody());
     }
 
     /**
@@ -546,11 +496,20 @@ public class JiraDefaultClient extends BaseClient {
     }
 
     /**
+     * 获取需求请求URL
+     *
+     * @return 返回请求URL
+     */
+    public String getBaseDemandUrl() {
+        return ENDPOINT;
+    }
+
+    /**
      * 获取请求URL
      *
      * @return 返回请求URL
      */
-    protected String getBaseUrl() {
+    public String getBaseUrl() {
         return ENDPOINT + PREFIX;
     }
 

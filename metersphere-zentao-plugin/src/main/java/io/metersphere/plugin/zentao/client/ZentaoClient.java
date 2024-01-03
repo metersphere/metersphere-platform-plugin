@@ -1,5 +1,6 @@
 package io.metersphere.plugin.zentao.client;
 
+import io.metersphere.plugin.platform.dto.SelectOption;
 import io.metersphere.plugin.platform.spi.BaseClient;
 import io.metersphere.plugin.sdk.util.MSPluginException;
 import io.metersphere.plugin.sdk.util.PluginLogUtils;
@@ -16,7 +17,9 @@ import org.springframework.web.client.RequestCallback;
 
 import java.io.File;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -42,6 +45,11 @@ public abstract class ZentaoClient extends BaseClient {
         ENDPOINT = url;
     }
 
+    /**
+     * 初始化禅道配置
+     *
+     * @param config 集成配置
+     */
     public void initConfig(ZentaoIntegrationConfig config) {
         if (config == null) {
             throw new MSPluginException("禅道服务集成配置为空");
@@ -51,6 +59,11 @@ public abstract class ZentaoClient extends BaseClient {
         ENDPOINT = config.getAddress();
     }
 
+    /**
+     * 登录认证
+     *
+     * @return sessionId
+     */
     public String auth() {
         ZentaoAuthUserResponse authUser;
         String sessionId;
@@ -79,7 +92,14 @@ public abstract class ZentaoClient extends BaseClient {
         return sessionId;
     }
 
+    /**
+     * 添加缺陷
+     *
+     * @param paramMap 参数集合
+     * @return 禅道缺陷返回结果
+     */
     public ZentaoAddBugResponse.Bug addBug(MultiValueMap<String, Object> paramMap) {
+        PluginLogUtils.info("Add Zentao Bug Param:" + paramMap);
         String sessionId = auth();
         String defaultProject = getDefaultProject(paramMap);
         ResponseEntity<String> response;
@@ -103,24 +123,38 @@ public abstract class ZentaoClient extends BaseClient {
         return bug;
     }
 
+    /**
+     * 更新缺陷
+     *
+     * @param id       缺陷ID
+     * @param paramMap 参数集合
+     */
     public void updateBug(String id, MultiValueMap<String, Object> paramMap) {
+        PluginLogUtils.info("Update Zentao Bug Param:" + paramMap);
         String sessionId = auth();
+        ResponseEntity<String> response;
         try {
-            ResponseEntity<String> response = restTemplate.exchange(requestUrl.getBugUpdate(),
+            response = restTemplate.exchange(requestUrl.getBugUpdate(),
                     HttpMethod.POST, getHttpEntity(paramMap), String.class, id, sessionId);
-            ZentaoAddBugResponse addBugResponse = getResultForObject(ZentaoAddBugResponse.class, response);
-            if (!StringUtils.equalsIgnoreCase(addBugResponse.getStatus(), "success")
-                    && StringUtils.isNotBlank(addBugResponse.getData())
-                    && !StringUtils.equals(addBugResponse.getData(), "[]")) {
-                // 如果没改啥东西保存也会报错，addIssueResponse.getData() 值为 "[]"
-                throw new MSPluginException(UnicodeConvertUtils.unicodeToCn(response.getBody()));
-            }
         } catch (Exception e) {
             PluginLogUtils.error(e.getMessage(), e);
             throw new MSPluginException(e.getMessage());
         }
+
+        ZentaoAddBugResponse addBugResponse = getResultForObject(ZentaoAddBugResponse.class, response);
+        if (!StringUtils.equalsIgnoreCase(addBugResponse.getStatus(), "success")
+                && StringUtils.isNotBlank(addBugResponse.getData())
+                && !StringUtils.equals(addBugResponse.getData(), "[]")) {
+            // 如果没改啥东西保存也会报错，addIssueResponse.getData() 值为 "[]"
+            throw new MSPluginException(UnicodeConvertUtils.unicodeToCn(response.getBody()));
+        }
     }
 
+    /**
+     * 删除缺陷
+     *
+     * @param id 缺陷ID
+     */
     public void deleteBug(String id) {
         String sessionId = auth();
         try {
@@ -131,6 +165,12 @@ public abstract class ZentaoClient extends BaseClient {
         }
     }
 
+    /**
+     * 获取缺陷详情
+     *
+     * @param id 缺陷ID
+     * @return 缺陷详情
+     */
     public Map<String, Object> getBugById(String id) {
         String sessionId = auth();
         ResponseEntity<String> response = restTemplate.exchange(requestUrl.getBugGet(), HttpMethod.GET, getHttpEntity(), String.class, id, sessionId);
@@ -149,6 +189,11 @@ public abstract class ZentaoClient extends BaseClient {
         return PluginUtils.parseMap(bugResponse.getData());
     }
 
+    /**
+     * 获取用户集合
+     *
+     * @return 用户集合
+     */
     public Map<String, Object> getUsers() {
         String sessionId = auth();
         ResponseEntity<String> response = restTemplate.exchange(requestUrl.getUserGet() + sessionId,
@@ -157,7 +202,18 @@ public abstract class ZentaoClient extends BaseClient {
         return PluginUtils.parseMap(response.getBody());
     }
 
-    public Map<String, Object> getDemands(String projectKey) {
+    /**
+     * 获取关联需求集合
+     *
+     * @param projectKey 项目Key
+     * @param pageNum    页码
+     * @param pageSize   每页大小
+     * @param query      查询关键字
+     * @param filter     列表过滤
+     * @return 需求集合
+     */
+    public Map<String, Object> pageDemands(String projectKey, int pageNum, int pageSize,
+                                           String query, Map<String, Object> filter) {
         String sessionId = auth();
         ResponseEntity<String> response = restTemplate.exchange(requestUrl.getStoryGet() + sessionId,
                 HttpMethod.GET, getHttpEntity(), String.class, projectKey);
@@ -165,6 +221,48 @@ public abstract class ZentaoClient extends BaseClient {
         return PluginUtils.parseMap(response.getBody());
     }
 
+    /**
+     * 获取项目计划
+     *
+     * @param projectKey 项目Key
+     * @return 计划集合
+     */
+    public List<SelectOption> getProductPlanOption(String projectKey) {
+        String sessionId = auth();
+        ResponseEntity<String> response = restTemplate.exchange(requestUrl.getProductPlanUrl(),
+                HttpMethod.GET, getHttpEntity(), String.class, projectKey, sessionId);
+        // noinspection unchecked
+        Map<String, Object> responseMap = PluginUtils.parseMap(response.getBody());
+        if (responseMap == null) {
+            return new ArrayList<>();
+        }
+        String responseData = responseMap.get("data").toString();
+        if (StringUtils.isBlank(responseData)) {
+            return new ArrayList<>();
+        }
+        List<SelectOption> options = new ArrayList<>();
+        // noinspection unchecked
+        Map<String, Map<String, Object>> dataMap = PluginUtils.parseMap(responseData);
+        Map<String, Object> plansMap = dataMap.get("plans");
+        if (plansMap == null) {
+            return new ArrayList<>();
+        }
+        plansMap.values().forEach(v -> {
+            SelectOption option = new SelectOption();
+            // noinspection unchecked
+            Map<String, Object> planObj = PluginUtils.parseMap(PluginUtils.toJSONString(v));
+            option.setValue(planObj.get("id").toString());
+            option.setText(planObj.get("title").toString());
+            options.add(option);
+        });
+        return options;
+    }
+
+    /**
+     * 校验项目是否存在
+     *
+     * @param projectKey 项目Key
+     */
     public void checkProject(String projectKey) {
         String sessionId = auth();
         ResponseEntity<String> response = restTemplate.exchange(requestUrl.getProductGet(),
@@ -182,6 +280,13 @@ public abstract class ZentaoClient extends BaseClient {
         throw new MSPluginException("项目不存在");
     }
 
+    /**
+     * 上传附件
+     *
+     * @param objectType 对象类型
+     * @param objectId   对象ID
+     * @param file       文件
+     */
     public void uploadAttachment(String objectType, String objectId, File file) {
         String sessionId = auth();
         MultiValueMap<String, Object> paramMap = new LinkedMultiValueMap<>();
@@ -197,6 +302,11 @@ public abstract class ZentaoClient extends BaseClient {
         }
     }
 
+    /**
+     * 删除附件
+     *
+     * @param fileId 文件ID
+     */
     public void deleteAttachment(String fileId) {
         String sessionId = auth();
         try {
@@ -206,6 +316,12 @@ public abstract class ZentaoClient extends BaseClient {
         }
     }
 
+    /**
+     * 获取附件字节流
+     *
+     * @param fileId             文件ID
+     * @param inputStreamHandler 流处理
+     */
     public void getAttachmentBytes(String fileId, Consumer<InputStream> inputStreamHandler) {
         RequestCallback requestCallback = request -> {
             // 定义请求头的接收类型
@@ -221,6 +337,14 @@ public abstract class ZentaoClient extends BaseClient {
                 }, fileId, sessionId);
     }
 
+    /**
+     * 获取项目下缺陷集合
+     *
+     * @param pageNum   页码
+     * @param pageSize  页面大小
+     * @param projectId 项目ID
+     * @return 缺陷集合
+     */
     public Map<String, Object> getBugsByProjectId(Integer pageNum, Integer pageSize, String projectId) {
         String sessionId = auth();
         ResponseEntity<String> response = restTemplate.exchange(requestUrl.getBugList(),
@@ -234,11 +358,61 @@ public abstract class ZentaoClient extends BaseClient {
         }
     }
 
+    /**
+     * 获取sessionId
+     *
+     * @return sessionId
+     */
     private String getSessionId() {
         String getSessionUrl = requestUrl.getSessionGet();
         ResponseEntity<String> response = restTemplate.exchange(getSessionUrl, HttpMethod.GET, getHttpEntity(), String.class);
         ZentaoSessionResponse sessionResponse = getResultForObject(ZentaoSessionResponse.class, response);
         return PluginUtils.parseObject(sessionResponse.getData(), ZentaoSessionResponse.Session.class).getSessionID();
+    }
+
+    /**
+     * 获取默认项目
+     *
+     * @param param 参数集合
+     * @return 默认项目
+     */
+    private String getDefaultProject(MultiValueMap<String, Object> param) {
+        if (param.containsKey(PROJECT_PARAM_KEY) && !CollectionUtils.isEmpty(param.get(PROJECT_PARAM_KEY))) {
+            return param.get(PROJECT_PARAM_KEY).get(0).toString();
+        }
+        return StringUtils.EMPTY;
+    }
+
+    /**
+     * 获取请求地址
+     *
+     * @return 请求地址
+     */
+    public String getBaseUrl() {
+        if (ENDPOINT.endsWith(END_SUFFIX)) {
+            return ENDPOINT.substring(0, ENDPOINT.length() - 1);
+        }
+        return ENDPOINT;
+    }
+
+    /**
+     * 获取替换图片地址
+     *
+     * @param replaceImgUrl 替换图片地址
+     * @return 替换图片地址
+     */
+    public String getReplaceImgUrl(String replaceImgUrl) {
+        String baseUrl = getBaseUrl();
+        String[] split = baseUrl.split("/");
+        String suffix = split[split.length - 1];
+        if (StringUtils.equals("biz", suffix)) {
+            suffix = baseUrl;
+        } else if (!StringUtils.equalsAny(suffix, "zentao", "pro", "zentaopms", "zentaopro", "zentaobiz")) {
+            suffix = "";
+        } else {
+            suffix = "/" + suffix;
+        }
+        return String.format(replaceImgUrl, suffix);
     }
 
     protected HttpHeaders getHeader() {
@@ -257,33 +431,5 @@ public abstract class ZentaoClient extends BaseClient {
 
     protected HttpEntity<MultiValueMap<String, Object>> getHttpEntity(MultiValueMap<String, Object> paramMap, MultiValueMap<String, String> headers) {
         return new HttpEntity<>(paramMap, headers);
-    }
-
-    private String getDefaultProject(MultiValueMap<String, Object> param) {
-        if (param.containsKey(PROJECT_PARAM_KEY) && !CollectionUtils.isEmpty(param.get(PROJECT_PARAM_KEY))) {
-            return param.get(PROJECT_PARAM_KEY).get(0).toString();
-        }
-        return StringUtils.EMPTY;
-    }
-
-    public String getBaseUrl() {
-        if (ENDPOINT.endsWith(END_SUFFIX)) {
-            return ENDPOINT.substring(0, ENDPOINT.length() - 1);
-        }
-        return ENDPOINT;
-    }
-
-    public String getReplaceImgUrl(String replaceImgUrl) {
-        String baseUrl = getBaseUrl();
-        String[] split = baseUrl.split("/");
-        String suffix = split[split.length - 1];
-        if (StringUtils.equals("biz", suffix)) {
-            suffix = baseUrl;
-        } else if (!StringUtils.equalsAny(suffix, "zentao", "pro", "zentaopms", "zentaopro", "zentaobiz")) {
-            suffix = "";
-        } else {
-            suffix = "/" + suffix;
-        }
-        return String.format(replaceImgUrl, suffix);
     }
 }

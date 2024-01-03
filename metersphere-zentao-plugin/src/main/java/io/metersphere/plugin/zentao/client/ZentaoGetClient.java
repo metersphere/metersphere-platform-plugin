@@ -31,6 +31,7 @@ public class ZentaoGetClient extends ZentaoClient {
      * 注意参数顺序不能调换
      */
     private static final String BUG_LIST_URL = "/?m=bug&f=browse&productID={0}&branch=&browseType=all&param=0&orderBy=&recTotal={1}&recPerPage={2}&pageID={3}&t=json&zentaosid={4}";
+    private static final String PRODUCT_PLAN = "/?m=productplan&f=browse&productID={0}&t=json&zentaosid={1}";
 
     public ZentaoGetClient(String url) {
         super(url);
@@ -57,6 +58,7 @@ public class ZentaoGetClient extends ZentaoClient {
         request.setProductGet(getUrl(PRODUCT_GET));
         request.setFileDelete(getNotSuperModelUrl(FILE_DELETE));
         request.setFileDownload(getNotSuperModelUrl(FILE_DOWNLOAD));
+        request.setProductPlanUrl(getNotSuperModelUrl(PRODUCT_PLAN));
         requestUrl = request;
     }
 

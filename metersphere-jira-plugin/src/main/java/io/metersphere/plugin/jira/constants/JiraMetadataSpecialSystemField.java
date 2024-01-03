@@ -7,6 +7,7 @@ public class JiraMetadataSpecialSystemField {
 
     public static final String TIME_TRACKING = "timetracking";
     public static final String ASSIGNEE = "assignee";
+    public static final String ASSIGNEE_ZH = "经办人";
     public static final String REPORTER = "reporter";
     public static final String ISSUE_LINKS = "issuelinks";
 

@@ -12,7 +12,7 @@ import io.metersphere.plugin.jira.enums.JiraOptionKey;
 import io.metersphere.plugin.platform.dto.PlatformAttachment;
 import io.metersphere.plugin.platform.dto.SelectOption;
 import io.metersphere.plugin.platform.dto.SyncBugResult;
-import io.metersphere.plugin.platform.dto.reponse.DemandDTO;
+import io.metersphere.plugin.platform.dto.reponse.DemandRelatePageResponse;
 import io.metersphere.plugin.platform.dto.reponse.PlatformBugDTO;
 import io.metersphere.plugin.platform.dto.reponse.PlatformBugUpdateDTO;
 import io.metersphere.plugin.platform.dto.reponse.PlatformCustomFieldItemDTO;
@@ -251,22 +251,42 @@ public class JiraPlatform extends AbstractPlatform {
      * @return 插件分页返回
      */
     @Override
-    public PluginPager<List<DemandDTO>> pageDemand(DemandPageRequest request) {
+    public PluginPager<DemandRelatePageResponse> pageDemand(DemandPageRequest request) {
+        // validate demand config
         projectConfig = getProjectConfig(request.getProjectConfig());
         validateDemandType();
-        return jiraClient.pageDemand(projectConfig.getJiraKey(), projectConfig.getJiraDemandTypeId(), request.getStartPage(), request.getPageSize(), request.getQuery());
-    }
-
-    /**
-     * 获取需求列表
-     *
-     * @param request 需求关联请求参数
-     * @return 需求列表
-     */
-    @Override
-    public List<DemandDTO> getDemands(DemandRelateQueryRequest request) {
-        JiraProjectConfig config = getProjectConfig(request.getProjectConfig());
-        return jiraClient.getDemands(config.getJiraKey(), config.getJiraDemandTypeId(), 0, Integer.MAX_VALUE, request.getRelateDemandIds());
+        // query demand list
+        Map<String, Object> bodyMap = jiraClient.pageDemand(projectConfig.getJiraKey(), projectConfig.getJiraDemandTypeId(),
+                request.getStartPage(), request.getPageSize(), request.getQuery());
+        // handle empty data
+        if (bodyMap == null) {
+            return new PluginPager<>(request.getStartPage(), request.getPageSize());
+        }
+        List<Map<String, Object>> issues = (List<Map<String, Object>>) bodyMap.get("issues");
+        if (CollectionUtils.isEmpty(issues)) {
+            return new PluginPager<>(request.getStartPage(), request.getPageSize());
+        }
+        // prepare custom headers
+        List<PlatformCustomFieldItemDTO> customHeaders = new ArrayList<>();
+        // prepare demand list
+        List<DemandRelatePageResponse.Demand> demands = new ArrayList<>();
+        issues.forEach(issue -> {
+            // Jira目前只满足第一层级需求, 父子层级看后续需求
+            DemandRelatePageResponse.Demand demand = new DemandRelatePageResponse.Demand();
+            demand.setDemandId(issue.get("key").toString());
+            // noinspection unchecked
+            Map<String, Object> fieldMap = (Map<String, Object>) issue.get("fields");
+            demand.setDemandName(fieldMap.get("summary").toString());
+            demand.setDemandUrl(jiraClient.getBaseDemandUrl() + "/jira/software/projects/" + projectConfig.getJiraKey() + "/issues/" + issue.get("key").toString());
+            demands.add(demand);
+        });
+        // sort by demand id
+        demands.sort(Comparator.comparing(DemandRelatePageResponse.Demand::getDemandId));
+        // set demand response
+        DemandRelatePageResponse response = new DemandRelatePageResponse();
+        response.setDemandList(demands);
+        response.setCustomHeaders(customHeaders);
+        return new PluginPager<>(response, (Integer) bodyMap.get("total"), request.getPageSize(), request.getStartPage());
     }
 
     /**
@@ -1090,7 +1110,9 @@ public class JiraPlatform extends AbstractPlatform {
             throw new MSPluginException("Jira缺陷字段为空, 请检查参数!");
         }
 
-        for (PlatformCustomFieldItemDTO item : customFields) {
+        Iterator<PlatformCustomFieldItemDTO> iterator = customFields.iterator();
+        while (iterator.hasNext()) {
+            PlatformCustomFieldItemDTO item = iterator.next();
             String fieldName = item.getCustomData();
             if (StringUtils.isEmpty(item.getCustomData()) || StringUtils.isEmpty(item.getType()) || ObjectUtils.isEmpty(item.getValue())) {
                 continue;
@@ -1100,6 +1122,10 @@ public class JiraPlatform extends AbstractPlatform {
                     PlatformCustomFieldType.RADIO.getType(), PlatformCustomFieldType.MEMBER.getType())) {
                 if (StringUtils.equals(fieldName, JiraMetadataSpecialSystemField.ASSIGNEE)) {
                     platformBug.setPlatformHandleUser(item.getValue().toString());
+                    // 如果是插件内置的处理人(Jira指派人), 则移除自定义字段中的处理人
+                    if (!StringUtils.equals(item.getName().toString(), JiraMetadataSpecialSystemField.ASSIGNEE_ZH)) {
+                        iterator.remove();
+                    }
                 }
                 Map<String, Object> param = new LinkedHashMap<>();
                 param.put("id", item.getValue());
@@ -1416,8 +1442,7 @@ public class JiraPlatform extends AbstractPlatform {
             }
         } else {
             // 缺陷使用的非平台默认模板, 使用模板中配置的映射字段
-            List<PlatformCustomFieldItemDTO> needSyncFields = defaultTemplateFields.stream().filter(field -> msBug.getNeedSyncCustomFields().contains(field.getCustomData())).toList();
-            for (PlatformCustomFieldItemDTO field : needSyncFields) {
+            for (PlatformCustomFieldItemDTO field : msBug.getNeedSyncCustomFields()) {
                 needSyncCustomFields.add(SerializationUtils.clone(field));
             }
         }

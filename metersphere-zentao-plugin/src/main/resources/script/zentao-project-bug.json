@@ -11,7 +11,7 @@
         "required": true,
         "subDesc": "如何获取禅道项目key",
         "inputSearch": false,
-        "instructionsIcon": "static/zentao-key.png",
+        "instructionsIcon": "static/zentao-key.jpg",
         "optionMethod": "",
         "couplingConfig": {}
       }

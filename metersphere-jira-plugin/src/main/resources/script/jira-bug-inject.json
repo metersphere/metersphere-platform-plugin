@@ -5,7 +5,7 @@
     "injectFields": [
       {
         "id": "assignee",
-        "name": "Jira处理人",
+        "name": "处理人(Jira经办人)",
         "type": "SELECT",
         "defaultValue": "",
         "required": false,
