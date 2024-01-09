@@ -6,6 +6,7 @@
       {
         "id": "assignedTo",
         "name": "处理人(禅道指派人)",
+        "injectKey": "handlerUser",
         "type": "SELECT",
         "defaultValue": "",
         "required": false,
