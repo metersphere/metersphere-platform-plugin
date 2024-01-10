@@ -108,13 +108,12 @@ public class JiraPlatform extends AbstractPlatform {
             // 如果是用户配置, 则从数据库中获取集成信息
             integrationConfig = getIntegrationConfig(JiraIntegrationConfig.class);
             JiraUserPlatformInfo userConfig = PluginUtils.parseObject(userPlatformConfig, JiraUserPlatformInfo.class);
-            if (userConfig == null) {
-                throw new MSPluginException("三方平台账号配置为空!");
+            if (userConfig != null) {
+                integrationConfig.setAccount(userConfig.getJiraAccount());
+                integrationConfig.setPassword(userConfig.getJiraPassword());
+                integrationConfig.setToken(userConfig.getToken());
+                integrationConfig.setAuthType(userConfig.getAuthType());
             }
-            integrationConfig.setAccount(userConfig.getJiraAccount());
-            integrationConfig.setPassword(userConfig.getJiraPassword());
-            integrationConfig.setToken(userConfig.getToken());
-            integrationConfig.setAuthType(userConfig.getAuthType());
         } else {
             // 如果是集成配置, 则直接从参数中获取集成信息
             integrationConfig = getIntegrationConfig(userPlatformConfig, JiraIntegrationConfig.class);

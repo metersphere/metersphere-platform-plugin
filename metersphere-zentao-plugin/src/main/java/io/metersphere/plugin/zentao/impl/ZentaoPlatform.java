@@ -114,11 +114,10 @@ public class ZentaoPlatform extends AbstractPlatform {
             // 如果是用户配置, 则直接从平台参数中获取集成信息, 并替换用户账号配置
             integrationConfig = getIntegrationConfig(ZentaoIntegrationConfig.class);
             ZentaoPlatformUserInfo userConfig = PluginUtils.parseObject(userPlatformConfig, ZentaoPlatformUserInfo.class);
-            if (userConfig == null) {
-                throw new MSPluginException("三方平台账号配置为空!");
+            if (userConfig != null) {
+                integrationConfig.setAccount(userConfig.getZentaoAccount());
+                integrationConfig.setPassword(userConfig.getZentaoPassword());
             }
-            integrationConfig.setAccount(userConfig.getZentaoAccount());
-            integrationConfig.setPassword(userConfig.getZentaoPassword());
         } else {
             // 如果是集成配置, 则直接从参数中获取集成信息
             integrationConfig = getIntegrationConfig(userPlatformConfig, ZentaoIntegrationConfig.class);
