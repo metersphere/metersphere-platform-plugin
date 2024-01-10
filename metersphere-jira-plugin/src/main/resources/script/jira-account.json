@@ -2,66 +2,54 @@
   "id": "account",
   "name": "个人信息账号配置",
   "script": {
-    "label": "organization.integration.jira_information",
-    "instructionsInfo": "organization.integration.jira_prompt_information",
-    "i18n": true,
     "formItems": [
       {
         "name": "authType",
-        "type": "SELECT",
+        "type": "RADIO",
+        "label": "认证方式",
         "defaultValue": "basic",
-        "required": false,
-        "i18n": true,
+        "required": true,
+        "tooltip": "私有化部署选择 Basic Auth 填写账号密码, 选择 Bearer Token 填写 Token, SaaS 版本只能选择 Basic Auth, 填写(账号+令牌)(账户设置-安全-创建API令牌)",
         "options": [
           {
-            "text": "Basic Auth",
-            "value": "basic"
+            "value": "basic",
+            "text": "Basic Auth"
           },
           {
-            "text": "Bearer Token",
-            "value": "bearer"
+            "value": "bearer",
+            "text": "Bearer Token"
           }
-        ],
-        "label": "api_test.definition.request.verification_method"
+        ]
       },
       {
         "name": "jiraAccount",
         "type": "INPUT",
-        "defaultValue": "",
-        "required": false,
-        "i18n": true,
+        "label": "JIRA账号",
+        "required": true,
         "displayConditions": {
           "field": "authType",
           "value": "basic"
-        },
-        "label": "organization.integration.account",
-        "message": "organization.integration.input_api_account"
+        }
       },
       {
         "name": "jiraPassword",
         "type": "PASSWORD",
-        "defaultValue": "",
-        "required": false,
-        "i18n": true,
+        "label": "JIRA密码",
+        "required": true,
         "displayConditions": {
           "field": "authType",
           "value": "basic"
-        },
-        "label": "organization.integration.password",
-        "message": "organization.integration.input_api_password"
+        }
       },
       {
         "name": "token",
-        "type": "PASSWORD",
-        "defaultValue": "",
-        "required": false,
-        "i18n": true,
+        "type": "INPUT",
+        "label": "Token",
+        "required": true,
         "displayConditions": {
           "field": "authType",
           "value": "bearer"
-        },
-        "label": "Token",
-        "message": "organization.integration.input_token"
+        }
       }
     ]
   }

@@ -4,7 +4,7 @@
   "script": {
     "formItems": [
       {
-        "name": "account",
+        "name": "zentaoAccount",
         "type": "INPUT",
         "label": "禅道账号",
         "tooltip": "禅道账号具有API相应的权限, 请按照参考页面勾选上对应权限{参考页面: 组织-权限-分组-权限维护-API开发}; 还需开启超级Model配置项, 禅道配置文件中$config->features-apiGetModel = true{配置文件参考路径：/opt/zbox/app/zentao/config/my.php};",
@@ -12,29 +12,11 @@
         "required": true
       },
       {
-        "name": "password",
+        "name": "zentaoPassword",
         "type": "PASSWORD",
         "label": "禅道密码",
         "value": "",
         "required": true
-      },
-      {
-        "name": "requestType",
-        "type": "RADIO",
-        "label": "请求方式",
-        "value": "PATH_INFO",
-        "required": true,
-        "tooltip": "参考禅道配置文件中 $config->requestType 的值",
-        "options": [
-          {
-            "value": "PATH_INFO",
-            "text": "PATH_INFO"
-          },
-          {
-            "value": "GET",
-            "text": "GET"
-          }
-        ]
       }
     ]
   }

@@ -17,10 +17,7 @@ import io.metersphere.plugin.sdk.util.PluginUtils;
 import io.metersphere.plugin.zentao.client.ZentaoClient;
 import io.metersphere.plugin.zentao.client.ZentaoFactory;
 import io.metersphere.plugin.zentao.constants.ZentaoDemandCustomField;
-import io.metersphere.plugin.zentao.domain.ZentaoAddBugResponse;
-import io.metersphere.plugin.zentao.domain.ZentaoBugResponse;
-import io.metersphere.plugin.zentao.domain.ZentaoIntegrationConfig;
-import io.metersphere.plugin.zentao.domain.ZentaoProjectConfig;
+import io.metersphere.plugin.zentao.domain.*;
 import io.metersphere.plugin.zentao.enums.ZentaoBugPlatformStatus;
 import org.apache.commons.lang3.SerializationUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -52,7 +49,7 @@ public class ZentaoPlatform extends AbstractPlatform {
         super(request);
         ZentaoIntegrationConfig zentaoConfig = getIntegrationConfig(request.getIntegrationConfig(), ZentaoIntegrationConfig.class);
         zentaoClient = ZentaoFactory.getInstance(zentaoConfig.getAddress(), zentaoConfig.getRequestType());
-        setUserConfig(request.getIntegrationConfig());
+        setUserConfig(request.getIntegrationConfig(), false);
     }
 
     /**
@@ -60,6 +57,12 @@ public class ZentaoPlatform extends AbstractPlatform {
      */
     @Override
     public void validateIntegrationConfig() {
+        zentaoClient.auth();
+    }
+
+    @Override
+    public void validateUserConfig(String userConfig) {
+        setUserConfig(userConfig, true);
         zentaoClient.auth();
     }
 
@@ -94,19 +97,33 @@ public class ZentaoPlatform extends AbstractPlatform {
      * @param projectConfig      项目配置
      */
     private void validateConfig(String userPlatformConfig, String projectConfig) {
-        setUserConfig(userPlatformConfig);
+        setUserConfig(userPlatformConfig, true);
         this.projectConfig = getProjectConfig(projectConfig);
         validateProjectKey();
     }
 
+
     /**
-     * 设置用户平台配置
+     * 设置用户平台配置(集成信息)
      *
      * @param userPlatformConfig 用户平台配置
      */
-    public void setUserConfig(String userPlatformConfig) {
-        ZentaoIntegrationConfig config = getIntegrationConfig(userPlatformConfig, ZentaoIntegrationConfig.class);
-        validateAndSetConfig(config);
+    public void setUserConfig(String userPlatformConfig, Boolean isUserConfig) {
+        ZentaoIntegrationConfig integrationConfig;
+        if (isUserConfig) {
+            // 如果是用户配置, 则直接从平台参数中获取集成信息, 并替换用户账号配置
+            integrationConfig = getIntegrationConfig(ZentaoIntegrationConfig.class);
+            ZentaoPlatformUserInfo userConfig = PluginUtils.parseObject(userPlatformConfig, ZentaoPlatformUserInfo.class);
+            if (userConfig == null) {
+                throw new MSPluginException("三方平台账号配置为空!");
+            }
+            integrationConfig.setAccount(userConfig.getZentaoAccount());
+            integrationConfig.setPassword(userConfig.getZentaoPassword());
+        } else {
+            // 如果是集成配置, 则直接从参数中获取集成信息
+            integrationConfig = getIntegrationConfig(userPlatformConfig, ZentaoIntegrationConfig.class);
+        }
+        validateAndSetConfig(integrationConfig);
     }
 
     /**

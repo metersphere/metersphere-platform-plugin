@@ -4,6 +4,6 @@ import lombok.Data;
 
 @Data
 public class ZentaoPlatformUserInfo {
-    private String zentaoUserName;
+    private String zentaoAccount;
     private String zentaoPassword;
 }

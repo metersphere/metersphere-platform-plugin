@@ -73,6 +73,12 @@ public class JiraPlatform extends AbstractPlatform {
         jiraClient.auth();
     }
 
+    @Override
+    public void validateUserConfig(String userConfig) {
+        setUserConfig(userConfig, true);
+        jiraClient.auth();
+    }
+
     /**
      * 校验项目配置
      *
@@ -96,9 +102,24 @@ public class JiraPlatform extends AbstractPlatform {
      *
      * @param userPlatformConfig 用户平台配置
      */
-    public void setUserConfig(String userPlatformConfig) {
-        JiraIntegrationConfig config = getIntegrationConfig(userPlatformConfig, JiraIntegrationConfig.class);
-        validateAndSetConfig(config);
+    public void setUserConfig(String userPlatformConfig, Boolean isUserConfig) {
+        JiraIntegrationConfig integrationConfig;
+        if (isUserConfig) {
+            // 如果是用户配置, 则从数据库中获取集成信息
+            integrationConfig = getIntegrationConfig(JiraIntegrationConfig.class);
+            JiraUserPlatformInfo userConfig = PluginUtils.parseObject(userPlatformConfig, JiraUserPlatformInfo.class);
+            if (userConfig == null) {
+                throw new MSPluginException("三方平台账号配置为空!");
+            }
+            integrationConfig.setAccount(userConfig.getJiraAccount());
+            integrationConfig.setPassword(userConfig.getJiraPassword());
+            integrationConfig.setToken(userConfig.getToken());
+            integrationConfig.setAuthType(userConfig.getAuthType());
+        } else {
+            // 如果是集成配置, 则直接从参数中获取集成信息
+            integrationConfig = getIntegrationConfig(userPlatformConfig, JiraIntegrationConfig.class);
+        }
+        validateAndSetConfig(integrationConfig);
     }
 
     /**
@@ -1026,7 +1047,7 @@ public class JiraPlatform extends AbstractPlatform {
      * @param projectConfig      项目配置
      */
     private void validateConfig(String userPlatformConfig, String projectConfig) {
-        setUserConfig(userPlatformConfig);
+        setUserConfig(userPlatformConfig, true);
         this.projectConfig = getProjectConfig(projectConfig);
         validateProjectKey(this.projectConfig.getJiraKey());
         validateIssueType();
