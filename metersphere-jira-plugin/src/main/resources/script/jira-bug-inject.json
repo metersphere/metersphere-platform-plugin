@@ -6,7 +6,7 @@
       {
         "id": "assignee",
         "name": "处理人(Jira经办人)",
-        "injectKey": "handlerUser",
+        "key": "assignee",
         "type": "SELECT",
         "defaultValue": "",
         "required": false,
