@@ -7,7 +7,7 @@
         "name": "authType",
         "type": "RADIO",
         "label": "认证方式",
-        "defaultValue": "basic",
+        "value": "basic",
         "required": true,
         "tooltip": "私有化部署选择 Basic Auth 填写账号密码, 选择 Bearer Token 填写 Token, SaaS 版本只能选择 Basic Auth, 填写(账号+令牌)(账户设置-安全-创建API令牌)",
         "options": [
