@@ -476,8 +476,8 @@ public class ZentaoPlatform extends AbstractPlatform {
 			Map<String, Object> customFields = new HashMap<>(1);
 			customFields.put(ZentaoDemandCustomField.PLAN_FIELD_ID, demandObj.get("plan").toString());
 			demand.setCustomFields(customFields);
-			demands.add(demand);
 			if (demandObj.get("children") != null) {
+				List<PlatformDemandDTO.Demand> childrenDemands = new ArrayList<>();
 				// handle children demand list
 				// noinspection unchecked
 				LinkedHashMap<String, Map<String, String>> children = (LinkedHashMap<String, Map<String, String>>) demandObj.get("children");
@@ -492,9 +492,11 @@ public class ZentaoPlatform extends AbstractPlatform {
 					Map<String, Object> childCustomFields = new HashMap<>(1);
 					childCustomFields.put(ZentaoDemandCustomField.PLAN_FIELD_ID, demandObj.get("plan").toString());
 					childDemand.setCustomFields(childCustomFields);
-					demands.add(childDemand);
+					childrenDemands.add(childDemand);
 				});
+				demand.setChildren(childrenDemands);
 			}
+			demands.add(demand);
 		});
 		// sort by demand id
 		demands.sort(Comparator.comparing(PlatformDemandDTO.Demand::getDemandId));
@@ -508,7 +510,8 @@ public class ZentaoPlatform extends AbstractPlatform {
 			filterDemands = filterDemands.stream().filter(demand -> {
 				boolean pass = true;
 				for (String key : request.getFilter().keySet()) {
-					if (demand.getCustomFields().get(key) == null || !StringUtils.equals(demand.getCustomFields().get(key).toString(), request.getFilter().get(key).toString())) {
+					if (demand.getCustomFields().get(key) == null ||
+							(!CollectionUtils.isEmpty(request.getFilter().get(key)) && !request.getFilter().get(key).contains(demand.getCustomFields().get(key).toString()))) {
 						pass = false;
 						break;
 					}
