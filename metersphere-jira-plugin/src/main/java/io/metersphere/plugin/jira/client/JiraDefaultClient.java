@@ -576,8 +576,8 @@ public class JiraDefaultClient extends BaseClient {
 	public JiraIssueListResponse getProjectIssues(Integer startAt, Integer maxResults, String projectKey, String issueType, SyncAllBugRequest syncRequest, String fields) {
 		ResponseEntity<String> responseEntity;
 		String url = getBaseUrl() + "/search?startAt={1}&maxResults={2}&jql=project={3}+AND+issuetype={4}";
-		if (syncRequest != null) {
-			url = url + "+AND+created" + (syncRequest.isPre() ? "<=" : ">=") + "\"" + DateFormatUtils.format(syncRequest.getCreateTime(), "yyyy-MM-dd HH:mm") + "\"";
+		if (syncRequest != null && syncRequest.getPre() != null && syncRequest.getCreateTime() != null) {
+			url = url + "+AND+created" + (syncRequest.getPre() ? "<=" : ">=") + "\"" + DateFormatUtils.format(syncRequest.getCreateTime(), "yyyy-MM-dd HH:mm") + "\"";
 		}
 		if (StringUtils.isNotBlank(fields)) {
 			url = url + "&fields=" + fields;

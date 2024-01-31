@@ -737,7 +737,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 	 * @return 过滤后的缺陷集合
 	 */
 	private List<?> filterBySyncCondition(List<?> zentaoBugs, SyncAllBugRequest request) {
-		if (request.getCreateTime() == null) {
+		if (request.getPre() == null || request.getCreateTime() == null) {
 			return zentaoBugs;
 		}
 		return zentaoBugs.stream().filter(bug -> {
@@ -746,7 +746,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 			long createTimeMills;
 			try {
 				createTimeMills = sdfWithZone.parse(bugMap.get("openedDate").toString()).getTime();
-				if (request.isPre()) {
+				if (request.getPre()) {
 					return createTimeMills <= request.getCreateTime();
 				} else {
 					return createTimeMills >= request.getCreateTime();
