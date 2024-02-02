@@ -728,7 +728,7 @@ public class JiraPlatform extends AbstractPlatform {
 		}
 		// set demand response
 		PlatformDemandDTO response = new PlatformDemandDTO();
-		response.setDemandList(filterDemands);
+		response.setList(filterDemands);
 		response.setCustomHeaders(customHeaders);
 		return response;
 	}

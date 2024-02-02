@@ -218,7 +218,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 		demands = demands.stream().skip((long) (request.getStartPage() - 1) * request.getPageSize()).limit(request.getPageSize()).collect(Collectors.toList());
 		// set demand response
 		PlatformDemandDTO demandRelatePageData = new PlatformDemandDTO();
-		demandRelatePageData.setDemandList(demands);
+		demandRelatePageData.setList(demands);
 		demandRelatePageData.setCustomHeaders(getDemandCustomField());
 		return new PluginPager<>(demandRelatePageData, total, request.getPageSize(), request.getStartPage());
 	}
@@ -236,7 +236,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 		List<PlatformDemandDTO.Demand> demands = queryDemandList(requestParam, request.getRelateDemandIds());
 		// set demand response
 		PlatformDemandDTO demandRelatePageData = new PlatformDemandDTO();
-		demandRelatePageData.setDemandList(demands);
+		demandRelatePageData.setList(demands);
 		demandRelatePageData.setCustomHeaders(getDemandCustomField());
 		return demandRelatePageData;
 	}
