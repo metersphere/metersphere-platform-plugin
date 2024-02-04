@@ -5,7 +5,7 @@ import lombok.Data;
 import java.util.regex.Pattern;
 
 @Data
-public class ZentaoApiUrl {
+public class ZentaoJsonApiUrl {
     private String login;
     private String sessionGet;
     private String bugCreate;

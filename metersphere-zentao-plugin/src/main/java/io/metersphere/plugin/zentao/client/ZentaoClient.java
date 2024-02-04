@@ -5,7 +5,12 @@ import io.metersphere.plugin.platform.spi.BaseClient;
 import io.metersphere.plugin.sdk.util.MSPluginException;
 import io.metersphere.plugin.sdk.util.PluginLogUtils;
 import io.metersphere.plugin.sdk.util.PluginUtils;
-import io.metersphere.plugin.zentao.domain.*;
+import io.metersphere.plugin.zentao.domain.ZentaoIntegrationConfig;
+import io.metersphere.plugin.zentao.domain.ZentaoJsonApiUrl;
+import io.metersphere.plugin.zentao.domain.response.json.ZentaoAddBugResponse;
+import io.metersphere.plugin.zentao.domain.response.json.ZentaoAuthUserResponse;
+import io.metersphere.plugin.zentao.domain.response.json.ZentaoBugResponse;
+import io.metersphere.plugin.zentao.domain.response.json.ZentaoSessionResponse;
 import io.metersphere.plugin.zentao.utils.UnicodeConvertUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.core.io.FileSystemResource;
@@ -24,8 +29,9 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 /**
- * 由于禅道RESTFUL-API接口不完善, 且不支持附件相关功能;
- * 故选择了JSON-API调用方式; 而禅道JSON-API接口支持配置两种请求方式{PATH_INFO, GET};
+ * 由于禅道最新Latest版本18.10所支持的RESTFUL-API接口不完善, 且不支持附件相关功能;
+ * 故保留了JSON-API调用方式供部分不支持接口的调用, 例如附件下载, 附件上传等等;
+ * 注意: 禅道JSON-API接口支持配置两种请求方式{PATH_INFO, GET}, 具体请求方式按照配置文件及插件集成配置而定;
  */
 public abstract class ZentaoClient extends BaseClient {
 
@@ -35,7 +41,7 @@ public abstract class ZentaoClient extends BaseClient {
 
 	protected static String PASSWD;
 
-	public ZentaoApiUrl requestUrl;
+	public ZentaoJsonApiUrl requestUrl;
 
 	public static final String PROJECT_PARAM_KEY = "project";
 

@@ -5,5 +5,6 @@ import lombok.Data;
 
 @Data
 public class ZentaoProjectConfig {
-    private String zentaoId;
+	private String zentaoKey;
+	private String type;
 }

@@ -5,6 +5,6 @@ package io.metersphere.plugin.zentao.constants;
  */
 public class ZentaoDemandCustomField {
 
-    public static final String PLAN_FIELD_ID = "plan";
-    public static final String PLAN_FIELD_NAME = "迭代计划";
+	public static final String PLAN_FIELD_ID = "plan";
+	public static final String PLAN_FIELD_NAME = "计划";
 }

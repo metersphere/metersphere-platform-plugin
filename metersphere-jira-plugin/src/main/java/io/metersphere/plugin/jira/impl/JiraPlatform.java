@@ -280,9 +280,12 @@ public class JiraPlatform extends AbstractPlatform {
 		// validate demand config
 		projectConfig = getProjectConfig(request.getProjectConfig());
 		validateDemandType();
+		if (request.isSelectAll()) {
+			request.setPageSize(Integer.MAX_VALUE);
+		}
 		// query demand list
 		Map<String, Object> bodyMap = jiraClient.pageDemand(projectConfig.getJiraKey(), projectConfig.getJiraDemandTypeId(),
-				request.getStartPage(), request.getPageSize(), request.getQuery());
+				request.getStartPage() - 1, request.getPageSize(), null);
 		// handle empty data
 		if (bodyMap == null) {
 			return new PluginPager<>(request.getStartPage(), request.getPageSize());
@@ -291,7 +294,7 @@ public class JiraPlatform extends AbstractPlatform {
 		if (CollectionUtils.isEmpty(issues)) {
 			return new PluginPager<>(request.getStartPage(), request.getPageSize());
 		}
-		PlatformDemandDTO response = buildPlatformDemand(issues, null);
+		PlatformDemandDTO response = buildPlatformDemand(issues, null, request.getQuery(), request.getExcludeIds());
 		return new PluginPager<>(response, (Integer) bodyMap.get("total"), request.getPageSize(), request.getStartPage());
 	}
 
@@ -316,7 +319,7 @@ public class JiraPlatform extends AbstractPlatform {
 		if (CollectionUtils.isEmpty(issues)) {
 			return null;
 		}
-		return buildPlatformDemand(issues, request.getRelateDemandIds());
+		return buildPlatformDemand(issues, request.getRelateDemandIds(), null, null);
 	}
 
 	/**
@@ -708,7 +711,7 @@ public class JiraPlatform extends AbstractPlatform {
 	 * @param filterIds 过滤的需求ID
 	 * @return
 	 */
-	private PlatformDemandDTO buildPlatformDemand(List<Map<String, Object>> issues, List<String> filterIds) {
+	private PlatformDemandDTO buildPlatformDemand(List<Map<String, Object>> issues, List<String> filterIds, String query, List<String> excludeIds) {
 		// prepare custom headers
 		List<PlatformCustomFieldItemDTO> customHeaders = new ArrayList<>();
 		// prepare demand list
@@ -721,7 +724,11 @@ public class JiraPlatform extends AbstractPlatform {
 			Map<String, Object> fieldMap = (Map<String, Object>) issue.get("fields");
 			demand.setDemandName(fieldMap.get("summary").toString());
 			demand.setDemandUrl(jiraClient.getBaseDemandUrl() + "/jira/software/projects/" + projectConfig.getJiraKey() + "/issues/" + issue.get("key").toString());
-			demands.add(demand);
+			boolean isDemandShow = (StringUtils.isBlank(query) || StringUtils.equalsAny(query, demand.getDemandId(), demand.getDemandName())) &&
+					(CollectionUtils.isEmpty(excludeIds) || !excludeIds.contains(demand.getDemandId()));
+			if (isDemandShow) {
+				demands.add(demand);
+			}
 		});
 		// sort by demand id
 		demands.sort(Comparator.comparing(PlatformDemandDTO.Demand::getDemandId));
