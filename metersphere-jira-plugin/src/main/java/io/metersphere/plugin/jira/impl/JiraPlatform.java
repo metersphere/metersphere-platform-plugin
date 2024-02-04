@@ -526,6 +526,10 @@ public class JiraPlatform extends AbstractPlatform {
 			// query jira bug by page
 			JiraIssueListResponse result = jiraClient.getProjectIssues(startAt, maxResults, projectConfig.getJiraKey(), projectConfig.getJiraBugTypeId(), request);
 			List<JiraIssue> jiraIssues = result.getIssues();
+			if (CollectionUtils.isEmpty(jiraIssues)) {
+				break;
+			}
+
 			currentSize = jiraIssues.size();
 			if (!CollectionUtils.isEmpty(jiraIssues)) {
 				// jira attachment field

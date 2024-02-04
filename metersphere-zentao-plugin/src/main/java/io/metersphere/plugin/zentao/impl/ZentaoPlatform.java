@@ -388,21 +388,24 @@ public class ZentaoPlatform extends AbstractPlatform {
 				// query zentao bug by page
 				Map<String, Object> bugResponseMap = zentaoClient.getBugsByProjectId(pageNum, pageSize, projectConfig.getZentaoId());
 				List<?> zentaoBugs = (List<?>) bugResponseMap.get("bugs");
+				if (CollectionUtils.isEmpty(zentaoBugs)) {
+					// zentao bugs is empty, break loop
+					break;
+				}
+
 				currentSize = zentaoBugs.size();
 				zentaoBugs = filterBySyncCondition(zentaoBugs, request);
-				if (!CollectionUtils.isEmpty(zentaoBugs)) {
-					for (Object bugObj : zentaoBugs) {
-						// transfer zentao bug field to ms
-						// noinspection unchecked
-						Map<String, Object> zenBugInfo = (Map<String, Object>) bugObj;
-						PlatformBugDTO bug = new PlatformBugDTO();
-						bug.setId(UUID.randomUUID().toString());
-						bug.setPlatformBugId(zenBugInfo.get("id").toString());
-						syncZentaoFieldToMsBug(bug, zenBugInfo, true);
-						// handle attachment
-						parseAttachmentToMsBug(syncBugResult, bug);
-						needSyncBugs.add(bug);
-					}
+				for (Object bugObj : zentaoBugs) {
+					// transfer zentao bug field to ms
+					// noinspection unchecked
+					Map<String, Object> zenBugInfo = (Map<String, Object>) bugObj;
+					PlatformBugDTO bug = new PlatformBugDTO();
+					bug.setId(UUID.randomUUID().toString());
+					bug.setPlatformBugId(zenBugInfo.get("id").toString());
+					syncZentaoFieldToMsBug(bug, zenBugInfo, true);
+					// handle attachment
+					parseAttachmentToMsBug(syncBugResult, bug);
+					needSyncBugs.add(bug);
 				}
 
 				// set post process func param
