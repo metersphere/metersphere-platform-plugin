@@ -459,7 +459,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 			return List.of();
 		}
 		String demandData = demandMapResponse.get("data").toString();
-		if (StringUtils.isBlank(demandData)) {
+		if (StringUtils.isBlank(demandData) || StringUtils.equals(demandData, "[]")) {
 			return List.of();
 		}
 

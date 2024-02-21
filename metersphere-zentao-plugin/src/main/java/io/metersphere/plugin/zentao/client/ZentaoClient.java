@@ -238,6 +238,9 @@ public abstract class ZentaoClient extends BaseClient {
 		List<SelectOption> options = new ArrayList<>();
 		// noinspection unchecked
 		Map<String, Map<String, Object>> dataMap = PluginUtils.parseMap(responseData);
+		if (dataMap.get("plans") instanceof List) {
+			return new ArrayList<>();
+		}
 		Map<String, Object> plansMap = dataMap.get("plans");
 		if (plansMap == null) {
 			return new ArrayList<>();
