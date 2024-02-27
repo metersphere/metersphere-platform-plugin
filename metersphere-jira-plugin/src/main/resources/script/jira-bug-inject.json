@@ -9,7 +9,7 @@
         "key": "handleUser",
         "type": "SELECT",
         "defaultValue": "",
-        "required": false,
+        "required": true,
         "supportSearch": true,
         "optionMethod": "getAssignableOptions"
       }

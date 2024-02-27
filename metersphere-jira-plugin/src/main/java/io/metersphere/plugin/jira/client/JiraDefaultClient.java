@@ -441,21 +441,21 @@ public class JiraDefaultClient extends BaseClient {
 		try {
 			response = restTemplate.exchange(getBaseUrl() + "/myself", HttpMethod.GET, getAuthHttpEntity(), String.class);
 			if (StringUtils.isBlank(response.getBody()) || !response.getBody().startsWith(AUTH_SELF)) {
-				throw new MSPluginException("测试连接失败，请检查Jira地址是否正确");
+				throw new MSPluginException("JIRA认证失败: 地址错误");
 			}
 		} catch (HttpClientErrorException e) {
 			if (HttpStatus.UNAUTHORIZED.isSameCodeAs(e.getStatusCode())) {
-				throw new MSPluginException("账号名或密码(Token)错误");
+				throw new MSPluginException("JIRA认证失败: 账号或密码(Token)错误");
 			}
 			if (HttpStatus.NOT_FOUND.isSameCodeAs(e.getStatusCode())) {
-				throw new MSPluginException("404 资源不存在");
+				throw new MSPluginException("JIRA认证失败: 地址错误");
 			} else {
 				PluginLogUtils.error(e);
-				throw new MSPluginException("校验失败", e);
+				throw new MSPluginException("JIRA认证失败", e);
 			}
 		} catch (Exception e) {
 			PluginLogUtils.error(e.getMessage(), e);
-			throw new MSPluginException("校验失败", e);
+			throw new MSPluginException("JIRA认证失败", e);
 		}
 	}
 

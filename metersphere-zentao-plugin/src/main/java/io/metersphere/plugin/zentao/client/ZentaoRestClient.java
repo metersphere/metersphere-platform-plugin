@@ -12,6 +12,7 @@ import io.metersphere.plugin.zentao.domain.response.rest.*;
 import io.metersphere.plugin.zentao.utils.UnicodeConvertUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.*;
+import org.springframework.web.client.HttpClientErrorException;
 
 import java.util.Map;
 
@@ -80,10 +81,14 @@ public class ZentaoRestClient extends BaseClient {
 		try {
 			response = restTemplate.postForEntity(getRestUrl(ZentaoRestApiUrl.GET_TOKEN, null), getJsonHttpEntity(jsonObj), ZentaoRestTokenResponse.class);
 			if (response.getBody() == null) {
-				throw new MSPluginException("禅道认证失败: 未获取到Token");
+				throw new MSPluginException("禅道认证失败: 地址错误或未获取到Token");
 			}
 		} catch (Exception e) {
-			throw new MSPluginException(UnicodeConvertUtils.unicodeToCn(e.getMessage()));
+			if (e instanceof HttpClientErrorException && ((HttpClientErrorException.BadRequest) e).getStatusCode().is4xxClientError()) {
+				throw new MSPluginException("禅道认证失败: 账号或密码错误");
+			} else {
+				throw new MSPluginException("禅道认证失败: 地址错误或连接超时");
+			}
 		}
 		return response.getBody().getToken();
 	}
