@@ -285,7 +285,7 @@ public class JiraPlatform extends AbstractPlatform {
 		}
 		// query demand list
 		Map<String, Object> bodyMap = jiraClient.pageDemand(projectConfig.getJiraKey(), projectConfig.getJiraDemandTypeId(),
-				request.getStartPage() - 1, request.getPageSize(), null);
+				(request.getStartPage() - 1) * request.getPageSize(), request.getPageSize(), null);
 		// handle empty data
 		if (bodyMap == null) {
 			return new PluginPager<>(request.getStartPage(), request.getPageSize());
