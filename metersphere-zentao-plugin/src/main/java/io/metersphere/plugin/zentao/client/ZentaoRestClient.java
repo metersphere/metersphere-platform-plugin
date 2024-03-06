@@ -102,7 +102,7 @@ public class ZentaoRestClient extends BaseClient {
 		}
 		ResponseEntity<Map> response;
 		try {
-			response = restTemplate.getForEntity(getRestUrl(ZentaoRestApiUrl.GET_PRODUCT_OR_PROJECT, type), Map.class, zentaoKey);
+			response = restTemplate.exchange(getRestUrl(ZentaoRestApiUrl.GET_PRODUCT_OR_PROJECT, type), HttpMethod.GET, getJsonHttpEntityWithToken(StringUtils.EMPTY), Map.class, zentaoKey);
 			if (response.getBody() == null || response.getBody().containsKey(ERROR_RESPONSE_KEY)) {
 				throw new MSPluginException("产品或项目不存在!");
 			}
