@@ -114,10 +114,18 @@ public class JiraPlatform extends AbstractPlatform {
 			integrationConfig = getIntegrationConfig(JiraIntegrationConfig.class);
 			JiraUserPlatformInfo userConfig = PluginUtils.parseObject(userPlatformConfig, JiraUserPlatformInfo.class);
 			if (userConfig != null) {
-				integrationConfig.setAccount(userConfig.getJiraAccount());
-				integrationConfig.setPassword(userConfig.getJiraPassword());
-				integrationConfig.setToken(userConfig.getToken());
-				integrationConfig.setAuthType(userConfig.getAuthType());
+				if (StringUtils.isNotBlank(userConfig.getJiraAccount())) {
+					integrationConfig.setAccount(userConfig.getJiraAccount());
+				}
+				if (StringUtils.isNotBlank(userConfig.getJiraPassword())) {
+					integrationConfig.setPassword(userConfig.getJiraPassword());
+				}
+				if (StringUtils.isNotBlank(userConfig.getToken())) {
+					integrationConfig.setToken(userConfig.getToken());
+				}
+				if (StringUtils.isNotBlank(userConfig.getAuthType())) {
+					integrationConfig.setAuthType(userConfig.getAuthType());
+				}
 			}
 		} else {
 			// 如果是集成配置, 则直接从参数中获取集成信息
@@ -411,6 +419,7 @@ public class JiraPlatform extends AbstractPlatform {
 			status.put("id", statusField.getValue().toString());
 			transitionMap.put("transition", status);
 			jiraClient.doTransitions(PluginUtils.toJSONString(transitionMap), request.getPlatformBugId());
+			platformBug.setPlatformStatus(status.get("id"));
 		}
 
 		// TODO: Jira的富文本字段图片处理
