@@ -2,10 +2,7 @@ package io.metersphere.plugin.jira.impl;
 
 
 import io.metersphere.plugin.jira.client.JiraDefaultClient;
-import io.metersphere.plugin.jira.constants.JiraMetadataField;
-import io.metersphere.plugin.jira.constants.JiraMetadataFieldSearchMethod;
-import io.metersphere.plugin.jira.constants.JiraMetadataSpecialCustomField;
-import io.metersphere.plugin.jira.constants.JiraMetadataSpecialSystemField;
+import io.metersphere.plugin.jira.constants.*;
 import io.metersphere.plugin.jira.domain.*;
 import io.metersphere.plugin.jira.enums.JiraMetadataFieldType;
 import io.metersphere.plugin.jira.enums.JiraOptionKey;
@@ -38,10 +35,7 @@ import java.io.File;
 import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.text.SimpleDateFormat;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
-import java.time.ZoneId;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.Consumer;
@@ -784,6 +778,11 @@ public class JiraPlatform extends AbstractPlatform {
 		} else {
 			customField.setRequired(item.isRequired());
 		}
+		if (StringUtils.equalsAnyIgnoreCase(item.getKey(), JiraMetadataField.SUMMARY_FIELD_NAME, JiraMetadataField.DESCRIPTION_FIELD_NAME, JiraMetadataField.ENVIRONMENT_FIELD_NAME)) {
+			customField.setSystemField(true);
+		} else {
+			customField.setSystemField(false);
+		}
 	}
 
 	/**
@@ -816,6 +815,15 @@ public class JiraPlatform extends AbstractPlatform {
 				customField.setType(JiraMetadataFieldType.mappingJiraCustomType(schema.getType()));
 			}
 		}
+		// 如果是MULTIPLE_INPUT类型, 则设置placeholder
+		if (StringUtils.equals(customField.getType(), PlatformCustomFieldType.MULTIPLE_INPUT.name())) {
+			customField.setPlaceHolder(JiraMetadataFieldPlaceHolder.TAG_PLACEHOLDER);
+		}
+		// 如果是textfield类型且为预估时间, 则设置placeholder
+		if (StringUtils.equals(customField.getName(), JiraMetadataField.INITIAL_ESTIMATE_FIELD_ZH)) {
+			customField.setPlaceHolder(JiraMetadataFieldPlaceHolder.ESTIMATE_FIELD_PLACEHOLDER);
+		}
+
 		// allowedValues不为空时, 替换options
 		if (!CollectionUtils.isEmpty(allowedValues)) {
 			customField.setOptions(PluginUtils.toJSONString(handleAllowedValuesOptions(allowedValues)));
@@ -835,21 +843,21 @@ public class JiraPlatform extends AbstractPlatform {
 
 		if (StringUtils.contains(customType, JiraMetadataSpecialCustomField.MULTI_CHECK_BOX)) {
 			// 多选复选框, 需设置默认值为空数组
-			customField.setType(PlatformCustomFieldType.CHECKBOX.getType());
+			customField.setType(PlatformCustomFieldType.CHECKBOX.name());
 			customField.setDefaultValue(PluginUtils.toJSONString(new ArrayList<>()));
 		}
 
 		if (StringUtils.contains(customType, JiraMetadataSpecialCustomField.CUSTOM_FIELD_TYPES) && StringUtils.equals(schema.getType(), specialCustomFieldTypesOfSchemaType)) {
 			// 插件字段类型为{自定义字段类型获取}
-			customField.setType(PlatformCustomFieldType.SELECT.getType());
+			customField.setType(PlatformCustomFieldType.SELECT.name());
 		}
 
 		if (StringUtils.contains(customType, JiraMetadataSpecialCustomField.PEOPLE)) {
 			// PEOPLE类型特殊字段
 			if (StringUtils.isNotBlank(schema.getType()) && StringUtils.equals(schema.getType(), arraySchemaType)) {
-				customField.setType(PlatformCustomFieldType.MULTIPLE_SELECT.getType());
+				customField.setType(PlatformCustomFieldType.MULTIPLE_SELECT.name());
 			} else {
-				customField.setType(PlatformCustomFieldType.SELECT.getType());
+				customField.setType(PlatformCustomFieldType.SELECT.name());
 			}
 			customField.setSupportSearch(true);
 			customField.setSearchMethod(JiraMetadataFieldSearchMethod.GET_USER);
@@ -858,7 +866,7 @@ public class JiraPlatform extends AbstractPlatform {
 
 		if (StringUtils.contains(customType, JiraMetadataSpecialCustomField.USER_PICKER)) {
 			// 自定义字段类型为用户选择器
-			customField.setType(PlatformCustomFieldType.SELECT.getType());
+			customField.setType(PlatformCustomFieldType.SELECT.name());
 			customField.setSupportSearch(true);
 			customField.setSearchMethod(JiraMetadataFieldSearchMethod.GET_USER);
 			customField.setOptions(optionData.get(JiraOptionKey.USER.name()));
@@ -866,7 +874,7 @@ public class JiraPlatform extends AbstractPlatform {
 
 		if (StringUtils.contains(customType, JiraMetadataSpecialCustomField.MULTI_USER_PICKER)) {
 			// 自定义字段类型为多用户选择器
-			customField.setType(PlatformCustomFieldType.MULTIPLE_SELECT.getType());
+			customField.setType(PlatformCustomFieldType.MULTIPLE_SELECT.name());
 			customField.setSupportSearch(true);
 			customField.setSearchMethod(JiraMetadataFieldSearchMethod.GET_USER);
 			customField.setOptions(optionData.get(JiraOptionKey.USER.name()));
@@ -877,13 +885,13 @@ public class JiraPlatform extends AbstractPlatform {
 			customField.setOptions(optionData.get(JiraOptionKey.SPRINT.name()));
 			customField.setSupportSearch(true);
 			customField.setSearchMethod(JiraMetadataFieldSearchMethod.GET_SPRINT);
-			customField.setType(PlatformCustomFieldType.SELECT.getType());
+			customField.setType(PlatformCustomFieldType.SELECT.name());
 		}
 
 		if (StringUtils.contains(customType, JiraMetadataSpecialCustomField.EPIC_LINK)) {
 			// 自定义字段类型为epic-link
 			customField.setOptions(optionData.get(JiraOptionKey.EPIC.name()));
-			customField.setType(PlatformCustomFieldType.SELECT.getType());
+			customField.setType(PlatformCustomFieldType.SELECT.name());
 		}
 	}
 
@@ -899,28 +907,30 @@ public class JiraPlatform extends AbstractPlatform {
 			customField.setId(JiraMetadataField.ORIGINAL_ESTIMATE_TRACKING_FIELD_ID);
 			customField.setCustomData(JiraMetadataField.ORIGINAL_ESTIMATE_TRACKING_FIELD_ID);
 			customField.setName(JiraMetadataField.ORIGINAL_ESTIMATE_TRACKING_FIELD_NAME);
-			customField.setType(PlatformCustomFieldType.INPUT.getType());
+			customField.setType(PlatformCustomFieldType.INPUT.name());
+			customField.setPlaceHolder(JiraMetadataFieldPlaceHolder.ESTIMATE_FIELD_PLACEHOLDER);
 		}
 
 		if (StringUtils.equals(schema.getSystem(), JiraMetadataSpecialSystemField.ASSIGNEE)) {
 			customField.setSupportSearch(true);
 			customField.setSearchMethod(JiraMetadataFieldSearchMethod.GET_ASSIGNABLE);
 			customField.setOptions(optionData.get(JiraOptionKey.ASSIGN.name()));
-			customField.setType(PlatformCustomFieldType.SELECT.getType());
+			customField.setType(PlatformCustomFieldType.SELECT.name());
 		}
 
 		if (StringUtils.equals(schema.getSystem(), JiraMetadataSpecialSystemField.REPORTER)) {
 			customField.setSupportSearch(true);
 			customField.setSearchMethod(JiraMetadataFieldSearchMethod.GET_USER);
 			customField.setOptions(optionData.get(JiraOptionKey.USER.name()));
-			customField.setType(PlatformCustomFieldType.SELECT.getType());
+			customField.setType(PlatformCustomFieldType.SELECT.name());
 		}
 
 		if (StringUtils.equals(schema.getSystem(), JiraMetadataSpecialSystemField.ISSUE_LINKS)) {
 			customField.setSupportSearch(true);
 			customField.setSearchMethod(JiraMetadataFieldSearchMethod.GET_ISSUE_LINK);
 			customField.setOptions(optionData.get(JiraOptionKey.ISSUE_LINK.name()));
-			customField.setType(PlatformCustomFieldType.MULTIPLE_SELECT.getType());
+			customField.setType(PlatformCustomFieldType.MULTIPLE_SELECT.name());
+			customField.setPlaceHolder(JiraMetadataFieldPlaceHolder.ISSUE_LINK_TYPE_PLACEHOLDER);
 		}
 	}
 
@@ -934,10 +944,15 @@ public class JiraPlatform extends AbstractPlatform {
 		if (item.isHasDefaultValue()) {
 			Object defaultValue = item.getDefaultValue();
 			if (defaultValue != null) {
-				Object msDefaultValue;
+				String msDefaultValue;
 				if (defaultValue instanceof Map) {
 					// noinspection unchecked
-					msDefaultValue = ((Map<String, Object>) defaultValue).get("id");
+					Object val = ((Map<String, Object>) defaultValue).get("id");
+					if (val instanceof String) {
+						msDefaultValue = (String) val;
+					} else {
+						msDefaultValue = PluginUtils.toJSONString(val);
+					}
 				} else if (defaultValue instanceof List) {
 					List<Object> defaultList = new ArrayList<>();
 					// noinspection unchecked
@@ -949,25 +964,27 @@ public class JiraPlatform extends AbstractPlatform {
 							defaultList.add(i);
 						}
 					});
-					msDefaultValue = defaultList;
+					msDefaultValue = PluginUtils.toJSONString(defaultList);
 				} else {
-					if (customField.getType().equals(PlatformCustomFieldType.DATE.getType())) {
+					if (customField.getType().equals(PlatformCustomFieldType.DATE.name())) {
 						if (defaultValue instanceof String) {
-							msDefaultValue = defaultValue;
+							msDefaultValue = (String) defaultValue;
 						} else {
-							msDefaultValue = Instant.ofEpochMilli((Long) defaultValue).atZone(ZoneId.systemDefault()).toLocalDate().toString();
+							LocalDate defaultDate = Instant.ofEpochMilli((Long) defaultValue).atZone(ZoneId.systemDefault()).toLocalDate();
+							msDefaultValue = defaultDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
 						}
-					} else if (customField.getType().equals(PlatformCustomFieldType.DATETIME.getType())) {
+					} else if (customField.getType().equals(PlatformCustomFieldType.DATETIME.name())) {
 						if (defaultValue instanceof String) {
-							msDefaultValue = defaultValue;
+							msDefaultValue = (String) defaultValue;
 						} else {
-							msDefaultValue = LocalDateTime.ofInstant(Instant.ofEpochMilli((Long) defaultValue), ZoneId.systemDefault()).toString();
+							LocalDateTime defaultDateTime = LocalDateTime.ofInstant(Instant.ofEpochMilli((Long) defaultValue), ZoneId.systemDefault());
+							msDefaultValue = defaultDateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 						}
 					} else {
-						msDefaultValue = defaultValue;
+						msDefaultValue = (String) defaultValue;
 					}
 				}
-				customField.setDefaultValue(PluginUtils.toJSONString(msDefaultValue));
+				customField.setDefaultValue(msDefaultValue);
 			}
 		}
 	}
@@ -990,6 +1007,7 @@ public class JiraPlatform extends AbstractPlatform {
 			remainingEstimate.setCustomData(JiraMetadataField.REMAINING_ESTIMATE_TRACKING_FIELD_ID);
 			remainingEstimate.setName(JiraMetadataField.REMAINING_ESTIMATE_TRACKING_FIELD_NAME);
 			remainingEstimate.setKey(String.valueOf(key++));
+			remainingEstimate.setPlaceHolder(JiraMetadataFieldPlaceHolder.ESTIMATE_FIELD_PLACEHOLDER);
 			fields.add(remainingEstimate);
 		}
 
@@ -1001,7 +1019,7 @@ public class JiraPlatform extends AbstractPlatform {
 			issueLinkField.setCustomData(JiraMetadataField.ISSUE_LINK_TYPE);
 			issueLinkField.setRequired(false);
 			issueLinkField.setOptions(optionData.get(JiraOptionKey.ISSUE_LINK_TYPE.name()));
-			issueLinkField.setType(PlatformCustomFieldType.SELECT.getType());
+			issueLinkField.setType(PlatformCustomFieldType.SELECT.name());
 			issueLinkField.setKey(String.valueOf(key++));
 			fields.add(issueLinkField);
 		}
@@ -1018,10 +1036,10 @@ public class JiraPlatform extends AbstractPlatform {
 	private List<PlatformCustomFieldItemDTO> sortCustomField(List<PlatformCustomFieldItemDTO> fields) {
 		// 按类型排序 (富文本排最后, 缺陷链接事务其次, INPUT最前面, SUMMARY其次, 其余字段按默认排序)
 		fields.sort((a, b) -> {
-			if (a.getType().equals(PlatformCustomFieldType.RICH_TEXT.getType())) {
+			if (a.getType().equals(PlatformCustomFieldType.RICH_TEXT.name())) {
 				return 1;
 			}
-			if (b.getType().equals(PlatformCustomFieldType.RICH_TEXT.getType())) {
+			if (b.getType().equals(PlatformCustomFieldType.RICH_TEXT.name())) {
 				return -1;
 			}
 			if (a.getId().equals(JiraMetadataSpecialSystemField.ISSUE_LINKS)) {
@@ -1042,10 +1060,10 @@ public class JiraPlatform extends AbstractPlatform {
 			if (b.getId().equals(JiraMetadataField.SUMMARY_FIELD_NAME)) {
 				return 1;
 			}
-			if (a.getType().equals(PlatformCustomFieldType.INPUT.getType())) {
+			if (a.getType().equals(PlatformCustomFieldType.INPUT.name())) {
 				return -1;
 			}
-			if (b.getType().equals(PlatformCustomFieldType.INPUT.getType())) {
+			if (b.getType().equals(PlatformCustomFieldType.INPUT.name())) {
 				return 1;
 			}
 			return a.getType().compareTo(b.getType());
@@ -1204,8 +1222,8 @@ public class JiraPlatform extends AbstractPlatform {
 				continue;
 			}
 			// 把不同字段类型, 解析成Jira保存缺陷数据时的结构
-			if (StringUtils.equalsAnyIgnoreCase(item.getType(), PlatformCustomFieldType.SELECT.getType(),
-					PlatformCustomFieldType.RADIO.getType(), PlatformCustomFieldType.MEMBER.getType())) {
+			if (StringUtils.equalsAnyIgnoreCase(item.getType(), PlatformCustomFieldType.SELECT.name(),
+					PlatformCustomFieldType.RADIO.name(), PlatformCustomFieldType.MEMBER.name())) {
 				if (StringUtils.equals(fieldName, JiraMetadataSpecialSystemField.ASSIGNEE)) {
 					platformBug.setPlatformHandleUser(item.getValue().toString());
 					// 如果是插件内置的处理人(Jira指派人), 则移除自定义字段中的处理人
@@ -1216,8 +1234,8 @@ public class JiraPlatform extends AbstractPlatform {
 				Map<String, Object> param = new LinkedHashMap<>();
 				param.put("id", item.getValue());
 				fields.put(fieldName, param);
-			} else if (StringUtils.equalsAnyIgnoreCase(item.getType(), PlatformCustomFieldType.MULTIPLE_SELECT.getType(),
-					PlatformCustomFieldType.CHECKBOX.getType(), PlatformCustomFieldType.MULTIPLE_MEMBER.getType())) {
+			} else if (StringUtils.equalsAnyIgnoreCase(item.getType(), PlatformCustomFieldType.MULTIPLE_SELECT.name(),
+					PlatformCustomFieldType.CHECKBOX.name(), PlatformCustomFieldType.MULTIPLE_MEMBER.name())) {
 				List<Map<String, Object>> attrs = new ArrayList<>();
 				List<Object> values = PluginUtils.parseArray((String) item.getValue(), Object.class);
 				values.forEach(v -> {
@@ -1226,7 +1244,7 @@ public class JiraPlatform extends AbstractPlatform {
 					attrs.add(param);
 				});
 				fields.put(fieldName, attrs);
-			} else if (StringUtils.equalsIgnoreCase(item.getType(), PlatformCustomFieldType.CASCADE_SELECT.getType())) {
+			} else if (StringUtils.equalsIgnoreCase(item.getType(), PlatformCustomFieldType.CASCADER.name())) {
 				// 级联类型, 通常默认为["父级", "子级"]这样的结构处理
 				Map<String, Object> attr = new LinkedHashMap<>();
 				List<Object> values = PluginUtils.parseArray((String) item.getValue(), Object.class);
@@ -1245,18 +1263,18 @@ public class JiraPlatform extends AbstractPlatform {
 					}
 				}
 				fields.put(fieldName, attr);
-			} else if (StringUtils.equalsIgnoreCase(item.getType(), PlatformCustomFieldType.RICH_TEXT.getType())) {
+			} else if (StringUtils.equalsIgnoreCase(item.getType(), PlatformCustomFieldType.RICH_TEXT.name())) {
 				// fields.put(fieldName, parseRichTextImageUrlToJira(item.getValue().toString()));
 				if (fieldName.equals(JiraMetadataField.DESCRIPTION_FIELD_NAME)) {
 					platformBug.setPlatformDescription(item.getValue().toString());
 				}
 				fields.put(fieldName, item.getValue());
-			} else if (StringUtils.equalsIgnoreCase(item.getType(), PlatformCustomFieldType.DATETIME.getType())) {
+			} else if (StringUtils.equalsIgnoreCase(item.getType(), PlatformCustomFieldType.DATETIME.name())) {
 				if (item.getValue() instanceof String) {
 					// 日期时间类型处理成Jira可解析{2023-07-12 11:12:46 -> 2021-12-10T11:12:46+08:00}
 					fields.put(fieldName, ((String) item.getValue()).trim().replace(" ", "T") + "+08:00");
 				}
-			} else if (StringUtils.equalsIgnoreCase(item.getType(), PlatformCustomFieldType.MULTIPLE_INPUT.getType())) {
+			} else if (StringUtils.equalsIgnoreCase(item.getType(), PlatformCustomFieldType.MULTIPLE_INPUT.name())) {
 				List<Object> values = PluginUtils.parseArray((String) item.getValue(), Object.class);
 				fields.put(fieldName, values);
 			} else {
@@ -1544,7 +1562,7 @@ public class JiraPlatform extends AbstractPlatform {
 					if (CollectionUtils.isEmpty((List) value)) {
 						fieldItem.setValue(null);
 					} else {
-						if (StringUtils.equals(fieldItem.getType(), PlatformCustomFieldType.SELECT.getType())) {
+						if (StringUtils.equals(fieldItem.getType(), PlatformCustomFieldType.SELECT.name())) {
 							fieldItem.setValue(getSyncJsonParamValue(((List) value).get(0)));
 						} else {
 							List<Object> values = new ArrayList<>();
@@ -1610,7 +1628,7 @@ public class JiraPlatform extends AbstractPlatform {
 				}
 			}
 			// datetime
-			if (StringUtils.equals(fieldItem.getType(), PlatformCustomFieldType.DATETIME.getType())) {
+			if (StringUtils.equals(fieldItem.getType(), PlatformCustomFieldType.DATETIME.name())) {
 				if (value != null && value instanceof String) {
 					fieldItem.setValue(convertToUniversalFormat(value.toString()));
 				} else {
