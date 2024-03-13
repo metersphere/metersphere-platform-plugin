@@ -489,10 +489,13 @@ public class JiraPlatform extends AbstractPlatform {
 		// 获取默认的模板字段
 		List<PlatformCustomFieldItemDTO> defaultTemplateCustomField = getDefaultTemplateCustomField(request.getProjectConfig());
 		List<PlatformBugDTO> syncBugs = request.getBugs();
+		List<JiraTransitionsResponse.Transitions> transitions = jiraClient.getTransitions(syncBugs.get(0).getPlatformBugId());
 		syncBugs.forEach(syncBug -> {
 			try {
 				JiraIssue jiraIssue = jiraClient.getIssues(syncBug.getPlatformBugId());
 				syncJiraFieldToMsBug(syncBug, jiraIssue, defaultTemplateCustomField);
+				// parse transition status
+				syncBug.setStatus(parseTransitionStatus(transitions, syncBug.getStatus()));
 				parseAttachmentToMsBug(syncResult, syncBug, jiraIssue);
 				// 同步的缺陷待更新
 				syncResult.getUpdateBug().add(syncBug);
