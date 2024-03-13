@@ -285,7 +285,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 		if (zentaoBug != null && StringUtils.isNotBlank(zentaoBug.getId())) {
 			platformBug.setPlatformBugKey(zentaoBug.getId());
 			// transition zentao bug status
-			transitionStatus(statusField, zentaoBug.getId(), editRequest.getAssignedTo());
+			platformBug.setPlatformStatus(transitionStatus(statusField, zentaoBug.getId(), editRequest.getAssignedTo()));
 		} else {
 			throw new MSPluginException("创建禅道缺陷失败!");
 		}
@@ -313,7 +313,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 		ZentaoBugRestEditResponse zentaoBug = zentaoRestClient.update(editParam, request.getPlatformBugId());
 		platformBug.setPlatformBugKey(zentaoBug.getId());
 		// transition zentao bug status
-		transitionStatus(statusField, zentaoBug.getId(), editParam.getAssignedTo());
+		platformBug.setPlatformStatus(transitionStatus(statusField, zentaoBug.getId(), editParam.getAssignedTo()));
 		return platformBug;
 	}
 
@@ -890,7 +890,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 	 *
 	 * @param status 状态
 	 */
-	private void transitionStatus(PlatformCustomFieldItemDTO status, String zentaoKey, String assignedTo) {
+	private String transitionStatus(PlatformCustomFieldItemDTO status, String zentaoKey, String assignedTo) {
 		if (status != null) {
 			if (StringUtils.equals(status.getValue().toString(), ZentaoBugPlatformStatus.resolved.name())) {
 				zentaoRestClient.resolveBug(zentaoKey, assignedTo);
@@ -899,6 +899,8 @@ public class ZentaoPlatform extends AbstractPlatform {
 			} else {
 				zentaoRestClient.activeBug(zentaoKey, assignedTo);
 			}
+			return status.getValue().toString();
 		}
+		return null;
 	}
 }

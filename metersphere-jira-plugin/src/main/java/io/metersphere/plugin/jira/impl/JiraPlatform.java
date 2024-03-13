@@ -730,7 +730,7 @@ public class JiraPlatform extends AbstractPlatform {
 			Map<String, Object> fieldMap = (Map<String, Object>) issue.get("fields");
 			demand.setDemandName(fieldMap.get("summary").toString());
 			demand.setDemandUrl(jiraClient.getBaseDemandUrl() + "/jira/software/projects/" + projectConfig.getJiraKey() + "/issues/" + issue.get("key").toString());
-			boolean isDemandShow = (StringUtils.isBlank(query) || StringUtils.equalsAny(query, demand.getDemandId(), demand.getDemandName())) &&
+			boolean isDemandShow = (StringUtils.isBlank(query) || StringUtils.containsIgnoreCase(demand.getDemandId(), query) || StringUtils.containsIgnoreCase(demand.getDemandName(), query)) &&
 					(CollectionUtils.isEmpty(excludeIds) || !excludeIds.contains(demand.getDemandId()));
 			if (isDemandShow) {
 				demands.add(demand);
