@@ -282,22 +282,21 @@ public class JiraPlatform extends AbstractPlatform {
 		// validate demand config
 		projectConfig = getProjectConfig(request.getProjectConfig());
 		validateDemandType();
-		if (request.isSelectAll()) {
-			request.setPageSize(Integer.MAX_VALUE);
-		}
-		// query demand list
-		Map<String, Object> bodyMap = jiraClient.pageDemand(projectConfig.getJiraKey(), projectConfig.getJiraDemandTypeId(),
-				(request.getStartPage() - 1) * request.getPageSize(), request.getPageSize(), null);
-		// handle empty data
-		if (bodyMap == null) {
-			return new PluginPager<>(request.getStartPage(), request.getPageSize());
-		}
-		List<Map<String, Object>> issues = (List<Map<String, Object>>) bodyMap.get("issues");
+		List<Map<String, Object>> issues = queryAllDemand(request);
 		if (CollectionUtils.isEmpty(issues)) {
-			return new PluginPager<>(request.getStartPage(), request.getPageSize());
+			return new PluginPager<>(new PlatformDemandDTO(), 0, request.getPageSize(), request.getStartPage());
 		}
 		PlatformDemandDTO response = buildPlatformDemand(issues, null, request.getQuery(), request.getExcludeIds());
-		return new PluginPager<>(response, (Integer) bodyMap.get("total"), request.getPageSize(), request.getStartPage());
+		int total = response.getList().size();
+		if (request.isSelectAll()) {
+			// no pager
+			return new PluginPager<>(response, total, Integer.MAX_VALUE, request.getStartPage());
+		} else {
+			// set pager
+			List<PlatformDemandDTO.Demand> pageDemands = response.getList().stream().skip((long) (request.getStartPage() - 1) * request.getPageSize()).limit(request.getPageSize()).collect(Collectors.toList());
+			response.setList(pageDemands);
+			return new PluginPager<>(response, total, request.getPageSize(), request.getStartPage());
+		}
 	}
 
 	/**
@@ -708,6 +707,40 @@ public class JiraPlatform extends AbstractPlatform {
 				.stream()
 				.map(item -> new SelectOption(item.getName(), item.getId()))
 				.collect(Collectors.toList());
+	}
+
+	private List<Map<String, Object>> queryAllDemand(DemandPageRequest request) {
+		List<Map<String, Object>> allIssues = new ArrayList<>();
+		// 由于Jira接口限制, 一次最多返回100条数据
+		int maxResult = 100;
+		// query demand list
+		Map<String, Object> bodyMap = jiraClient.pageDemand(projectConfig.getJiraKey(), projectConfig.getJiraDemandTypeId(),
+				0, maxResult, null);
+		// handle empty data
+		if (bodyMap == null) {
+			return allIssues;
+		}
+		List<Map<String, Object>> issues = (List<Map<String, Object>>) bodyMap.get("issues");
+		if (CollectionUtils.isEmpty(issues)) {
+			return allIssues;
+		}
+		allIssues.addAll(issues);
+		int total = (Integer) bodyMap.get("total");
+		// query next page
+		if (total > maxResult) {
+			int totalPage = (int) Math.ceil((double) total / maxResult);
+			for (int i = 2; i <= totalPage; i++) {
+				Map<String, Object> nextBodyMap = jiraClient.pageDemand(projectConfig.getJiraKey(), projectConfig.getJiraDemandTypeId(),
+						(i - 1) * maxResult, maxResult, null);
+				if (nextBodyMap != null) {
+					List<Map<String, Object>> nextIssues = (List<Map<String, Object>>) nextBodyMap.get("issues");
+					if (!CollectionUtils.isEmpty(nextIssues)) {
+						allIssues.addAll(nextIssues);
+					}
+				}
+			}
+		}
+		return allIssues;
 	}
 
 	/**
