@@ -165,25 +165,6 @@ public class ZentaoRestClient extends BaseClient {
 	}
 
 	/**
-	 * 获取禅道缺陷详情
-	 *
-	 * @param issueKey 缺陷Key
-	 * @return 缺陷详情
-	 */
-	public ZentaoRestBuildResponse getBuilds(String issueKey) {
-		ResponseEntity<ZentaoRestBuildResponse> response;
-		try {
-			response = restTemplate.exchange(getRestUrl(ZentaoRestApiUrl.GET_BUILDS, null), HttpMethod.GET, getJsonHttpEntityWithToken(StringUtils.EMPTY), ZentaoRestBuildResponse.class, issueKey);
-			if (response.getBody() == null) {
-				throw new MSPluginException("获取禅道项目版本失败!");
-			}
-		} catch (Exception e) {
-			throw new MSPluginException(UnicodeConvertUtils.unicodeToCn(e.getMessage()));
-		}
-		return response.getBody();
-	}
-
-	/**
 	 * 删除禅道缺陷
 	 *
 	 * @param issueKey 缺陷Key

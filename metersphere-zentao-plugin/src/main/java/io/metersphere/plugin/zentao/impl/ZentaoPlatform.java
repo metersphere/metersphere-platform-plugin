@@ -38,6 +38,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Extension
@@ -642,8 +644,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 		ZentaoBugResponse.Bug zenBug = PluginUtils.parseObject(PluginUtils.toJSONString(zenBugInfo), ZentaoBugResponse.Bug.class);
 		// 处理基础字段(TITLE, DESCRIPTION, HANDLE_USER, STATUS)
 		msBug.setTitle(zenBug.getTitle());
-		// TODO: 描述中图片文本暂时未处理
-		msBug.setDescription(zenBug.getSteps());
+		msBug.setDescription(parseZentaoPicToMsRichText(zenBug.getSteps(), msBug));
 		if (StringUtils.isEmpty(zenBug.getAssignedTo())) {
 			msBug.setHandleUser(StringUtils.EMPTY);
 		} else {
@@ -703,12 +704,11 @@ public class ZentaoPlatform extends AbstractPlatform {
 					if (value instanceof Map) {
 						field.setValue(getSyncJsonParamValue(value));
 					} else if (value instanceof List) {
-						if (CollectionUtils.isEmpty((List) value)) {
+						if (CollectionUtils.isEmpty((List<?>) value)) {
 							field.setValue(null);
 						} else {
 							List<Object> values = new ArrayList<>();
-							// noinspection unchecked
-							((List) value).forEach(attr -> {
+							((List<?>) value).forEach(attr -> {
 								if (attr instanceof Map) {
 									values.add(getSyncJsonParamValue(attr));
 								} else {
@@ -728,22 +728,6 @@ public class ZentaoPlatform extends AbstractPlatform {
 		msBug.setCustomFieldList(needSyncCustomFields);
 	}
 
-	private List<String> getBuildId(Object buildVal, List<ZentaoRestBuildResponse.Build> builds) {
-		if (buildVal == null) {
-			return null;
-		}
-		List<String> buildIds = new ArrayList<>();
-		String[] buildArr = StringUtils.split(buildVal.toString(), ",");
-		builds.add(new ZentaoRestBuildResponse.Build("trunk", "主干"));
-		Map<String, String> buildMap = builds.stream().collect(Collectors.toMap(ZentaoRestBuildResponse.Build::getName, ZentaoRestBuildResponse.Build::getId));
-		for (String build : buildArr) {
-			if (buildMap.containsKey(build)) {
-				buildIds.add("\"" + buildMap.get(build) + "\"");
-			}
-		}
-		return buildIds;
-	}
-
 	/**
 	 * 获取同步的JSON值
 	 *
@@ -751,8 +735,10 @@ public class ZentaoPlatform extends AbstractPlatform {
 	 * @return JSON字符串
 	 */
 	private String getSyncJsonParamValue(Object value) {
-		Map valObj = ((Map) value);
-		Map child = (Map) valObj.get("child");
+		// noinspection unchecked
+		Map<String, Object> valObj = (Map<String, Object>) value;
+		// noinspection unchecked
+		Map<String, Object> child = (Map<String, Object>) valObj.get("child");
 		String idValue = Optional.ofNullable(valObj.get("id")).orElse(StringUtils.EMPTY).toString();
 
 		if (child != null) {// 级联框
@@ -773,7 +759,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 	 * @param child   子级元素值
 	 * @return 级联框的值
 	 */
-	private List<Object> getCascadeValues(String idValue, Map child) {
+	private List<Object> getCascadeValues(String idValue, Map<String, Object> child) {
 		List<Object> values = new ArrayList<>();
 		if (StringUtils.isNotBlank(idValue)) {
 			values.add(idValue);
@@ -866,7 +852,8 @@ public class ZentaoPlatform extends AbstractPlatform {
 	private ZentaoRestBugEditRequest buildUpdateParam(PlatformBugUpdateRequest request, PlatformBugUpdateDTO platformBug) {
 		ZentaoRestBugEditRequest zentaoEditParam = new ZentaoRestBugEditRequest();
 		zentaoEditParam.setTitle(request.getTitle());
-		zentaoEditParam.setSteps(request.getDescription());
+		// 目前只处理禅道步骤内的图片文本
+		zentaoEditParam.setSteps(parseRichTextPicToZentao(request.getDescription(), projectConfig.getZentaoKey(), request.getRichFileMap(), platformBug));
 		parseCustomFields(request, zentaoEditParam, platformBug);
 		return zentaoEditParam;
 	}
@@ -937,5 +924,63 @@ public class ZentaoPlatform extends AbstractPlatform {
 			return status.getValue().toString();
 		}
 		return null;
+	}
+
+	private String parseRichTextPicToZentao(String content, String projectKey, Map<String, File> msFileMap, PlatformBugUpdateDTO platformBug) {
+		// 图片链接中存在MS-URL, 暂时不处理, 后续MS-RIchText支持图片本地上传后, 再处理
+		if (!CollectionUtils.isEmpty(msFileMap)) {
+			for (String key : msFileMap.keySet()) {
+				if (content.contains("permalinksrc")) {
+					// eg: <img src="/attachment/download/file/pid/fid/true" permalinksrc="/attachment/download/file/pid/fid/true">
+					// => <img src="/file-read-zFid.png" alt="/attachment/download/file/pid/fid/true"/>
+					// 还未双向同步的图片, 上传附件(图片)至禅道
+					String fileId = zentaoClient.uploadFile(msFileMap.get(key), "bug", projectKey);
+					// 替换的目标禅道URL
+					String zentaoImgUrl = "<img src=\"/file-read-" + fileId + ".png";
+					// 替换的源MS-URL正则
+					String sourceRegex = "(<img src=\"/attachment/download/file/)(.*?)(/" + key + "/true)";
+					// 保留permalinksrc链接, 同步至MS时备用
+					content = content.replaceAll(sourceRegex, zentaoImgUrl).replaceAll("permalinksrc", "alt");
+					// MS-URL, 需同步修改为禅道可识别的URL
+					String msUrl = content.replaceAll("src=\"/file-read", "z-src=\"/file-read").replaceAll("alt=\"/attachment/download/file", "src=\"/attachment/download/file");
+					platformBug.setPlatformDescription(msUrl);
+				}
+			}
+		}
+		if (content.contains("z-src")) {
+			// eg: <img z-src="/file-read-zFid.png" src=/attachment/download/file/pid/fid/true">
+			// => <img src="/file-read-zFid.png" alt="/attachment/download/file/pid/fid/true"/>
+			// 图片双向同步过, 直接替换URL即可
+			content = content.replaceAll("z-src", "src").replaceAll("src=\"/attachment/download/file", "alt=\"/attachment/download/file");
+		}
+		// 图片链接中存在HTTP-URL, 不用替换
+		return content;
+	}
+
+	private String parseZentaoPicToMsRichText(String content, PlatformBugDTO msBug) {
+		// 图片链接中存在本地上传的URL, 及已经双向同步的URL, 网络链接的URL
+		// eg: <img src="/file-read-zFid.png" alt="/attachment/download/file/pid/fid/true" 需处理, 已双向同步无需下载
+		// eg: <img src="/file-read-51.jpg" alt /> 需替换图片URL, 并提供下载流, 供MS下载
+		// eg: <img src="https.pic.s" alt /> 不用处理
+		content = content
+				.replaceAll("<img src=\"/file-read-", "<img z-src=\"/file-read-")
+				.replaceAll("<img src=\"\\{", "<img z-src=\"/file-read-").replaceAll("}", StringUtils.EMPTY)
+				.replaceAll("alt=\"/attachment/download/file", "src=\"/attachment/download/file");
+		String zentaoLocalRegex = "(<img z-src=\"/file-read-)(.*?)(alt=\"\" />)";
+		Matcher matcher = Pattern.compile(zentaoLocalRegex).matcher(content);
+		List<String> fileKeys = new ArrayList<>();
+		while (matcher.find()) {
+			String matchLocalFileUrl = matcher.group(0);
+			String fileRegex = "\\d+";
+			Matcher fileMatch = Pattern.compile(fileRegex).matcher(matchLocalFileUrl);
+			while (fileMatch.find()) {
+				String fileId = fileMatch.group(0);
+				String replaceTmpUrl = matchLocalFileUrl.replaceAll("alt=\"\" />", "alt=\"" + fileId + "\" />");
+				content = content.replaceAll(matchLocalFileUrl, replaceTmpUrl);
+				fileKeys.add(fileId);
+			}
+		}
+		msBug.setRichTextImageKeys(fileKeys);
+		return content;
 	}
 }

@@ -22,10 +22,7 @@ import org.springframework.web.client.RequestCallback;
 
 import java.io.File;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Consumer;
 
 /**
@@ -414,6 +411,35 @@ public abstract class ZentaoClient extends BaseClient {
 			suffix = "/" + suffix;
 		}
 		return String.format(replaceImgUrl, suffix);
+	}
+
+	/**
+	 * 上传文件至禅道缺陷
+	 *
+	 * @param file 文件
+	 * @return 文件ID
+	 */
+	public String uploadFile(File file, String objectType, String objectId) {
+		String id = "";
+		String sessionId = auth();
+		MultiValueMap<String, Object> paramMap = new LinkedMultiValueMap<>();
+		paramMap.add("files", new FileSystemResource(file));
+		try {
+			ResponseEntity<String> responseEntity = restTemplate.exchange(requestUrl.getFileUpload(), HttpMethod.POST, getHttpEntity(paramMap),
+					String.class, objectType, objectId, sessionId);
+			// noinspection unchecked
+			Map<String, Object> dataMap = (Map<String, Object>) PluginUtils.parseMap(responseEntity.getBody());
+			// noinspection unchecked
+			Map<String, Object> data = (Map<String, Object>) PluginUtils.parseObject(dataMap.get("data").toString());
+			Set<String> set = data.keySet();
+			if (!set.isEmpty()) {
+				id = (String) set.toArray()[0];
+			}
+		} catch (Exception e) {
+			PluginLogUtils.error(e, e.getMessage());
+		}
+		PluginLogUtils.info("upload file id: " + id);
+		return id;
 	}
 
 	protected HttpHeaders getHeader() {
