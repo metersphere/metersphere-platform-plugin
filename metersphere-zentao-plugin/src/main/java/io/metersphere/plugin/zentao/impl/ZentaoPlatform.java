@@ -356,12 +356,16 @@ public class ZentaoPlatform extends AbstractPlatform {
 		} else if (StringUtils.equals(SyncAttachmentType.DELETE.syncOperateType(), syncType)) {
 			// delete attachment
 			ZentaoRestBugDetailResponse response = zentaoRestClient.get(request.getPlatformKey());
-			Map<String, ZentaoRestBugDetailResponse.File> zenFiles = response.getFiles();
-			for (String fileId : zenFiles.keySet()) {
-				ZentaoRestBugDetailResponse.File zenFile = zenFiles.get(fileId);
-				if (StringUtils.equals(file.getName(), zenFile.getTitle())) {
-					zentaoClient.deleteAttachment(fileId);
-					break;
+			Object files = response.getFiles();
+			if (files instanceof Map) {
+				// noinspection unchecked
+				Map<String, LinkedHashMap<String, Object>> zenFiles = (Map<String, LinkedHashMap<String, Object>>) files;
+				for (String fileId : zenFiles.keySet()) {
+					LinkedHashMap<String, Object> zenFileMap = zenFiles.get(fileId);
+					if (StringUtils.equals(file.getName(), zenFileMap.get("title").toString())) {
+						zentaoClient.deleteAttachment(fileId);
+						break;
+					}
 				}
 			}
 		}
@@ -381,7 +385,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 			Map<String, Object> zenBugInfo = zentaoClient.getBugById(bug.getPlatformBugId());
 			if (!StringUtils.equals(zenBugInfo.get("deleted").toString(), "1")) {
 				syncZentaoFieldToMsBug(bug, zenBugInfo, false);
-				parseAttachmentToMsBug(syncResult, bug);
+				parseAttachmentOrBuildToMsBug(syncResult, bug);
 				syncResult.getUpdateBug().add(bug);
 			} else {
 				// not found, delete it
@@ -425,7 +429,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 						bug.setPlatformBugId(zenBugInfo.get("id").toString());
 						syncZentaoFieldToMsBug(bug, zenBugInfo, true);
 						// handle attachment
-						parseAttachmentToMsBug(syncBugResult, bug);
+						parseAttachmentOrBuildToMsBug(syncBugResult, bug);
 						needSyncBugs.add(bug);
 					}
 				}
@@ -724,6 +728,22 @@ public class ZentaoPlatform extends AbstractPlatform {
 		msBug.setCustomFieldList(needSyncCustomFields);
 	}
 
+	private List<String> getBuildId(Object buildVal, List<ZentaoRestBuildResponse.Build> builds) {
+		if (buildVal == null) {
+			return null;
+		}
+		List<String> buildIds = new ArrayList<>();
+		String[] buildArr = StringUtils.split(buildVal.toString(), ",");
+		builds.add(new ZentaoRestBuildResponse.Build("trunk", "主干"));
+		Map<String, String> buildMap = builds.stream().collect(Collectors.toMap(ZentaoRestBuildResponse.Build::getName, ZentaoRestBuildResponse.Build::getId));
+		for (String build : buildArr) {
+			if (buildMap.containsKey(build)) {
+				buildIds.add("\"" + buildMap.get(build) + "\"");
+			}
+		}
+		return buildIds;
+	}
+
 	/**
 	 * 获取同步的JSON值
 	 *
@@ -800,21 +820,36 @@ public class ZentaoPlatform extends AbstractPlatform {
 	 * @param syncResult 同步结果
 	 * @param bug        缺陷
 	 */
-	public void parseAttachmentToMsBug(SyncBugResult syncResult, PlatformBugDTO bug) {
+	public void parseAttachmentOrBuildToMsBug(SyncBugResult syncResult, PlatformBugDTO bug) {
 		try {
 			ZentaoRestBugDetailResponse response = zentaoRestClient.get(bug.getPlatformBugId());
-			Map<String, ZentaoRestBugDetailResponse.File> zenFiles = response.getFiles();
-			if (!CollectionUtils.isEmpty(zenFiles)) {
-				Map<String, List<PlatformAttachment>> attachmentMap = syncResult.getAttachmentMap();
-				attachmentMap.put(bug.getId(), new ArrayList<>());
-				for (String fileId : zenFiles.keySet()) {
-					ZentaoRestBugDetailResponse.File zenFile = zenFiles.get(fileId);
-					PlatformAttachment syncAttachment = new PlatformAttachment();
-					// key for get attachment content
-					syncAttachment.setFileKey(zenFile.getId());
-					// name for check
-					syncAttachment.setFileName(zenFile.getTitle());
-					attachmentMap.get(bug.getId()).add(syncAttachment);
+			if (!CollectionUtils.isEmpty(response.getOpenedBuild())) {
+				List<String> buildIds = new ArrayList<>();
+				response.getOpenedBuild().forEach(build -> {
+					buildIds.add("\"" + build.get("id") + "\"");
+				});
+				bug.getCustomFieldList().forEach(field -> {
+					if (StringUtils.equals(field.getId(), "openedBuild")) {
+						field.setValue(buildIds);
+					}
+				});
+			}
+			Object files = response.getFiles();
+			Map<String, List<PlatformAttachment>> attachmentMap = syncResult.getAttachmentMap();
+			attachmentMap.put(bug.getId(), new ArrayList<>());
+			if (files instanceof Map) {
+				// noinspection unchecked
+				Map<String, LinkedHashMap<String, Object>> zenFiles = (Map<String, LinkedHashMap<String, Object>>) files;
+				if (!CollectionUtils.isEmpty(zenFiles)) {
+					for (String fileId : zenFiles.keySet()) {
+						LinkedHashMap<String, Object> zenFileMap = zenFiles.get(fileId);
+						PlatformAttachment syncAttachment = new PlatformAttachment();
+						// key for get attachment content
+						syncAttachment.setFileKey(zenFileMap.get("id").toString());
+						// name for check
+						syncAttachment.setFileName(zenFileMap.get("title").toString());
+						attachmentMap.get(bug.getId()).add(syncAttachment);
+					}
 				}
 			}
 		} catch (Exception e) {

@@ -95,13 +95,7 @@ public class ZentaoRestBugDetailResponse {
 	 */
 	private Boolean deleted;
 	/**
-	 * 相关附件
+	 * 相关附件 (文件存在时为Map, 不存在时为Array)
 	 */
-	private Map<String, File> files;
-
-	@Data
-	public static class File {
-		private String id;     // 文件ID
-		private String title;  // 文件名称
-	}
+	private Object files;
 }

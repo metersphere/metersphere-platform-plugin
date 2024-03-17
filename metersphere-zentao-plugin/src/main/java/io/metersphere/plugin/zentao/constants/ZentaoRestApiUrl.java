@@ -12,5 +12,6 @@ public class ZentaoRestApiUrl {
 	public static final String GET_USERS = "/users";
 	public static final String LIST_DEMAND = "/{1}/stories?page={2}&limit={3}";
 	public static final String LIST_PLAN = "/products/{1}/plans?page={2}&limit={3}";
+	public static final String GET_BUILDS = "/projects/{1}/builds";
 
 }

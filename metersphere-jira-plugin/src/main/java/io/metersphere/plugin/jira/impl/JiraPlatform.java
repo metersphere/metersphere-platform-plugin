@@ -1722,6 +1722,8 @@ public class JiraPlatform extends AbstractPlatform {
 						attachmentMap.get(msBug.getId()).add(syncAttachment);
 					}
 				}
+			} else {
+				result.getAttachmentMap().put(msBug.getId(), new ArrayList<>());
 			}
 		} catch (Exception e) {
 			PluginLogUtils.error(e);
