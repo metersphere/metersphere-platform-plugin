@@ -55,6 +55,10 @@ public class ZentaoPlatform extends AbstractPlatform {
 
 	protected static final String DATE_PREFIX = "0000-00-00";
 
+	protected static final String MS_RICH_TEXT_PREVIEW_SRC_PREFIX = "/bug/attachment/preview/md";
+
+	protected static final String ZENTAO_RICH_TEXT_IMG_SRC_PREFIX = "/file-read-";
+
 	public ZentaoPlatform(PlatformRequest request) {
 		super(request);
 		ZentaoIntegrationConfig zentaoConfig = getIntegrationConfig(request.getIntegrationConfig(), ZentaoIntegrationConfig.class);
@@ -495,9 +499,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 			demand.setDemandName(story.getTitle());
 			demand.setDemandUrl(zentaoRestClient.getBaseUrl() + "story-view-" + story.getId() + ".html");
 			// add plan to custom fields
-			Map<String, Object> customFields = new HashMap<>(1);
-			customFields.put(ZentaoDemandCustomField.PLAN_FIELD_ID, story.getPlan());
-			demand.setCustomFields(customFields);
+			demand.getCustomFields().put(ZentaoDemandCustomField.PLAN_FIELD_ID, story.getPlan());
 			boolean isParentDemandShow = StringUtils.isBlank(request.getQuery()) || demand.getDemandName().contains(request.getQuery()) || demand.getDemandId().contains(request.getQuery());
 			if (!CollectionUtils.isEmpty(story.getChildren())) {
 				List<PlatformDemandDTO.Demand> childrenDemands = new ArrayList<>();
@@ -509,9 +511,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 					childDemand.setDemandUrl(zentaoRestClient.getBaseUrl() + "story-view-" + childStory.getId() + ".html");
 					childDemand.setParent(demand.getDemandId());
 					// add plan to custom fields
-					Map<String, Object> childCustomFields = new HashMap<>(1);
-					childCustomFields.put(ZentaoDemandCustomField.PLAN_FIELD_ID, childStory.getPlan());
-					childDemand.setCustomFields(childCustomFields);
+					childDemand.getCustomFields().put(ZentaoDemandCustomField.PLAN_FIELD_ID, childStory.getPlan());
 					boolean isChildDemandShow = StringUtils.isBlank(request.getQuery()) || childDemand.getDemandName().contains(request.getQuery()) || childDemand.getDemandId().contains(request.getQuery());
 					if (isChildDemandShow) {
 						// 满足过滤条件的子需求, 才展示
@@ -533,8 +533,11 @@ public class ZentaoPlatform extends AbstractPlatform {
 			filterDemands = filterDemands.stream().filter(demand -> {
 				boolean pass = true;
 				for (String key : request.getFilter().keySet()) {
-					if (demand.getCustomFields().get(key) == null ||
-							(!CollectionUtils.isEmpty(request.getFilter().get(key)) && !request.getFilter().get(key).contains(demand.getCustomFields().get(key).toString()))) {
+					if (demand.getCustomFields().get(key) == null) {
+						pass = false;
+						break;
+					}
+					if (!CollectionUtils.isEmpty(request.getFilter().get(key)) && !request.getFilter().get(key).contains(demand.getCustomFields().get(key).toString())) {
 						pass = false;
 						break;
 					}
@@ -811,9 +814,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 			ZentaoRestBugDetailResponse response = zentaoRestClient.get(bug.getPlatformBugId());
 			if (!CollectionUtils.isEmpty(response.getOpenedBuild())) {
 				List<String> buildIds = new ArrayList<>();
-				response.getOpenedBuild().forEach(build -> {
-					buildIds.add("\"" + build.get("id") + "\"");
-				});
+				response.getOpenedBuild().forEach(build -> buildIds.add("\"" + build.get("id") + "\""));
 				bug.getCustomFieldList().forEach(field -> {
 					if (StringUtils.equals(field.getId(), "openedBuild")) {
 						field.setValue(buildIds);
@@ -927,7 +928,14 @@ public class ZentaoPlatform extends AbstractPlatform {
 	}
 
 	private String parseRichTextPicToZentao(String content, String projectKey, Map<String, File> msFileMap, PlatformBugUpdateDTO platformBug) {
-		// 图片链接中存在MS-URL, 暂时不处理, 后续MS-RIchText支持图片本地上传后, 再处理
+		// 图片链接中存在MS-URL, 暂时不处理, 后续MS-RichText支持图片本地上传后, 再处理
+		// psrc => src
+		if (content.contains("psrc")) {
+			// eg: <img psrc="/file-read-zFid.png" src=/bug/attachment/preview/md/pid/fid/true">
+			// => <img src="/file-read-zFid.png" src="/bug/attachment/preview/md/pid/fid/true"/>
+			// 图片双向同步过, 直接替换URL即可
+			content = content.replaceAll("psrc", "src");
+		}
 		if (!CollectionUtils.isEmpty(msFileMap)) {
 			for (String key : msFileMap.keySet()) {
 				if (content.contains("permalinksrc")) {
@@ -936,23 +944,21 @@ public class ZentaoPlatform extends AbstractPlatform {
 					// 还未双向同步的图片, 上传附件(图片)至禅道
 					String fileId = zentaoClient.uploadFile(msFileMap.get(key), "bug", projectKey);
 					// 替换的目标禅道URL
-					String zentaoImgUrl = "<img src=\"/file-read-" + fileId + ".png";
+					String zentaoImgUrl = "<img src=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX + fileId + ".jpg";
 					// 替换的源MS-URL正则
-					String sourceRegex = "(<img src=\"/attachment/download/file/)(.*?)(/" + key + "/true)";
+					String sourceRegex = "(<img src=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX + "/)(.*?)(/" + key + "/true)";
 					// 保留permalinksrc链接, 同步至MS时备用
 					content = content.replaceAll(sourceRegex, zentaoImgUrl).replaceAll("permalinksrc", "alt");
-					// MS-URL, 需同步修改为禅道可识别的URL
-					String msUrl = content.replaceAll("src=\"/file-read", "z-src=\"/file-read").replaceAll("alt=\"/attachment/download/file", "src=\"/attachment/download/file");
-					platformBug.setPlatformDescription(msUrl);
 				}
 			}
 		}
-		if (content.contains("z-src")) {
-			// eg: <img z-src="/file-read-zFid.png" src=/attachment/download/file/pid/fid/true">
-			// => <img src="/file-read-zFid.png" alt="/attachment/download/file/pid/fid/true"/>
-			// 图片双向同步过, 直接替换URL即可
-			content = content.replaceAll("z-src", "src").replaceAll("src=\"/attachment/download/file", "alt=\"/attachment/download/file");
-		}
+		// 保留MS-URL中的一些参数{src}
+		content = content.replaceAll("src=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX, "alt=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX);
+
+		// MS-URL, 需同步修改为禅道可识别的URL
+		String msUrl = content.replaceAll("src=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX, "psrc=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX)
+				.replaceAll("alt=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX, "src=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX);
+		platformBug.setPlatformDescription(msUrl);
 		// 图片链接中存在HTTP-URL, 不用替换
 		return content;
 	}
@@ -963,12 +969,12 @@ public class ZentaoPlatform extends AbstractPlatform {
 		// eg: <img src="/file-read-51.jpg" alt /> 需替换图片URL, 并提供下载流, 供MS下载
 		// eg: <img src="https.pic.s" alt /> 不用处理
 		content = content
-				.replaceAll("<img src=\"/file-read-", "<img z-src=\"/file-read-")
-				.replaceAll("<img src=\"\\{", "<img z-src=\"/file-read-").replaceAll("}", StringUtils.EMPTY)
-				.replaceAll("alt=\"/attachment/download/file", "src=\"/attachment/download/file");
-		String zentaoLocalRegex = "(<img z-src=\"/file-read-)(.*?)(alt=\"\" />)";
+				.replaceAll("<img src=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX, "<img psrc=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX)
+				.replaceAll("<img src=\"\\{", "<img psrc=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX).replaceAll("}", StringUtils.EMPTY)
+				.replaceAll("alt=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX, "src=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX);
+		String zentaoLocalRegex = "(<img psrc=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX + ")(.*?)(alt=\"\" />)";
 		Matcher matcher = Pattern.compile(zentaoLocalRegex).matcher(content);
-		List<String> fileKeys = new ArrayList<>();
+		Map<String, String> richFileMap = new HashMap<>(16);
 		while (matcher.find()) {
 			String matchLocalFileUrl = matcher.group(0);
 			String fileRegex = "\\d+";
@@ -977,10 +983,11 @@ public class ZentaoPlatform extends AbstractPlatform {
 				String fileId = fileMatch.group(0);
 				String replaceTmpUrl = matchLocalFileUrl.replaceAll("alt=\"\" />", "alt=\"" + fileId + "\" />");
 				content = content.replaceAll(matchLocalFileUrl, replaceTmpUrl);
-				fileKeys.add(fileId);
+				// 禅道富文本中的图片默认命名为*.jpg, *:唯一文件ID, 标识, 整数
+				richFileMap.put(fileId, fileId + ".jpg");
 			}
 		}
-		msBug.setRichTextImageKeys(fileKeys);
+		msBug.setRichTextImageMap(richFileMap);
 		return content;
 	}
 }
