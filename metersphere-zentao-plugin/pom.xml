@@ -7,7 +7,7 @@
     <parent>
         <groupId>io.metersphere</groupId>
         <artifactId>metersphere-platform-plugin</artifactId>
-        <version>${revision}</version>
+        <version>3.x</version>
     </parent>
 
     <artifactId>metersphere-zentao-plugin</artifactId>
