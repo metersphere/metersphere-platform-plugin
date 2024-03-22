@@ -214,14 +214,14 @@ public abstract class ZentaoClient extends BaseClient {
         return (Map<String, Object>) JSON.parseMap(response.getBody()).get("data");
     }
 
-    public String uploadFile(File file) {
+    public String uploadFile(File file, String projectKey) {
         String id = "";
         String sessionId = login();
         MultiValueMap<String, Object> paramMap = new LinkedMultiValueMap<>();
         paramMap.add("files", new FileSystemResource(file));
         try {
             ResponseEntity<String> responseEntity = restTemplate.exchange(requestUrl.getFileUpload(), HttpMethod.POST, getHttpEntity(paramMap),
-                    String.class, null, sessionId);
+                    String.class, projectKey, sessionId);
             String body = responseEntity.getBody();
             Map obj = JSON.parseMap(body);
             Map data = (Map) JSON.parseObject(obj.get("data").toString());

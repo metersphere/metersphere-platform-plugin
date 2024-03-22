@@ -486,7 +486,7 @@ public class ZentaoPlatform extends AbstractPlatform {
         return list;
     }
 
-    private String ms2ZentaoDescription(String msDescription) {
+    private String ms2ZentaoDescription(String msDescription, String projectId) {
         String imgUrlRegex = "!\\[.*?]\\(/resource/md/get(.*?\\..*?)\\)";
         String zentaoSteps = msDescription.replaceAll(imgUrlRegex, zentaoClient.requestUrl.getReplaceImgUrl());
         Matcher matcher = zentaoClient.requestUrl.getImgPattern().matcher(zentaoSteps);
@@ -506,7 +506,7 @@ public class ZentaoPlatform extends AbstractPlatform {
                 String fileName = originSubUrl.substring(10);
                 // upload zentao
                 try {
-                    String id = zentaoClient.uploadFile(getRealMdFile(fileName));
+                    String id = zentaoClient.uploadFile(getRealMdFile(fileName), projectId);
                     // todo delete local file
                     int index = fileName.lastIndexOf(".");
                     String suffix = "";
@@ -686,7 +686,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 
         // transfer description
         try {
-            zentaoSteps = ms2ZentaoDescription(description);
+            zentaoSteps = ms2ZentaoDescription(description, projectId);
             zentaoSteps = zentaoSteps.replaceAll("\\n", "<br/>");
         } catch (Exception e) {
             LogUtil.error(e.getMessage(), e);
