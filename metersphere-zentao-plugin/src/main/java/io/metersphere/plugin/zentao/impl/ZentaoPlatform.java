@@ -42,6 +42,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+/**
+ * @author song-cc-rock
+ */
 @Extension
 public class ZentaoPlatform extends AbstractPlatform {
 
@@ -290,11 +293,16 @@ public class ZentaoPlatform extends AbstractPlatform {
 		ZentaoBugRestEditResponse zentaoBug = zentaoRestClient.add(editRequest, projectConfig.getZentaoKey());
 		if (zentaoBug != null && StringUtils.isNotBlank(zentaoBug.getId())) {
 			platformBug.setPlatformBugKey(zentaoBug.getId());
-			// transition zentao bug status
-			platformBug.setPlatformStatus(transitionStatus(statusField, zentaoBug.getId(), editRequest.getAssignedTo()));
+			platformBug.setPlatformStatus(statusField.getValue().toString());
 		} else {
 			throw new MSPluginException("创建禅道缺陷失败!");
 		}
+
+		new Thread(() -> {
+			// transition zentao bug status
+			transitionStatus(statusField, zentaoBug.getId(), editRequest.getAssignedTo());
+		}).start();
+
 		return platformBug;
 	}
 
@@ -319,7 +327,11 @@ public class ZentaoPlatform extends AbstractPlatform {
 		ZentaoBugRestEditResponse zentaoBug = zentaoRestClient.update(editParam, request.getPlatformBugId());
 		platformBug.setPlatformBugKey(zentaoBug.getId());
 		// transition zentao bug status
-		platformBug.setPlatformStatus(transitionStatus(statusField, zentaoBug.getId(), editParam.getAssignedTo()));
+		platformBug.setPlatformStatus(statusField.getValue().toString());
+
+		new Thread(() -> {
+			transitionStatus(statusField, zentaoBug.getId(), editParam.getAssignedTo());
+		}).start();
 		return platformBug;
 	}
 
@@ -351,9 +363,6 @@ public class ZentaoPlatform extends AbstractPlatform {
 	 */
 	@Override
 	public void syncAttachmentToPlatform(SyncAttachmentToPlatformRequest request) {
-		if (!isSupportAttachment()) {
-			return;
-		}
 		String syncType = request.getSyncType();
 		File file = request.getFile();
 		if (StringUtils.equals(SyncAttachmentType.UPLOAD.syncOperateType(), syncType)) {
@@ -913,7 +922,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 	 *
 	 * @param status 状态
 	 */
-	private String transitionStatus(PlatformCustomFieldItemDTO status, String zentaoKey, String assignedTo) {
+	private void transitionStatus(PlatformCustomFieldItemDTO status, String zentaoKey, String assignedTo) {
 		if (status != null) {
 			if (StringUtils.equals(status.getValue().toString(), ZentaoBugPlatformStatus.resolved.name())) {
 				zentaoRestClient.resolveBug(zentaoKey, assignedTo);
@@ -922,13 +931,10 @@ public class ZentaoPlatform extends AbstractPlatform {
 			} else {
 				zentaoRestClient.activeBug(zentaoKey, assignedTo);
 			}
-			return status.getValue().toString();
 		}
-		return null;
 	}
 
 	private String parseRichTextPicToZentao(String content, String projectKey, Map<String, File> msFileMap, PlatformBugUpdateDTO platformBug) {
-		// 图片链接中存在MS-URL, 暂时不处理, 后续MS-RichText支持图片本地上传后, 再处理
 		// psrc => src
 		if (content.contains("psrc")) {
 			// eg: <img psrc="/file-read-zFid.png" src=/bug/attachment/preview/md/pid/fid/true">
@@ -968,6 +974,9 @@ public class ZentaoPlatform extends AbstractPlatform {
 		// eg: <img src="/file-read-zFid.png" alt="/attachment/download/file/pid/fid/true" 需处理, 已双向同步无需下载
 		// eg: <img src="/file-read-51.jpg" alt /> 需替换图片URL, 并提供下载流, 供MS下载
 		// eg: <img src="https.pic.s" alt /> 不用处理
+		if (StringUtils.isBlank(content)) {
+			return null;
+		}
 		content = content
 				.replaceAll("<img src=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX, "<img psrc=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX)
 				.replaceAll("<img src=\"\\{", "<img psrc=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX).replaceAll("}", StringUtils.EMPTY)

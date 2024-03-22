@@ -39,10 +39,12 @@ import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * @author jianxing
+ * @author song-cc-rock
  */
 @Extension
 public class JiraPlatform extends AbstractPlatform {
@@ -52,6 +54,8 @@ public class JiraPlatform extends AbstractPlatform {
 	protected JiraProjectConfig projectConfig;
 
 	protected SimpleDateFormat sdfWithZone = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+
+	protected static final String MS_RICH_TEXT_PREVIEW_SRC_PREFIX = "/bug/attachment/preview/md";
 
 	public JiraPlatform(PlatformRequest request) {
 		super(request);
@@ -340,19 +344,16 @@ public class JiraPlatform extends AbstractPlatform {
 		List<PlatformCustomFieldItemDTO> issueLinkFields = filterIssueLinksField(request);
 		// filter issue status transition field param
 		PlatformCustomFieldItemDTO statusField = filterStatusTransition(request);
+		// prepare issue rich text image name param
+		List<String> remainImgNameFromRichText = new ArrayList<>();
 		// filter issue custom field param
-		Map<String, Object> paramMap = buildParamMap(request, projectConfig.getJiraBugTypeId(), projectConfig.getJiraKey(), platformBug);
+		Map<String, Object> paramMap = buildParamMap(request, projectConfig.getJiraBugTypeId(), projectConfig.getJiraKey(), platformBug, remainImgNameFromRichText);
 
 		// add issue
 		JiraAddIssueResponse result = jiraClient.addIssue(PluginUtils.toJSONString(paramMap), getFieldNameMap(request));
-
-		// link issue
-		if (!CollectionUtils.isEmpty(issueLinkFields)) {
-			linkIssue(issueLinkFields, result.getKey(), jiraClient.getIssueLinkType());
-		}
 		// do transition
+		Map<String, Object> transitionMap = new HashMap<>();
 		if (statusField != null) {
-			Map<String, Object> transitionMap = new HashMap<>();
 			List<JiraTransitionsResponse.Transitions> transitions = jiraClient.getTransitions(result.getKey());
 			if (!CollectionUtils.isEmpty(transitions)) {
 				JiraTransitionsResponse.Transitions transition = transitions.stream().filter(item -> StringUtils.equals(item.getTo().getId(),
@@ -361,15 +362,28 @@ public class JiraPlatform extends AbstractPlatform {
 					Map<String, String> status = new HashMap<>();
 					status.put("id", transition.getId());
 					transitionMap.put("transition", status);
-					jiraClient.doTransitions(PluginUtils.toJSONString(transitionMap), result.getKey());
 					platformBug.setPlatformStatus(status.get("id"));
 				}
 			}
 		}
 
-		// TODO: Jira的富文本字段图片处理
-		// List<File> imageFiles = getImageFiles(request);
-		// imageFiles.forEach(img -> jiraClient.uploadAttachment(result.getKey(), img));
+		// Time-consuming, some operations are handle async;
+		new Thread(() -> {
+			// handle rich-text image (no-delete-image)
+			request.getRichFileMap().values().forEach(file -> {
+				// add image attachment
+				jiraClient.uploadAttachment(result.getKey(), file);
+			});
+
+			// link issue
+			if (!CollectionUtils.isEmpty(issueLinkFields)) {
+				linkIssue(issueLinkFields, result.getKey(), jiraClient.getIssueLinkType());
+			}
+			// do transition
+			if (statusField != null) {
+				jiraClient.doTransitions(PluginUtils.toJSONString(transitionMap), result.getKey());
+			}
+		}).start();
 
 		// return result
 		platformBug.setPlatformBugKey(result.getKey());
@@ -393,29 +407,61 @@ public class JiraPlatform extends AbstractPlatform {
 		List<PlatformCustomFieldItemDTO> issueLinkFields = filterIssueLinksField(request);
 		// filter issue status transition field param
 		PlatformCustomFieldItemDTO statusField = filterStatusTransition(request);
+		// prepare issue rich text image name param
+		List<String> remainImgNameFromRichText = new ArrayList<>();
 		// filter issue custom field param
-		Map<String, Object> param = buildParamMap(request, projectConfig.getJiraBugTypeId(), projectConfig.getJiraKey(), platformBug);
+		Map<String, Object> param = buildParamMap(request, projectConfig.getJiraBugTypeId(), projectConfig.getJiraKey(), platformBug, remainImgNameFromRichText);
 
 		// update issue
 		jiraClient.updateIssue(request.getPlatformBugId(), PluginUtils.toJSONString(param), getFieldNameMap(request));
-
-		// link or unlink issue
-		if (!CollectionUtils.isEmpty(issueLinkFields)) {
-			// 编辑时, 删除上一次所有的 issue link, 重新关联一组 issue link
-			unLinkIssue(request.getPlatformBugId());
-			linkIssue(issueLinkFields, request.getPlatformBugId(), jiraClient.getIssueLinkType());
-		}
 		// do transition
 		if (statusField != null && statusField.getValue() != null) {
-			Map<String, Object> transitionMap = new HashMap<>();
-			Map<String, String> status = new HashMap<>();
-			status.put("id", statusField.getValue().toString());
-			transitionMap.put("transition", status);
-			jiraClient.doTransitions(PluginUtils.toJSONString(transitionMap), request.getPlatformBugId());
-			platformBug.setPlatformStatus(status.get("id"));
+			platformBug.setPlatformStatus(statusField.getValue().toString());
 		}
 
-		// TODO: Jira的富文本字段图片处理
+		// Time-consuming, some operations are handle async;
+		new Thread(() -> {
+			// handle rich-text image
+			JiraIssue jiraIssue = jiraClient.getIssues(request.getPlatformBugId());
+			Map<String, Object> fields = jiraIssue.getFields();
+			List<Map<String, Object>> attachments = (List<Map<String, Object>>) fields.get(JiraMetadataField.ATTACHMENT_NAME);
+			if (!CollectionUtils.isEmpty(attachments)) {
+				// delete image attachment
+				for (Map<String, Object> attachment : attachments) {
+					String filename = attachment.get("filename").toString();
+					String mimeType = attachment.get("mimeType").toString();
+					if (StringUtils.startsWithIgnoreCase(mimeType, "image") && StringUtils.startsWithIgnoreCase(filename, "image")
+							&& !remainImgNameFromRichText.contains(filename)) {
+						// 只处理富文本生成的图片附件, 如果更新后不存在则移除, 其余类型文件暂不处理
+						String fileId = attachment.get("id").toString();
+						jiraClient.deleteAttachment(fileId);
+					}
+				}
+			}
+
+			if (!CollectionUtils.isEmpty(request.getRichFileMap())) {
+				// add image attachment
+				request.getRichFileMap().values().forEach(file -> {
+					jiraClient.uploadAttachment(request.getPlatformBugId(), file);
+				});
+			}
+
+			// link or unlink issue
+			if (!CollectionUtils.isEmpty(issueLinkFields)) {
+				// When edit, clean up all the last issue links and re-associate a group of issue links
+				unLinkIssue(request.getPlatformBugId());
+				linkIssue(issueLinkFields, request.getPlatformBugId(), jiraClient.getIssueLinkType());
+			}
+
+			// do transition
+			if (statusField != null && statusField.getValue() != null) {
+				Map<String, Object> transitionMap = new HashMap<>();
+				Map<String, String> status = new HashMap<>();
+				status.put("id", statusField.getValue().toString());
+				transitionMap.put("transition", status);
+				jiraClient.doTransitions(PluginUtils.toJSONString(transitionMap), request.getPlatformBugId());
+			}
+		}).start();
 
 		// return result
 		platformBug.setPlatformBugKey(request.getPlatformBugId());
@@ -439,7 +485,7 @@ public class JiraPlatform extends AbstractPlatform {
 	 */
 	@Override
 	public boolean isSupportAttachment() {
-		// Jira 支持附件API
+		// Jira Rest-Api Support Attachment
 		return true;
 	}
 
@@ -450,9 +496,6 @@ public class JiraPlatform extends AbstractPlatform {
 	 */
 	@Override
 	public void syncAttachmentToPlatform(SyncAttachmentToPlatformRequest request) {
-		if (!isSupportAttachment()) {
-			return;
-		}
 		String syncType = request.getSyncType();
 		File file = request.getFile();
 		if (StringUtils.equals(SyncAttachmentType.UPLOAD.syncOperateType(), syncType)) {
@@ -488,14 +531,26 @@ public class JiraPlatform extends AbstractPlatform {
 		// 获取默认的模板字段
 		List<PlatformCustomFieldItemDTO> defaultTemplateCustomField = getDefaultTemplateCustomField(request.getProjectConfig());
 		List<PlatformBugDTO> syncBugs = request.getBugs();
-		List<JiraTransitionsResponse.Transitions> transitions = jiraClient.getTransitions(syncBugs.get(0).getPlatformBugId());
-		syncBugs.forEach(syncBug -> {
+		List<JiraTransitionsResponse.Transitions> transitions = new ArrayList<>();
+		for (PlatformBugDTO syncBug : syncBugs) {
 			try {
 				JiraIssue jiraIssue = jiraClient.getIssues(syncBug.getPlatformBugId());
-				syncJiraFieldToMsBug(syncBug, jiraIssue, defaultTemplateCustomField);
+				Map<String, String> jiraIssueAttachmentMap = new HashMap<>();
+				List attachments = (List) jiraIssue.getFields().get(JiraMetadataField.ATTACHMENT_NAME);
+				if (!CollectionUtils.isEmpty(attachments)) {
+					for (Object o : attachments) {
+						Map attachment = (Map) o;
+						jiraIssueAttachmentMap.put(attachment.get("filename").toString(), attachment.get("content").toString());
+					}
+				}
+
+				if (jiraIssue != null && CollectionUtils.isEmpty(transitions)) {
+					transitions = jiraClient.getTransitions(syncBug.getPlatformBugId());
+				}
+				syncJiraFieldToMsBug(syncBug, jiraIssue, defaultTemplateCustomField, jiraIssueAttachmentMap);
 				// parse transition status
 				syncBug.setStatus(parseTransitionStatus(transitions, syncBug.getStatus()));
-				parseAttachmentToMsBug(syncResult, syncBug, jiraIssue);
+				parseAttachmentToMsBug(syncResult, syncBug, jiraIssueAttachmentMap);
 				// 同步的缺陷待更新
 				syncResult.getUpdateBug().add(syncBug);
 			} catch (HttpClientErrorException e) {
@@ -506,7 +561,7 @@ public class JiraPlatform extends AbstractPlatform {
 			} catch (Exception e) {
 				PluginLogUtils.error(e);
 			}
-		});
+		}
 		return syncResult;
 	}
 
@@ -557,12 +612,21 @@ public class JiraPlatform extends AbstractPlatform {
 				List<JiraTransitionsResponse.Transitions> transitions = jiraClient.getTransitions(jiraIssues.get(0).getKey());
 
 				for (JiraIssue jiraIssue : jiraIssues) {
+					// prepare attachment param
+					Map<String, String> jiraIssueAttachmentMap = new HashMap<>();
+					List attachments = (List) jiraIssue.getFields().get(JiraMetadataField.ATTACHMENT_NAME);
+					if (!CollectionUtils.isEmpty(attachments)) {
+						for (Object o : attachments) {
+							Map attachment = (Map) o;
+							jiraIssueAttachmentMap.put(attachment.get("filename").toString(), attachment.get("content").toString());
+						}
+					}
 					// transfer jira bug field to ms
 					PlatformBugDTO msBug = new PlatformBugDTO();
 					msBug.setId(UUID.randomUUID().toString());
 					msBug.setPlatformDefaultTemplate(true);
 					msBug.setPlatformBugId(jiraIssue.getKey());
-					syncJiraFieldToMsBug(msBug, jiraIssue, defaultTemplateCustomField);
+					syncJiraFieldToMsBug(msBug, jiraIssue, defaultTemplateCustomField, jiraIssueAttachmentMap);
 					// parse transition status
 					msBug.setStatus(parseTransitionStatus(transitions, msBug.getStatus()));
 					needSyncBugs.add(msBug);
@@ -571,7 +635,7 @@ public class JiraPlatform extends AbstractPlatform {
 						// set jira attachment field when jira issue not contain attachment field
 						jiraIssue.getFields().put(JiraMetadataField.ATTACHMENT_NAME, attachmentFieldMap.get(jiraIssue.getKey()));
 					}
-					parseAttachmentToMsBug(syncBugResult, msBug, jiraIssue);
+					parseAttachmentToMsBug(syncBugResult, msBug, jiraIssueAttachmentMap);
 				}
 			}
 
@@ -1218,7 +1282,7 @@ public class JiraPlatform extends AbstractPlatform {
 	 * @return 参数Map
 	 */
 	private Map<String, Object> buildParamMap(PlatformBugUpdateRequest request, String issueTypeId, String jiraKey,
-											  PlatformBugUpdateDTO platformBug) {
+											  PlatformBugUpdateDTO platformBug, List<String> remainImgNameFromRichText) {
 		Map<String, Object> issuetype = new LinkedHashMap<>();
 		issuetype.put("id", issueTypeId);
 		Map<String, Object> project = new LinkedHashMap<>();
@@ -1231,7 +1295,7 @@ public class JiraPlatform extends AbstractPlatform {
 		Map<String, Object> param = new LinkedHashMap<>();
 		param.put("fields", fields);
 
-		parseField(request, fields, platformBug);
+		parseField(request, fields, platformBug, remainImgNameFromRichText);
 		setSpecialParam(fields);
 		return param;
 	}
@@ -1243,8 +1307,9 @@ public class JiraPlatform extends AbstractPlatform {
 	 * @param fields      字段集合
 	 * @param platformBug 平台缺陷
 	 */
-	private void parseField(PlatformBugUpdateRequest request, Map<String, Object> fields, PlatformBugUpdateDTO platformBug) {
+	private void parseField(PlatformBugUpdateRequest request, Map<String, Object> fields, PlatformBugUpdateDTO platformBug, List<String> remainImgNameFromRichText) {
 		List<PlatformCustomFieldItemDTO> customFields = request.getCustomFieldList();
+		Map<String, String> platformCustomFieldMap = new HashMap<>();
 		if (CollectionUtils.isEmpty(customFields)) {
 			PluginLogUtils.error("Jira缺陷字段为空, 请检查参数!");
 			throw new MSPluginException("Jira缺陷字段为空, 请检查参数!");
@@ -1300,11 +1365,11 @@ public class JiraPlatform extends AbstractPlatform {
 				}
 				fields.put(fieldName, attr);
 			} else if (StringUtils.equalsIgnoreCase(item.getType(), PlatformCustomFieldType.RICH_TEXT.name())) {
-				// fields.put(fieldName, parseRichTextImageUrlToJira(item.getValue().toString()));
+				String parseText = parseMsRichTextToJira(fieldName, item.getValue().toString(), request.getRichFileMap(), platformCustomFieldMap, remainImgNameFromRichText);
 				if (fieldName.equals(JiraMetadataField.DESCRIPTION_FIELD_NAME)) {
-					platformBug.setPlatformDescription(item.getValue().toString());
+					platformBug.setPlatformDescription(platformCustomFieldMap.get(fieldName));
 				}
-				fields.put(fieldName, item.getValue());
+				fields.put(fieldName, parseText);
 			} else if (StringUtils.equalsIgnoreCase(item.getType(), PlatformCustomFieldType.DATETIME.name())) {
 				if (item.getValue() instanceof String) {
 					// 日期时间类型处理成Jira可解析{2023-07-12 11:12:46 -> 2021-12-10T11:12:46+08:00}
@@ -1329,8 +1394,11 @@ public class JiraPlatform extends AbstractPlatform {
 
 		// 如果平台自定义字段中不包含Jira的描述字段, 手动插入
 		if (!fields.containsKey(JiraMetadataField.DESCRIPTION_FIELD_NAME)) {
-			fields.put(JiraMetadataField.DESCRIPTION_FIELD_NAME, request.getDescription());
+			String parseText = parseMsRichTextToJira(JiraMetadataField.DESCRIPTION_FIELD_NAME, request.getDescription(), request.getRichFileMap(), platformCustomFieldMap, remainImgNameFromRichText);
+			fields.put(JiraMetadataField.DESCRIPTION_FIELD_NAME, parseText);
+			platformBug.setPlatformDescription(platformCustomFieldMap.get(JiraMetadataField.DESCRIPTION_FIELD_NAME));
 		}
+		platformBug.setPlatformCustomFieldMap(platformCustomFieldMap);
 	}
 
 	/**
@@ -1346,11 +1414,14 @@ public class JiraPlatform extends AbstractPlatform {
 				JiraCreateMetadataResponse.Schema schema = item.getSchema();
 
 				if (StringUtils.equals(key, JiraMetadataSpecialSystemField.TIME_TRACKING)) {
-					Map<String, Object> newField = new LinkedHashMap<>();
-					// originalEstimate -> 2d 转成 timetracking : { originalEstimate: 2d}
-					newField.put(JiraMetadataField.ORIGINAL_ESTIMATE_TRACKING_FIELD_ID, fields.get(JiraMetadataField.ORIGINAL_ESTIMATE_TRACKING_FIELD_ID));
-					newField.put(JiraMetadataField.REMAINING_ESTIMATE_TRACKING_FIELD_ID, fields.get(JiraMetadataField.REMAINING_ESTIMATE_TRACKING_FIELD_ID));
-					fields.put(key, newField);
+					if (fields.get(JiraMetadataField.ORIGINAL_ESTIMATE_TRACKING_FIELD_ID) != null || fields.get(JiraMetadataField.REMAINING_ESTIMATE_TRACKING_FIELD_ID) != null) {
+						// 原始预估, 时间追踪有值时, 封装timetracking
+						Map<String, Object> newField = new LinkedHashMap<>();
+						// originalEstimate -> 2d 转成 timetracking : { originalEstimate: 2d}
+						newField.put(JiraMetadataField.ORIGINAL_ESTIMATE_TRACKING_FIELD_ID, fields.get(JiraMetadataField.ORIGINAL_ESTIMATE_TRACKING_FIELD_ID));
+						newField.put(JiraMetadataField.REMAINING_ESTIMATE_TRACKING_FIELD_ID, fields.get(JiraMetadataField.REMAINING_ESTIMATE_TRACKING_FIELD_ID));
+						fields.put(key, newField);
+					}
 					fields.remove(JiraMetadataField.ORIGINAL_ESTIMATE_TRACKING_FIELD_ID);
 					fields.remove(JiraMetadataField.REMAINING_ESTIMATE_TRACKING_FIELD_ID);
 				}
@@ -1424,27 +1495,6 @@ public class JiraPlatform extends AbstractPlatform {
 		Optional<String> findField = specialFields.stream().filter(field -> StringUtils.contains(type, field)).findAny();
 		return findField.isPresent();
 	}
-
-	// private List<File> getImageFiles(PlatformBugUpdateRequest request) {
-	//     List<File> files = new ArrayList<>();
-	//     List<PlatformCustomFieldItemDTO> customFields = request.getCustomFieldList();
-	//     if (!CollectionUtils.isEmpty(customFields)) {
-	//         customFields.forEach(item -> {
-	//             String fieldName = item.getCustomData();
-	//             if (StringUtils.isNotBlank(fieldName)) {
-	//                 if (item.getValue() != null) {
-	//                     if (StringUtils.isNotBlank(item.getType())) {
-	//                         if (StringUtils.equalsAny(item.getType(), "richText")) {
-	//                             files.addAll(getImageFiles(item.getValue().toString()));
-	//                         }
-	//                     }
-	//                 }
-	//             }
-	//         });
-	//     }
-	//
-	//     return files;
-	// }
 
 	/**
 	 * link jira issue
@@ -1527,12 +1577,16 @@ public class JiraPlatform extends AbstractPlatform {
 	 * @param jiraIssue             jira缺陷
 	 * @param defaultTemplateFields 默认模板字段集合
 	 */
-	private void syncJiraFieldToMsBug(PlatformBugDTO msBug, JiraIssue jiraIssue, List<PlatformCustomFieldItemDTO> defaultTemplateFields) {
+	private void syncJiraFieldToMsBug(PlatformBugDTO msBug, JiraIssue jiraIssue, List<PlatformCustomFieldItemDTO> defaultTemplateFields, Map<String, String> jiraIssueAttachmentMap) {
 		try {
+			// 下载的富文本文件集合
+			Map<String, String> richFileMap = new HashMap<>(16);
 			// 处理基础字段
-			parseBaseFieldToMsBug(msBug, jiraIssue.getFields());
+			parseBaseFieldToMsBug(msBug, jiraIssue.getFields(), jiraIssueAttachmentMap, richFileMap);
 			// 处理自定义字段
-			parseCustomFieldToMsBug(msBug, jiraIssue.getFields(), defaultTemplateFields);
+			parseCustomFieldToMsBug(msBug, jiraIssue.getFields(), defaultTemplateFields, jiraIssueAttachmentMap, richFileMap);
+			// 设置富文本集合
+			msBug.setRichTextImageMap(richFileMap);
 		} catch (Exception e) {
 			PluginLogUtils.error(e);
 		}
@@ -1545,10 +1599,14 @@ public class JiraPlatform extends AbstractPlatform {
 	 * @param jiraFieldMap jira字段集合
 	 * @throws Exception 解析异常
 	 */
-	private void parseBaseFieldToMsBug(PlatformBugDTO msBug, Map jiraFieldMap) throws Exception {
+	private void parseBaseFieldToMsBug(PlatformBugDTO msBug, Map jiraFieldMap, Map<String, String> jiraIssueAttachmentMap, Map<String, String> richFileMap) throws Exception {
 		// 处理基础字段(TITLE, DESCRIPTION, HANDLE_USER, STATUS)
 		msBug.setTitle(jiraFieldMap.get(JiraMetadataField.SUMMARY_FIELD_NAME).toString());
-		msBug.setDescription(jiraFieldMap.get(JiraMetadataField.DESCRIPTION_FIELD_NAME) != null ? jiraFieldMap.get(JiraMetadataField.DESCRIPTION_FIELD_NAME).toString() : null);
+		if (jiraFieldMap.get(JiraMetadataField.DESCRIPTION_FIELD_NAME) == null) {
+			msBug.setDescription(null);
+		} else {
+			msBug.setDescription(parseJiraRichTextToMs(jiraFieldMap.get(JiraMetadataField.DESCRIPTION_FIELD_NAME).toString(), msBug, jiraIssueAttachmentMap, richFileMap));
+		}
 		Map<String, Object> assignMap = (Map) jiraFieldMap.get(JiraMetadataSpecialSystemField.ASSIGNEE);
 		if (assignMap == null) {
 			msBug.setHandleUser(StringUtils.EMPTY);
@@ -1573,7 +1631,8 @@ public class JiraPlatform extends AbstractPlatform {
 	 * @param jiraFieldMap          jira字段集合
 	 * @param defaultTemplateFields 默认模板字段集合
 	 */
-	private void parseCustomFieldToMsBug(PlatformBugDTO msBug, Map jiraFieldMap, List<PlatformCustomFieldItemDTO> defaultTemplateFields) {
+	private void parseCustomFieldToMsBug(PlatformBugDTO msBug, Map jiraFieldMap, List<PlatformCustomFieldItemDTO> defaultTemplateFields,
+										 Map<String, String> jiraIssueAttachmentMap, Map<String, String> richFileMap) {
 		List<PlatformCustomFieldItemDTO> needSyncCustomFields = new ArrayList<>();
 		if (isSupportDefaultTemplate() && msBug.getPlatformDefaultTemplate()) {
 			// 缺陷使用的平台默认模板, 使用平台默认模板字段
@@ -1613,7 +1672,16 @@ public class JiraPlatform extends AbstractPlatform {
 						}
 					}
 				} else {
-					fieldItem.setValue(value.toString());
+					// 富文本需单独处理
+					if (StringUtils.equals(fieldItem.getType(), PlatformCustomFieldType.RICH_TEXT.name())) {
+						if (!StringUtils.equals(fieldItem.getCustomData(), JiraMetadataField.DESCRIPTION_FIELD_NAME)) {
+							fieldItem.setValue(parseJiraRichTextToMs(value.toString(), msBug, jiraIssueAttachmentMap, richFileMap));
+						} else {
+							fieldItem.setValue(msBug.getDescription());
+						}
+					} else {
+						fieldItem.setValue(value.toString());
+					}
 				}
 			} else {
 				fieldItem.setValue(null);
@@ -1703,25 +1771,20 @@ public class JiraPlatform extends AbstractPlatform {
 	 * @param msBug     平台缺陷
 	 * @param jiraIssue jira缺陷
 	 */
-	private void parseAttachmentToMsBug(SyncBugResult result, PlatformBugDTO msBug, JiraIssue jiraIssue) {
+	private void parseAttachmentToMsBug(SyncBugResult result, PlatformBugDTO msBug, Map<String, String> jiraIssueAttachmentMap) {
 		try {
-			List attachments = (List) jiraIssue.getFields().get(JiraMetadataField.ATTACHMENT_NAME);
 			// handle bug attachment
-			if (!CollectionUtils.isEmpty(attachments)) {
+			if (!CollectionUtils.isEmpty(jiraIssueAttachmentMap)) {
 				Map<String, List<PlatformAttachment>> attachmentMap = result.getAttachmentMap();
 				attachmentMap.put(msBug.getId(), new ArrayList<>());
-				for (Object o : attachments) {
-					Map attachment = (Map) o;
-					String filename = attachment.get("filename").toString();
-					if ((msBug.getDescription() == null || !msBug.getDescription().contains(filename))) {
-						PlatformAttachment syncAttachment = new PlatformAttachment();
-						// name 用于查重
-						syncAttachment.setFileName(filename);
-						// key 用于获取附件内容
-						syncAttachment.setFileKey(attachment.get("content").toString());
-						attachmentMap.get(msBug.getId()).add(syncAttachment);
-					}
-				}
+				jiraIssueAttachmentMap.keySet().forEach(key -> {
+					PlatformAttachment syncAttachment = new PlatformAttachment();
+					// name 用于查重
+					syncAttachment.setFileName(key);
+					// key 用于获取附件内容
+					syncAttachment.setFileKey(jiraIssueAttachmentMap.get(key));
+					attachmentMap.get(msBug.getId()).add(syncAttachment);
+				});
 			} else {
 				result.getAttachmentMap().put(msBug.getId(), new ArrayList<>());
 			}
@@ -1853,5 +1916,123 @@ public class JiraPlatform extends AbstractPlatform {
 			}
 		}
 		return status;
+	}
+
+	/**
+	 * 解析MS富文本字段内容至Jira富文本内容
+	 *
+	 * <p style="">
+	 * <img src="https://pic.com/bjh/1.jpeg" permalinksrc="https://pic.com/bjh/1.jpeg">
+	 * <img src="/bug/attachment/preview/md/pid/fid/true" fileid="884436848394240" permalinksrc="/bug/attachment/preview/md/pid/fid/true">
+	 * <img src="/bug/attachment/preview/md/pid/fid/true" psrc="!image-20202020-32393131.jpg!">
+	 * </p>
+	 *
+	 * @param key                       富文本字段Key, 用来MS拦截并替换字段内容
+	 * @param content                   解析内容, 格式参考如上
+	 * @param msFileMap                 MS上传的一些图片临时文件集合
+	 * @param platformBug               平台缺陷
+	 * @param remainImgNameFromRichText 遗留的图片附件名称集合(同步附件时, 用来做排除)
+	 * @return 解析后的Jira富文本内容 (图片默认样式: width=1360,height=876)
+	 */
+	private String parseMsRichTextToJira(String key, String content, Map<String, File> msFileMap, Map<String, String> platformCustomFieldMap, List<String> remainImgNameFromRichText) {
+		String sourceRegex = "(<img src=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX + "/)(.*?)(\")";
+		StringBuilder jiraRichText = new StringBuilder();
+		String[] splitText = content.split(">");
+		for (String split : splitText) {
+			String replaceText = "";
+			if (split.contains("<img") && split.contains("http")) {
+				// ms-httpUrl: <img src="http-url"> => !http-url|width=!
+				String msHttpUrl = split.substring(split.indexOf("permalinksrc=") + 13).replaceAll("\"", StringUtils.EMPTY).replaceAll(StringUtils.SPACE, StringUtils.EMPTY);
+				replaceText = "!" + msHttpUrl + "|width=1360,height=876!";
+			} else if (split.contains("<img") && !split.contains("http")) {
+				// ms-localUrl: <img src="local-url" psrc="!jira-pic-name!">
+				// local-url match by source-regex
+				if (split.contains("psrc")) {
+					// include psrc, split it then append the jira text
+					String jiraLocalUrl = split.substring(split.indexOf("psrc=") + 5).replaceAll("\"", StringUtils.EMPTY).replaceAll(StringUtils.SPACE, StringUtils.EMPTY);
+					Matcher matcher = Pattern.compile(sourceRegex).matcher(split);
+					while (matcher.find()) {
+						String group = matcher.group(0);
+						String msLocalUrl = group.substring(group.indexOf("<img src=") + 9).replaceAll("\"", StringUtils.EMPTY).replaceAll(StringUtils.SPACE, StringUtils.EMPTY);
+						replaceText = "!" + jiraLocalUrl + "|width=1360,height=876,alt=\'" + msLocalUrl + "\'!";
+						remainImgNameFromRichText.add(jiraLocalUrl);
+						msFileMap.remove(split.substring(split.indexOf("fileid") + 7, split.indexOf("permalinksrc=")).replaceAll("\"", StringUtils.EMPTY).trim());
+					}
+				} else {
+					// ms-localUrl => !image-20240319-113551.png|alt=!
+					String msLocalUrl = split.substring(split.indexOf("permalinksrc=") + 13).replaceAll("\"", StringUtils.EMPTY);
+					String fileId = split.substring(split.indexOf("fileid") + 7, split.indexOf("permalinksrc="))
+							.replaceAll("\"", StringUtils.EMPTY).replaceAll(StringUtils.SPACE, StringUtils.EMPTY);
+					if (msFileMap.containsKey(fileId)) {
+						// rename ms image to jira  (rules: image-20201015-110015-uid.jpg)
+						String fileName = "image-" + UUID.randomUUID().toString() + ".jpg";
+						File sourceFile = msFileMap.get(fileId);
+						File targetFile = new File(sourceFile.getParent(), fileName);
+						sourceFile.renameTo(targetFile);
+						msFileMap.put(fileId, targetFile);
+						replaceText = "!" + fileName + "|width=1360,height=876,alt=\'" + msLocalUrl + "\'!";
+						content = content.replaceAll(split, split + " psrc=\"" + fileName + "\"");
+					}
+				}
+			} else {
+				replaceText = split + ">";
+			}
+			jiraRichText.append(replaceText);
+		}
+		platformCustomFieldMap.put(key, content);
+		return jiraRichText.toString();
+	}
+
+	/**
+	 * 解析Jira富文本内容至MS
+	 *
+	 * <p style="">
+	 * !https://pic.com/1.jpeg|width=1360,height=876!
+	 * !image-202020-173612.jpg|width=1360,height=876,alt='/bug/attachment/preview/md/pid/fid/true'!
+	 * </p>
+	 *
+	 * @param content                解析内容, 格式参考如上
+	 * @param msBug                  MS缺陷
+	 * @param jiraIssueAttachmentMap Jira缺陷集合(用来排除图片资源附件, 防止同步)
+	 * @return
+	 */
+	private String parseJiraRichTextToMs(String content, PlatformBugDTO msBug, Map<String, String> jiraIssueAttachmentMap, Map<String, String> richFileMap) {
+		if (StringUtils.isBlank(content)) {
+			return null;
+		}
+		StringBuilder msRichText = new StringBuilder();
+		String[] splitText = content.split("!(.*?)");
+		for (String split : splitText) {
+			String replaceText = "";
+			if (split.startsWith("http")) {
+				// jiraHttpUrl: !https://pic.com/1.jpeg|width=1360,height=876! => <img src="http-url">
+				String httpSrcUrl = split.split("\\|")[0];
+				replaceText = "<img src=\"" + httpSrcUrl + "\" permalinksrc=\"" + httpSrcUrl + "\" >";
+			} else if (split.contains("|width")) {
+				// jiraLocalUrl => msLocalUrl
+				// !image-202020-173612.jpg|width=1360,height=876,alt='/bug/attachment/preview/md/pid/fid/true'!
+				// !image-202020-173612.jpg|width=1360,height=876
+				String localJiraSrcUrl = split.split("\\|")[0];
+				String fileKey = "";
+				if (jiraIssueAttachmentMap.containsKey(localJiraSrcUrl)) {
+					fileKey = jiraIssueAttachmentMap.get(localJiraSrcUrl);
+					jiraIssueAttachmentMap.remove(localJiraSrcUrl);
+				}
+				String localMsSrcUrl = split.split("\\|")[1];
+				if (StringUtils.contains(localMsSrcUrl, "alt=\"\'" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX)) {
+					String altLocalMsUrl = localMsSrcUrl.substring(localMsSrcUrl.indexOf("alt=") + 4)
+							.replaceAll("\'", StringUtils.EMPTY).replaceAll("\"", StringUtils.EMPTY);
+					replaceText = "<img src=\"" + altLocalMsUrl + "\" psrc=\"" + localJiraSrcUrl + "\" >";
+				} else {
+					// set field key to alt, for ms download and replace it
+					replaceText = "<img alt=\"" + fileKey + "\" psrc=\"" + localJiraSrcUrl + "\" >";
+					richFileMap.put(fileKey, localJiraSrcUrl);
+				}
+			} else {
+				replaceText = split;
+			}
+			msRichText.append(replaceText);
+		}
+		return msRichText.toString();
 	}
 }
