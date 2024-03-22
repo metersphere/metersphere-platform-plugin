@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.metersphere.plugin.platform.spi.BaseClient;
 import io.metersphere.plugin.sdk.util.MSPluginException;
+import io.metersphere.plugin.sdk.util.PluginLogUtils;
 import io.metersphere.plugin.sdk.util.PluginUtils;
 import io.metersphere.plugin.zentao.constants.ZentaoRestApiUrl;
 import io.metersphere.plugin.zentao.domain.ZentaoIntegrationConfig;
@@ -174,10 +175,10 @@ public class ZentaoRestClient extends BaseClient {
 		try {
 			response = restTemplate.exchange(getRestUrl(ZentaoRestApiUrl.GET_OR_UPDATE_OR_DELETE_BUG, null), HttpMethod.DELETE, getJsonHttpEntityWithToken(StringUtils.EMPTY), ZentaoRestMessageResponse.class, issueKey);
 			if (response.getBody() == null || !StringUtils.equals(response.getBody().getMessage(), SUCCESS_RESPONSE_KEY)) {
-				throw new MSPluginException("删除禅道缺陷失败!");
+				PluginLogUtils.error("删除禅道缺陷失败!");
 			}
 		} catch (Exception e) {
-			throw new MSPluginException(UnicodeConvertUtils.unicodeToCn(e.getMessage()));
+			PluginLogUtils.error(UnicodeConvertUtils.unicodeToCn(e.getMessage()));
 		}
 	}
 

@@ -387,8 +387,8 @@ public class JiraDefaultClient extends BaseClient {
 			restTemplate.exchange(getBaseUrl() + "/issue/" + id, HttpMethod.DELETE, getAuthHttpEntity(), String.class);
 		} catch (HttpClientErrorException e) {
 			if (HttpStatus.NOT_FOUND.isSameCodeAs(e.getStatusCode())) {
-				// 404说明jira没有，可以直接删
-				throw new MSPluginException(e.getMessage());
+				// NOT_FOUND 缺陷未找到
+				PluginLogUtils.error(e.getMessage());
 			}
 		}
 	}
