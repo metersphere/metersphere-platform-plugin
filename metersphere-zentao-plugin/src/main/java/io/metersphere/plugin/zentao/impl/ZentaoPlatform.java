@@ -952,11 +952,12 @@ public class ZentaoPlatform extends AbstractPlatform {
 					// 替换的目标禅道URL
 					String zentaoImgUrl = "<img src=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX + fileId + ".jpg";
 					// 替换的源MS-URL正则
-					String sourceRegex = "(<img src=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX + "/)(.*?)(/" + key + "/true)";
+					String sourceRegex = "(<img src=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX + "/)(\\d+)(/" + key + "/true)";
 					// 保留permalinksrc链接, 同步至MS时备用
-					content = content.replaceAll(sourceRegex, zentaoImgUrl).replaceAll("permalinksrc", "alt");
+					content = content.replaceAll(sourceRegex, zentaoImgUrl);
 				}
 			}
+			content = content.replaceAll("permalinksrc", "alt");
 		}
 		// 保留MS-URL中的一些参数{src}
 		content = content.replaceAll("src=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX, "alt=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX);
