@@ -18,7 +18,7 @@
       {
         "name": "jiraDemandTypeId",
         "type": "SELECT",
-        "label": "project.menu.defectType",
+        "label": "project.menu.demandType",
         "value": "",
         "required": true,
         "inputSearch": true,
