@@ -7,22 +7,26 @@
       "type": "INPUT",
       "label": "禅道地址",
       "value": "",
-      "required": true
+      "required": true,
+      "tooltip": "普通安装方式配置文件参考路径：/opt/zbox/app/zentao/config/my.php, 镜像方式安装配置文件在挂载目录",
+      "platformPlaceHolder": "请输入禅道地址"
     },
     {
       "name": "account",
       "type": "INPUT",
       "label": "禅道账号",
-      "tooltip": "禅道账号具有API相应的权限, 请按照参考页面勾选上对应权限{参考页面: 组织-权限-分组-权限维护-API开发}; 还需开启超级Model配置项, 禅道配置文件中$config->features-apiGetModel = true{配置文件参考路径：/opt/zbox/app/zentao/config/my.php};",
+      "tooltip": "禅道账号具有API相应的权限, 请按照参考页面勾选上对应权限{参考页面: 组织-权限-分组-权限维护-API开发}; 还需开启超级Model配置项, 禅道配置文件中$config->features-apiGetModel = true;",
       "value": "",
-      "required": true
+      "required": true,
+      "platformPlaceHolder": "请输入禅道账号 (确保该账号具有超级Model权限)"
     },
     {
       "name": "password",
       "type": "PASSWORD",
       "label": "禅道密码",
       "value": "",
-      "required": true
+      "required": true,
+      "platformPlaceHolder": "请输入禅道密码"
     },
     {
       "name": "requestType",

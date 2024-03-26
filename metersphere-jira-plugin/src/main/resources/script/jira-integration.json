@@ -7,7 +7,8 @@
       "type": "INPUT",
       "label": "JIRA地址",
       "value": "",
-      "required": true
+      "required": true,
+      "platformPlaceHolder": "请输入JIRA地址"
     },
     {
       "name": "authType",
@@ -36,7 +37,8 @@
       "displayConditions": {
         "field": "authType",
         "value": "basic"
-      }
+      },
+      "platformPlaceHolder": "请输入JIRA账号"
     },
     {
       "name": "password",
@@ -47,7 +49,8 @@
       "displayConditions": {
         "field": "authType",
         "value": "basic"
-      }
+      },
+      "platformPlaceHolder": "请输入JIRA密码"
     },
     {
       "name": "token",
@@ -58,7 +61,8 @@
       "displayConditions": {
         "field": "authType",
         "value": "bearer"
-      }
+      },
+      "platformPlaceHolder": "请输入Token"
     }
   ]
 }
