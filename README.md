@@ -1,8 +1,9 @@
 MeterSphere 平台插件
 =============================
 
-自 MeterSphere v3.x 版本起，MeterSphere 开始通过插件的方式来对接第三方缺陷与需求管理系统，比如 Jira、禅道、TAPD、Azure DevOps
-等。用户可通过安装对应第三方平台的插件，来实现缺陷和需求的创建、关联和同步。
+与 MeterSphere V2.4 后续的版本类似， MeterSphere V3.x 同样通过插件的方式来对接第三方缺陷与需求管理系统，比如
+Jira、禅道、TAPD、Azure DevOps 等。
+用户可通过安装对应第三方平台的插件，来实现缺陷和需求的创建、关联和同步。
 
 ### 版本说明
 
