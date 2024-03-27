@@ -935,6 +935,9 @@ public class ZentaoPlatform extends AbstractPlatform {
 	}
 
 	private String parseRichTextPicToZentao(String content, String projectKey, Map<String, File> msFileMap, PlatformBugUpdateDTO platformBug) {
+		if (StringUtils.isBlank(content)) {
+			return null;
+		}
 		// psrc => src
 		if (content.contains("psrc")) {
 			// eg: <img psrc="/file-read-zFid.png" src=/bug/attachment/preview/md/pid/fid/true">

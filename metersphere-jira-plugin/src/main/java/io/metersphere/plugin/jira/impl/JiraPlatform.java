@@ -1935,6 +1935,9 @@ public class JiraPlatform extends AbstractPlatform {
 	 * @return 解析后的Jira富文本内容 (图片默认样式: width=1360,height=876)
 	 */
 	private String parseMsRichTextToJira(String key, String content, Map<String, File> msFileMap, Map<String, String> platformCustomFieldMap, List<String> remainImgNameFromRichText) {
+		if (StringUtils.isBlank(content)) {
+			return null;
+		}
 		String sourceRegex = "(<img src=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX + "/)(.*?)(\")";
 		StringBuilder jiraRichText = new StringBuilder();
 		String[] splitText = content.split(">");
