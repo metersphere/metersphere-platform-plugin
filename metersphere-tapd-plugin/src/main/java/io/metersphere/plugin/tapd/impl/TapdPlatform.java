@@ -161,7 +161,7 @@ public class TapdPlatform extends AbstractPlatform {
 			SelectOption firstStepWorkFlow = tapdClient.getFirstStepWorkFlow(TapdSystemType.BUG, config.getTapdKey(), null);
 			statusOptions.add(firstStepWorkFlow);
 		} else {
-			statusOptions.addAll(tapdClient.getWorkFlowTransition(TapdSystemType.BUG, config.getTapdKey(), null, previousStatus));
+			statusOptions.addAll(tapdClient.getWorkFlowTransition(TapdSystemType.BUG, config.getTapdKey(), previousStatus));
 		}
 		return statusOptions;
 	}
@@ -564,7 +564,7 @@ public class TapdPlatform extends AbstractPlatform {
 		TapdProjectConfig config = validateConfig(request.getProjectConfig());
 
 		// query demand list no limit
-		List<TapdStoryResponse> storys = tapdClient.getProjectStorys(config.getTapdKey(), request.getStartPage(), Integer.MAX_VALUE);
+		List<TapdStoryResponse> storys = tapdClient.getProjectStories(config.getTapdKey(), request.getStartPage(), Integer.MAX_VALUE);
 		// handle empty data
 		if (CollectionUtils.isEmpty(storys)) {
 			return List.of();

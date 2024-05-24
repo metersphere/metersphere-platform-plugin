@@ -92,7 +92,7 @@ public class TapdClient extends BaseClient {
 	 *
 	 * @param systemType 系统类型
 	 * @param projectKey 项目ID
-	 * @return
+	 * @return 状态流
 	 */
 	public SelectOption getFirstStepWorkFlow(String systemType, String projectKey, String storyTypeId) {
 		SelectOption statusOption = new SelectOption();
@@ -105,6 +105,7 @@ public class TapdClient extends BaseClient {
 			if (response.getBody() == null) {
 				return null;
 			}
+			// noinspection unchecked
 			Map<String, String> statusMap = PluginUtils.parseMap(PluginUtils.toJSONString(response.getBody().getData()));
 			statusMap.keySet().forEach(statusKey -> {
 				statusOption.setText(statusMap.get(statusKey));
@@ -120,17 +121,14 @@ public class TapdClient extends BaseClient {
 	/**
 	 * 获取状态流, 流转细则
 	 *
-	 * @param systemType 系统类型
-	 * @param projectKey 项目ID
-	 * @return
+	 * @param systemType     系统类型
+	 * @param projectKey     项目ID
+	 * @param previousStatus 当前状态
+	 * @return 状态流选项
 	 */
-	public List<SelectOption> getWorkFlowTransition(String systemType, String projectKey, String storyTypeId, String previousStatus) {
+	public List<SelectOption> getWorkFlowTransition(String systemType, String projectKey, String previousStatus) {
 		List<SelectOption> statusOption = new ArrayList<>();
 		try {
-			String getTransitionUrl = ENDPOINT + TapdUrl.GET_WORKFLOW_TRANSITIONS;
-			if (StringUtils.equals(TapdSystemType.STORY, systemType)) {
-				getTransitionUrl = getTransitionUrl + "&workitem_type_id=" + storyTypeId;
-			}
 			ResponseEntity<TapdBaseResponse> response = restTemplate.exchange(ENDPOINT + TapdUrl.GET_WORKFLOW_TRANSITIONS, HttpMethod.GET, getAuthHttpEntity(), TapdBaseResponse.class, systemType, projectKey);
 			if (response.getBody() == null) {
 				return null;
@@ -141,8 +139,9 @@ public class TapdClient extends BaseClient {
 			}
 			// 获取工作流状态中英文名对应关系
 			ResponseEntity<TapdBaseResponse> statusDictResponse = restTemplate.exchange(ENDPOINT + TapdUrl.GET_WORKFLOW_STATUS_MAP, HttpMethod.GET, getAuthHttpEntity(), TapdBaseResponse.class, systemType, projectKey);
-			Map<String, String> statusDictMap = PluginUtils.parseMap(PluginUtils.toJSONString(statusDictResponse.getBody().getData()));
-			List<String> transitionStatus = new ArrayList<>();
+			// noinspection unchecked
+			Map<String, String> statusDictMap = PluginUtils.parseMap(PluginUtils.toJSONString(Objects.requireNonNull(statusDictResponse.getBody()).getData()));
+			List<String> transitionStatus;
 			if (StringUtils.isNotBlank(previousStatus)) {
 				transitionStatus = statusTransitions.stream().filter(transition -> StringUtils.equals(transition.getStepPrevious(), previousStatus)).map(TapdTransitionStatusItem::getStepNext).distinct().collect(Collectors.toList());
 			} else {
@@ -164,8 +163,8 @@ public class TapdClient extends BaseClient {
 	/**
 	 * 获取项目成员列表
 	 *
-	 * @param projectKey
-	 * @return
+	 * @param projectKey 项目Key
+	 * @return 成员列表
 	 */
 	public List<SelectOption> getProjectUsers(String projectKey) {
 		List<SelectOption> userOptions = new ArrayList<>();
@@ -179,6 +178,7 @@ public class TapdClient extends BaseClient {
 				throw new MSPluginException("获取Tapd项目成员列表为空!");
 			}
 			userMaps.forEach(userMap -> {
+				// noinspection unchecked
 				Map<String, String> user = PluginUtils.parseMap(PluginUtils.toJSONString(userMap.get("UserWorkspace")));
 				SelectOption selectOption = new SelectOption();
 				selectOption.setText(user.get("user"));
@@ -198,10 +198,10 @@ public class TapdClient extends BaseClient {
 	 * @param projectKey 项目Key
 	 * @param startPage  开始页码
 	 * @param pageSize   每页Size
-	 * @return
+	 * @return 需求列表
 	 */
-	public List<TapdStoryResponse> getProjectStorys(String projectKey, Integer startPage, Integer pageSize) {
-		List<TapdStoryResponse> storys = new ArrayList<>();
+	public List<TapdStoryResponse> getProjectStories(String projectKey, Integer startPage, Integer pageSize) {
+		List<TapdStoryResponse> stories = new ArrayList<>();
 		try {
 			ResponseEntity<TapdBaseResponse> response = restTemplate.exchange(ENDPOINT + TapdUrl.GET_PROJECT_STORY, HttpMethod.GET, getAuthHttpEntity(),
 					TapdBaseResponse.class, projectKey, startPage, pageSize);
@@ -209,27 +209,25 @@ public class TapdClient extends BaseClient {
 				return new ArrayList<>();
 			}
 			List<Map> storyMaps = PluginUtils.parseArray(PluginUtils.toJSONString(response.getBody().getData()), Map.class);
-			List<TapdStoryResponse> tmpStorys = new ArrayList<>();
+			List<TapdStoryResponse> tmpStories = new ArrayList<>();
 			storyMaps.forEach(storyMap -> {
 				TapdStoryResponse story = PluginUtils.parseObject(PluginUtils.toJSONString(storyMap.get("Story")), TapdStoryResponse.class);
-				tmpStorys.add(story);
+				tmpStories.add(story);
 			});
-			List<TapdStoryResponse> childStorys = tmpStorys.stream().filter(story -> StringUtils.isBlank(story.getParent_id()) || !StringUtils.equals(story.getParent_id(), "0")).collect(Collectors.toList());
-			List<TapdStoryResponse> parentStorys = tmpStorys.stream().filter(story -> StringUtils.isNotBlank(story.getParent_id()) && StringUtils.equals(story.getParent_id(), "0")).collect(Collectors.toList());
-			Iterator<TapdStoryResponse> iterator = parentStorys.iterator();
-			while (iterator.hasNext()) {
-				TapdStoryResponse story = iterator.next();
+			List<TapdStoryResponse> childStories = tmpStories.stream().filter(story -> StringUtils.isBlank(story.getParent_id()) || !StringUtils.equals(story.getParent_id(), "0")).toList();
+			List<TapdStoryResponse> parentStories = tmpStories.stream().filter(story -> StringUtils.isNotBlank(story.getParent_id()) && StringUtils.equals(story.getParent_id(), "0")).toList();
+			for (TapdStoryResponse story : parentStories) {
 				if (StringUtils.isNotBlank(story.getChildren_id()) && !StringUtils.equalsAny(story.getChildren_id(), "|", "||")) {
 					List<String> childStoryIds = List.of(story.getChildren_id().replaceAll("\\|\\|", StringUtils.EMPTY).split("\\|"));
-					List<TapdStoryResponse> filterChilds = childStorys.stream().filter(filterStory -> childStoryIds.contains(filterStory.getId())).collect(Collectors.toList());
-					story.setChildren(filterChilds);
+					List<TapdStoryResponse> filterChildList = childStories.stream().filter(filterStory -> childStoryIds.contains(filterStory.getId())).collect(Collectors.toList());
+					story.setChildren(filterChildList);
 				}
-				storys.add(story);
+				stories.add(story);
 			}
 		} catch (Exception e) {
 			PluginLogUtils.error(e.getMessage(), e);
 		}
-		return storys;
+		return stories;
 	}
 
 	/**
@@ -245,7 +243,7 @@ public class TapdClient extends BaseClient {
 			ResponseEntity<TapdBaseResponse> response = restTemplate.exchange(ENDPOINT + TapdUrl.EDIT_BUG, HttpMethod.POST,
 					getPostAuthHttpEntityForParam(paramMap), TapdBaseResponse.class);
 			return PluginUtils.parseObject(PluginUtils.toJSONString(PluginUtils.parseMap(
-					PluginUtils.toJSONString(response.getBody().getData())).get("Bug")), TapdBugResponse.class);
+					PluginUtils.toJSONString(Objects.requireNonNull(response.getBody()).getData())).get("Bug")), TapdBugResponse.class);
 		} catch (Exception e) {
 			PluginLogUtils.error(e.getMessage(), e);
 			throw new MSPluginException("创建Tapd缺陷异常");
@@ -258,7 +256,7 @@ public class TapdClient extends BaseClient {
 	 * @param projectKey 项目Key
 	 * @param page       页码
 	 * @param limit      每页大小
-	 * @return
+	 * @return 缺陷列表
 	 */
 	public List<Map> getBugForPage(String projectKey, int page, int limit) {
 		try {
@@ -268,9 +266,7 @@ public class TapdClient extends BaseClient {
 				return new ArrayList<>();
 			}
 			List<Map> bugMaps = PluginUtils.parseArray(PluginUtils.toJSONString(response.getBody().getData()), Map.class);
-			return bugMaps.stream().map(bugMap -> {
-				return (Map) bugMap.get("Bug");
-			}).collect(Collectors.toList());
+			return bugMaps.stream().map(bugMap -> (Map) bugMap.get("Bug")).collect(Collectors.toList());
 		} catch (Exception e) {
 			PluginLogUtils.error(e.getMessage(), e);
 			throw new MSPluginException("分页查询Tapd缺陷异常");
@@ -282,7 +278,7 @@ public class TapdClient extends BaseClient {
 	 *
 	 * @param projectKey 项目Key
 	 * @param imagePath  图片路径
-	 * @return
+	 * @return 获取图片下载链接
 	 */
 	public String getPicTmpDownUrl(String projectKey, String imagePath) {
 		try {
@@ -302,7 +298,7 @@ public class TapdClient extends BaseClient {
 	/**
 	 * 获取附件字节流
 	 *
-	 * @param fileId             文件ID
+	 * @param fileDownUrl        文件URL
 	 * @param inputStreamHandler 流处理
 	 */
 	public void getAttachmentBytes(String fileDownUrl, Consumer<InputStream> inputStreamHandler) {
@@ -322,7 +318,7 @@ public class TapdClient extends BaseClient {
 	/**
 	 * 获取认证实体
 	 *
-	 * @return
+	 * @return 获取认证头
 	 */
 	protected HttpEntity<MultiValueMap<String, Object>> getPostAuthHttpEntityForParam(MultiValueMap<String, Object> paramMap) {
 		return new HttpEntity<>(paramMap, getAuthHeader());
@@ -331,7 +327,7 @@ public class TapdClient extends BaseClient {
 	/**
 	 * 获取认证实体
 	 *
-	 * @return
+	 * @return 获取认证头
 	 */
 	protected HttpEntity<MultiValueMap<String, String>> getAuthHttpEntity() {
 		return new HttpEntity<>(getAuthHeader());
@@ -340,7 +336,7 @@ public class TapdClient extends BaseClient {
 	/**
 	 * 获取认证Header Base64{api_user:api_password}
 	 *
-	 * @return
+	 * @return 获取认证头
 	 */
 	protected HttpHeaders getAuthHeader() {
 		return getBasicHttpHeaders(USERNAME, PASSWORD);
@@ -349,7 +345,7 @@ public class TapdClient extends BaseClient {
 	/**
 	 * 获取URL前缀
 	 *
-	 * @return
+	 * @return 获取认证头
 	 */
 	public String getBaseUrl() {
 		return BASE_URL;
