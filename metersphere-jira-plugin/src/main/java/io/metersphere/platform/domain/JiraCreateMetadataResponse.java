@@ -30,6 +30,7 @@ public class JiraCreateMetadataResponse {
         private Schema schema;
         private String name;
         private String key;
+        private String fieldId;
         private String autoCompleteUrl;
         private boolean hasDefaultValue;
         private Object defaultValue;

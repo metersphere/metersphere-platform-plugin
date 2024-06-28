@@ -781,55 +781,58 @@ public class JiraPlatform extends AbstractPlatform {
                 String fieldName = item.getCustomData();
                 if (StringUtils.isNotBlank(fieldName)) {
                     if (ObjectUtils.isNotEmpty(item.getValue())) {
-                        if (StringUtils.isNotBlank(item.getType())) {
-                            if (StringUtils.equalsAny(item.getType(), "select", "radio", "member")) {
-                                Map param = new LinkedHashMap<>();
-                                param.put("id", item.getValue());
-                                fields.put(fieldName, param);
-                            } else if (StringUtils.equalsAny(item.getType(), "multipleSelect", "checkbox", "multipleMember")) {
-                                List attrs = new ArrayList();
-                                if (item.getValue() != null) {
-                                    List values = JSON.parseArray((String) item.getValue());
-                                    values.forEach(v -> {
-                                        Map param = new LinkedHashMap<>();
-                                        param.put("id", v);
-                                        attrs.add(param);
-                                    });
-                                }
-                                fields.put(fieldName, attrs);
-                            } else if (StringUtils.equalsAny(item.getType(), "cascadingSelect")) {
-                                if (item.getValue() != null) {
-                                    Map attr = new LinkedHashMap<>();
-                                    List values = JSON.parseArray((String) item.getValue());
-                                    if (CollectionUtils.isNotEmpty(values)) {
-                                        if (values.size() > 0) {
-                                            attr.put("id", values.get(0));
-                                        }
-                                        if (values.size() > 1) {
+                        if (StringUtils.containsIgnoreCase(item.getName(), "sprint")) {
+                            fields.put(fieldName, Integer.parseInt(item.getValue().toString()));
+                        } else {
+                            if (StringUtils.isNotBlank(item.getType())) {
+                                if (StringUtils.equalsAny(item.getType(), "select", "radio", "member")) {
+                                    Map param = new LinkedHashMap<>();
+                                    param.put("id", item.getValue());
+                                    fields.put(fieldName, param);
+                                } else if (StringUtils.equalsAny(item.getType(), "multipleSelect", "checkbox", "multipleMember")) {
+                                    List attrs = new ArrayList();
+                                    if (item.getValue() != null) {
+                                        List values = JSON.parseArray((String) item.getValue());
+                                        values.forEach(v -> {
                                             Map param = new LinkedHashMap<>();
-                                            param.put("id", values.get(1));
-                                            attr.put("child", param);
-                                        }
-                                    } else {
-                                        attr.put("id", item.getValue());
+                                            param.put("id", v);
+                                            attrs.add(param);
+                                        });
                                     }
-                                    fields.put(fieldName, attr);
+                                    fields.put(fieldName, attrs);
+                                } else if (StringUtils.equalsAny(item.getType(), "cascadingSelect")) {
+                                    if (item.getValue() != null) {
+                                        Map attr = new LinkedHashMap<>();
+                                        List values = JSON.parseArray((String) item.getValue());
+                                        if (CollectionUtils.isNotEmpty(values)) {
+                                            if (values.size() > 0) {
+                                                attr.put("id", values.get(0));
+                                            }
+                                            if (values.size() > 1) {
+                                                Map param = new LinkedHashMap<>();
+                                                param.put("id", values.get(1));
+                                                attr.put("child", param);
+                                            }
+                                        } else {
+                                            attr.put("id", item.getValue());
+                                        }
+                                        fields.put(fieldName, attr);
+                                    }
+                                } else if (StringUtils.equalsAny(item.getType(), "richText")) {
+                                    fields.put(fieldName, parseRichTextImageUrlToJira(item.getValue().toString()));
+                                    if (fieldName.equals(DESCRIPTION_FIELD_NAME)) {
+                                        request.setDescription(item.getValue().toString());
+                                    }
+                                } else if (StringUtils.equals(item.getType(), "datetime")) {
+                                    if (item.getValue() != null && item.getValue() instanceof String) {
+                                        // 2023-07-12 11:12:46 -> 2021-12-10T11:12:46+08:00
+                                        fields.put(fieldName, ((String) item.getValue()).trim().replace(" ", "T") + "+08:00");
+                                    }
+                                } else {
+                                    fields.put(fieldName, item.getValue());
                                 }
-                            } else if (StringUtils.equalsAny(item.getType(), "richText")) {
-                                fields.put(fieldName, parseRichTextImageUrlToJira(item.getValue().toString()));
-                                if (fieldName.equals(DESCRIPTION_FIELD_NAME)) {
-                                    request.setDescription(item.getValue().toString());
-                                }
-                            } else if (StringUtils.equals(item.getType(), "datetime")) {
-                                if (item.getValue() != null && item.getValue() instanceof String) {
-                                    // 2023-07-12 11:12:46 -> 2021-12-10T11:12:46+08:00
-                                    fields.put(fieldName, ((String) item.getValue()).trim().replace(" ", "T") + "+08:00");
-                                }
-                            } else {
-                                fields.put(fieldName, item.getValue());
                             }
                         }
-
                     }
                 }
             });

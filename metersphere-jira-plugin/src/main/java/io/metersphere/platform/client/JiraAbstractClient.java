@@ -51,20 +51,37 @@ public abstract class JiraAbstractClient extends BaseClient {
 
     public Map<String, JiraCreateMetadataResponse.Field> getCreateMetadata(String projectKey, String issueType) {
         String url = getBaseUrl() + "/issue/createmeta?projectKeys={1}&issuetypeIds={2}&expand=projects.issuetypes.fields";
-        ResponseEntity<String> response = null;
+        ResponseEntity<String> response;
         Map<String, JiraCreateMetadataResponse.Field> fields = null;
         try {
             response = restTemplate.exchange(url, HttpMethod.GET, getAuthHttpEntity(), String.class, projectKey, issueType);
-        } catch (Exception e) {
-            LogUtil.error(e.getMessage(), e);
-            MSPluginException.throwException(e.getMessage());
-        }
-        try {
             fields = ((JiraCreateMetadataResponse) getResultForObject(JiraCreateMetadataResponse.class, response))
                     .getProjects().get(0).getIssuetypes().get(0).getFields();
         } catch (Exception e) {
-            LogUtil.error(e);
-            MSPluginException.throwException("请检查服务集成信息或Jira项目ID");
+            if (HttpStatus.NOT_FOUND.equals(((HttpClientErrorException.NotFound) e).getStatusCode())) {
+                try {
+                    // 兼容9.x获取问题类型字段API
+                    List<JiraCreateMetadataResponse.Field> metaFields;
+                    final Map<String, JiraCreateMetadataResponse.Field> metafieldMap = new HashMap<>();
+                    String urlForNew =  getBaseUrl() + "/issue/createmeta/{1}/issuetypes/{2}";
+                    response = restTemplate.exchange(urlForNew, HttpMethod.GET, getAuthHttpEntity(), String.class, projectKey, issueType);
+                    metaFields = ((JiraCreateMetaFieldsResponse) getResultForObject(JiraCreateMetaFieldsResponse.class, response)).getFields();
+                    // 兼容一些旧的环境
+                    if (CollectionUtils.isEmpty(metaFields)) {
+                        metaFields = ((JiraCreateMetaFieldsResponse) getResultForObject(JiraCreateMetaFieldsResponse.class, response)).getValues();
+                    }
+                    metaFields.forEach(metaField -> {
+                        metafieldMap.put(metaField.getFieldId(), metaField);
+                    });
+                    fields = metafieldMap;
+                } catch (Exception e1) {
+                    LogUtil.error(e.getMessage(), e);
+                    MSPluginException.throwException(e.getMessage());
+                }
+            } else {
+                LogUtil.error(e.getMessage(), e);
+                MSPluginException.throwException("请检查服务集成信息或Jira项目ID");
+            }
         }
         fields.remove("project");
         fields.remove("issuetype");
