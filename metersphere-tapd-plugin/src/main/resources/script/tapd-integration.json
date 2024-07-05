@@ -8,7 +8,7 @@
       "label": "API账号",
       "value": "",
       "required": true,
-      "tooltip": "账号口令信息在\"公司管理-安全与集成-开放平台\"中查看",
+      "tooltip": "API账号在\"公司管理-开放集成-API账号管理\"中查看",
       "platformPlaceHolder": "请输入API账号"
     },
     {

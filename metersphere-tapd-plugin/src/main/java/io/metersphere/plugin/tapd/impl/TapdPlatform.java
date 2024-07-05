@@ -761,7 +761,7 @@ public class TapdPlatform extends AbstractPlatform {
 					if (StringUtils.isNotBlank(picTmpDownUrl)) {
 						String replaceTmpUrl = imgStr.replaceAll("src", "psrc").replaceAll("/>", "alt=\"" + picTmpDownUrl + "\" />");
 						content = content.replaceAll(imgStr, replaceTmpUrl);
-						// 禅道富文本中的图片默认命名为*.jpg, *:唯一文件ID, 标识, 整数
+						// Tapd的图片默认命名为*.jpg, *: 唯一文件ID, 标识, 整数
 						richFileMap.put(picTmpDownUrl, UUID.randomUUID() + ".jpg");
 					}
 				}
