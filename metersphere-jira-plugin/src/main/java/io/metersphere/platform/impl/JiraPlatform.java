@@ -12,6 +12,7 @@ import io.metersphere.plugin.exception.MSPluginException;
 import io.metersphere.plugin.utils.JSON;
 import io.metersphere.plugin.utils.LogUtil;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.ComparatorUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.ResponseEntity;
@@ -1060,17 +1061,37 @@ public class JiraPlatform extends AbstractPlatform {
 
         // 按类型排序，富文本排最后，input 排最前面，summary 排第一个
         fields.sort((a, b) -> {
-            if (a.getType().equals(CustomFieldType.RICH_TEXT.getValue())) return 1;
-            if (b.getType().equals(CustomFieldType.RICH_TEXT.getValue())) return -1;
-            if (a.getId().equals(ISSUE_LINK)) return 1;
-            if (b.getId().equals(ISSUE_LINK)) return -1;
-            if (a.getId().equals(ISSUE_LINK_TYPE)) return 1;
-            if (b.getId().equals(ISSUE_LINK_TYPE)) return -1;
-            if (a.getId().equals(SUMMARY_FIELD_NAME)) return -1;
-            if (b.getId().equals(SUMMARY_FIELD_NAME)) return 1;
-            if (a.getType().equals(CustomFieldType.INPUT.getValue())) return -1;
-            if (b.getType().equals(CustomFieldType.INPUT.getValue())) return 1;
-            return a.getType().compareTo(b.getType());
+            if (StringUtils.equals(a.getType(), CustomFieldType.RICH_TEXT.getValue())) {
+				return 1;
+			}
+            if (StringUtils.equals(b.getType(), CustomFieldType.RICH_TEXT.getValue())) {
+				return -1;
+			}
+            if (StringUtils.equals(a.getId(), ISSUE_LINK)) {
+				return 1;
+			}
+            if (StringUtils.equals(b.getId(), ISSUE_LINK)) {
+				return -1;
+			}
+            if (StringUtils.equals(a.getId(), ISSUE_LINK_TYPE)) {
+				return 1;
+			}
+            if (StringUtils.equals(b.getId(), ISSUE_LINK_TYPE)) {
+				return -1;
+			}
+            if (StringUtils.equals(a.getId(), SUMMARY_FIELD_NAME)) {
+				return -1;
+			}
+            if (StringUtils.equals(b.getId(), SUMMARY_FIELD_NAME)) {
+				return 1;
+			}
+            if (StringUtils.equals(a.getType(), CustomFieldType.INPUT.getValue())) {
+				return -1;
+			}
+            if (StringUtils.equals(b.getType(), CustomFieldType.INPUT.getValue())) {
+				return 1;
+			}
+            return ComparatorUtils.naturalComparator().compare(a.getType(), b.getType());
         });
         return fields;
     }
@@ -1239,13 +1260,13 @@ public class JiraPlatform extends AbstractPlatform {
 
                     msDefaultValue = defaultList;
                 } else {
-                    if (customField.getType().equals(CustomFieldType.DATE.getValue())) {
+                    if (StringUtils.equals(customField.getType(), CustomFieldType.DATE.getValue())) {
                         if (defaultValue instanceof String) {
                             msDefaultValue = defaultValue;
                         } else {
                             msDefaultValue = Instant.ofEpochMilli((Long) defaultValue).atZone(ZoneId.systemDefault()).toLocalDate().toString();
                         }
-                    } else if (customField.getType().equals(CustomFieldType.DATETIME.getValue())) {
+                    } else if (StringUtils.equals(customField.getType(), CustomFieldType.DATETIME.getValue())) {
                         if (defaultValue instanceof String) {
                             msDefaultValue = defaultValue;
                         } else {
