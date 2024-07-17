@@ -8,7 +8,7 @@
         "type": "RADIO",
         "label": "范围",
         "value": "products",
-        "subDesc": "",
+        "tooltip": "产品类型请选择产品, 项目类型(\"产品型项目\" 或 \"项目型项目\")请选择项目;",
         "options": [
           {
             "value": "products",
@@ -21,26 +21,36 @@
         ]
       },
       {
-        "name": "zentaoKey",
+        "name": "productKey",
         "type": "INPUT",
         "label": "产品 Key",
         "required": true,
         "subDesc": "如何填写禅道产品Key",
         "inputSearch": false,
-        "instructionsIcon": "static/zentao-key.jpg",
+        "instructionsIcon": "static/zentao-product.jpg",
         "displayConditions": {
           "field": "type",
           "value": "products"
         }
       },
       {
-        "name": "zentaoKey",
+        "name": "projectKey",
         "type": "INPUT",
         "label": "项目 Key",
         "required": true,
         "subDesc": "如何填写禅道项目Key",
         "inputSearch": false,
-        "instructionsIcon": "static/zentao-key.jpg",
+        "instructionsIcon": "static/zentao-project.png",
+        "displayConditions": {
+          "field": "type",
+          "value": "projects"
+        }
+      },
+      {
+        "name": "productKey",
+        "type": "INPUT",
+        "label": "产品 Key",
+        "tooltip": "通常情况下, 禅道的项目会默认关联产品(注: 项目型项目会关联影子产品Key); 请按照上述提示正确填写产品Key, 否则影响数据的同步;",
         "displayConditions": {
           "field": "type",
           "value": "projects"

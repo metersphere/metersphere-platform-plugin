@@ -102,7 +102,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 	public void validateProjectConfig(String projectConfigStr) {
 		try {
 			ZentaoProjectConfig projectConfig = getProjectConfig(projectConfigStr);
-			zentaoRestClient.validateProject(projectConfig.getZentaoKey(), projectConfig.getType());
+			zentaoRestClient.validateProject(StringUtils.equals("projects", projectConfig.getType()) ? projectConfig.getProjectKey() : projectConfig.getProductKey(), projectConfig.getType());
 		} catch (Exception e) {
 			throw new MSPluginException(e.getMessage());
 		}
@@ -112,7 +112,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 	 * 校验需求/缺陷项目KEY
 	 */
 	public void validateProjectKey() {
-		if (StringUtils.isBlank(projectConfig.getZentaoKey())) {
+		if (StringUtils.isBlank(StringUtils.equals("projects", projectConfig.getType()) ? projectConfig.getProjectKey() : projectConfig.getProductKey())) {
 			throw new MSPluginException("请在项目中配置禅道的项目Key!");
 		}
 	}
@@ -292,9 +292,9 @@ public class ZentaoPlatform extends AbstractPlatform {
 		ZentaoRestBugEditRequest editRequest = buildUpdateParam(request, platformBug);
 		if (StringUtils.equals("projects", projectConfig.getType())) {
 			// 项目型项目, 需设置所属项目
-			editRequest.setProject(projectConfig.getZentaoKey());
+			editRequest.setProject(projectConfig.getProjectKey());
 		}
-		ZentaoBugRestEditResponse zentaoBug = zentaoRestClient.add(editRequest, projectConfig.getZentaoKey());
+		ZentaoBugRestEditResponse zentaoBug = zentaoRestClient.add(editRequest, projectConfig.getProductKey());
 		if (zentaoBug != null && StringUtils.isNotBlank(zentaoBug.getId())) {
 			platformBug.setPlatformBugKey(zentaoBug.getId());
 			platformBug.setPlatformStatus(statusField.getValue().toString());
@@ -434,7 +434,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 				SyncBugResult syncBugResult = new SyncBugResult();
 
 				// query zentao bug by page
-				Map<String, Object> bugResponseMap = zentaoClient.getBugsByProjectId(pageNum, pageSize, projectConfig.getZentaoKey());
+				Map<String, Object> bugResponseMap = zentaoClient.getBugsByProjectId(pageNum, pageSize, projectConfig.getProductKey());
 				List<?> zentaoBugs = (List<?>) bugResponseMap.get("bugs");
 				currentSize = zentaoBugs.size();
 				zentaoBugs = filterBySyncCondition(zentaoBugs, request);
@@ -498,7 +498,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 		projectConfig = getProjectConfig(request.getProjectConfig());
 		validateProjectKey();
 		// query demand list no limit
-		ZentaoRestDemandResponse response = zentaoRestClient.pageDemands(projectConfig.getZentaoKey(), projectConfig.getType(), request.getStartPage(), Integer.MAX_VALUE);
+		ZentaoRestDemandResponse response = zentaoRestClient.pageDemands(StringUtils.equals("projects", projectConfig.getType()) ? projectConfig.getProjectKey() : projectConfig.getProductKey(), projectConfig.getType(), request.getStartPage(), Integer.MAX_VALUE);
 		// handle empty data
 		if (response == null || CollectionUtils.isEmpty(response.getStories())) {
 			return List.of();
@@ -597,7 +597,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 	 * @return 产品计划下拉选项
 	 */
 	private List<SelectOption> getProductPlanOption() {
-		ZentaoRestPlanResponse response = zentaoRestClient.getProductPlans(projectConfig.getZentaoKey(), 1, Integer.MAX_VALUE);
+		ZentaoRestPlanResponse response = zentaoRestClient.getProductPlans(StringUtils.equals("projects", projectConfig.getType()) ? projectConfig.getProjectKey() : projectConfig.getProductKey(), 1, Integer.MAX_VALUE);
 		if (response == null || CollectionUtils.isEmpty(response.getPlans())) {
 			return List.of();
 		}
@@ -872,7 +872,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 		ZentaoRestBugEditRequest zentaoEditParam = new ZentaoRestBugEditRequest();
 		zentaoEditParam.setTitle(request.getTitle());
 		// 目前只处理禅道步骤内的图片文本
-		zentaoEditParam.setSteps(parseRichTextPicToZentao(request.getDescription(), projectConfig.getZentaoKey(), request.getRichFileMap(), platformBug));
+		zentaoEditParam.setSteps(parseRichTextPicToZentao(request.getDescription(), StringUtils.equals("projects", projectConfig.getType()) ? projectConfig.getProjectKey() : projectConfig.getProductKey(), request.getRichFileMap(), platformBug));
 		parseCustomFields(request, zentaoEditParam, platformBug);
 		return zentaoEditParam;
 	}
