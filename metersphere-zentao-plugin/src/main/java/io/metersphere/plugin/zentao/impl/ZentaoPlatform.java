@@ -16,9 +16,10 @@ import io.metersphere.plugin.platform.utils.PluginPager;
 import io.metersphere.plugin.sdk.util.MSPluginException;
 import io.metersphere.plugin.sdk.util.PluginLogUtils;
 import io.metersphere.plugin.sdk.util.PluginUtils;
-import io.metersphere.plugin.zentao.client.ZentaoClient;
+import io.metersphere.plugin.zentao.client.BaseZentaoJsonClient;
 import io.metersphere.plugin.zentao.client.ZentaoFactory;
 import io.metersphere.plugin.zentao.client.ZentaoRestClient;
+import io.metersphere.plugin.zentao.constants.ZentaoConfigType;
 import io.metersphere.plugin.zentao.constants.ZentaoDemandCustomField;
 import io.metersphere.plugin.zentao.domain.ZentaoIntegrationConfig;
 import io.metersphere.plugin.zentao.domain.ZentaoPlatformUserInfo;
@@ -46,9 +47,10 @@ import java.util.stream.Collectors;
  * @author song-cc-rock
  */
 @Extension
+@SuppressWarnings("unused")
 public class ZentaoPlatform extends AbstractPlatform {
 
-	protected ZentaoClient zentaoClient;
+	protected BaseZentaoJsonClient zentaoJsonClient;
 
 	protected ZentaoRestClient zentaoRestClient;
 
@@ -56,16 +58,25 @@ public class ZentaoPlatform extends AbstractPlatform {
 
 	protected SimpleDateFormat sdfDateTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
+	/**
+	 * 一些局部常量(魔法值)
+	 */
 	protected static final String DATE_PREFIX = "0000-00-00";
-
 	protected static final String MS_RICH_TEXT_PREVIEW_SRC_PREFIX = "/bug/attachment/preview/md";
-
 	protected static final String ZENTAO_RICH_TEXT_IMG_SRC_PREFIX = "/file-read-";
+	protected static final String ZENTAO_BUILD = "openedBuild";
+	protected static final String ZENTAO_ID = "id";
+	protected static final String ZENTAO_BUG_DELETED = "deleted";
+	protected static final String ZENTAO_BUG_DELETED_STATUS = "1";
+	protected static final String MS_RICH_TEXT_REPLACE_WORD = "psrc";
+	protected static final String ZENTAO_PAGE_TOTAL_PARAM = "pageTotal";
+	protected static final String COMMA = ",";
 
+	@SuppressWarnings("unused")
 	public ZentaoPlatform(PlatformRequest request) {
 		super(request);
 		ZentaoIntegrationConfig zentaoConfig = getIntegrationConfig(request.getIntegrationConfig(), ZentaoIntegrationConfig.class);
-		zentaoClient = ZentaoFactory.getInstance(zentaoConfig.getAddress(), zentaoConfig.getRequestType());
+		zentaoJsonClient = ZentaoFactory.getInstance(zentaoConfig.getAddress(), zentaoConfig.getRequestType());
 		zentaoRestClient = new ZentaoRestClient(zentaoConfig.getAddress());
 		setUserConfig(request.getIntegrationConfig(), false);
 	}
@@ -112,7 +123,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 	 * 校验需求/缺陷项目KEY
 	 */
 	public void validateProjectKey() {
-		if (StringUtils.isBlank(StringUtils.equals("projects", projectConfig.getType()) ? projectConfig.getProjectKey() : projectConfig.getProductKey())) {
+		if (StringUtils.isBlank(StringUtils.equals(ZentaoConfigType.PROJECT, projectConfig.getType()) ? projectConfig.getProjectKey() : projectConfig.getProductKey())) {
 			throw new MSPluginException("请在项目中配置禅道的项目Key!");
 		}
 	}
@@ -158,7 +169,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 	 * @param config 集成配置
 	 */
 	private void validateAndSetConfig(ZentaoIntegrationConfig config) {
-		zentaoClient.initConfig(config);
+		zentaoJsonClient.initConfig(config);
 		zentaoRestClient.initConfig(config);
 	}
 
@@ -215,7 +226,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 	 * @return 状态选项
 	 */
 	@Override
-	public List<SelectOption> getStatusTransitions(String projectConfig, String issueKey, String previousStatus) throws Exception {
+	public List<SelectOption> getStatusTransitions(String projectConfig, String issueKey, String previousStatus) {
 		// Zentao don't support status flow, query all status item and return
 		List<SelectOption> statusOptions = new ArrayList<>();
 		for (ZentaoBugPlatformStatus status : ZentaoBugPlatformStatus.values()) {
@@ -290,22 +301,24 @@ public class ZentaoPlatform extends AbstractPlatform {
 		PlatformCustomFieldItemDTO statusField = filterStatusTransition(request);
 		// set param
 		ZentaoRestBugEditRequest editRequest = buildUpdateParam(request, platformBug);
-		if (StringUtils.equals("projects", projectConfig.getType())) {
+		if (StringUtils.equals(ZentaoConfigType.PROJECT, projectConfig.getType())) {
 			// 项目型项目, 需设置所属项目
 			editRequest.setProject(projectConfig.getProjectKey());
 		}
 		ZentaoBugRestEditResponse zentaoBug = zentaoRestClient.add(editRequest, projectConfig.getProductKey());
 		if (zentaoBug != null && StringUtils.isNotBlank(zentaoBug.getId())) {
 			platformBug.setPlatformBugKey(zentaoBug.getId());
-			platformBug.setPlatformStatus(statusField.getValue().toString());
+			if (statusField != null) {
+				platformBug.setPlatformStatus(statusField.getValue().toString());
+			}
 		} else {
 			throw new MSPluginException("创建禅道缺陷失败!");
 		}
 
-		new Thread(() -> {
+		Thread.startVirtualThread(() -> {
 			// transition zentao bug status
 			transitionStatus(statusField, zentaoBug.getId(), editRequest.getAssignedTo());
-		}).start();
+		});
 
 		return platformBug;
 	}
@@ -331,11 +344,14 @@ public class ZentaoPlatform extends AbstractPlatform {
 		ZentaoBugRestEditResponse zentaoBug = zentaoRestClient.update(editParam, request.getPlatformBugId());
 		platformBug.setPlatformBugKey(zentaoBug.getId());
 		// transition zentao bug status
-		platformBug.setPlatformStatus(statusField.getValue().toString());
+		if (statusField != null) {
+			platformBug.setPlatformStatus(statusField.getValue().toString());
+		}
 
-		new Thread(() -> {
+		Thread.startVirtualThread(() -> {
+			// transition zentao bug status
 			transitionStatus(statusField, zentaoBug.getId(), editParam.getAssignedTo());
-		}).start();
+		});
 		return platformBug;
 	}
 
@@ -371,7 +387,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 		File file = request.getFile();
 		if (StringUtils.equals(SyncAttachmentType.UPLOAD.syncOperateType(), syncType)) {
 			// upload attachment
-			zentaoClient.uploadAttachment("bug", request.getPlatformKey(), file);
+			zentaoJsonClient.uploadAttachment("bug", request.getPlatformKey(), file);
 		} else if (StringUtils.equals(SyncAttachmentType.DELETE.syncOperateType(), syncType)) {
 			// delete attachment
 			ZentaoRestBugDetailResponse response = zentaoRestClient.get(request.getPlatformKey());
@@ -382,7 +398,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 				for (String fileId : zenFiles.keySet()) {
 					LinkedHashMap<String, Object> zenFileMap = zenFiles.get(fileId);
 					if (StringUtils.equals(file.getName(), zenFileMap.get("title").toString())) {
-						zentaoClient.deleteAttachment(fileId);
+						zentaoJsonClient.deleteAttachment(fileId);
 						break;
 					}
 				}
@@ -401,8 +417,8 @@ public class ZentaoPlatform extends AbstractPlatform {
 		SyncBugResult syncResult = new SyncBugResult();
 		List<PlatformBugDTO> bugs = request.getBugs();
 		bugs.forEach(bug -> {
-			Map<String, Object> zenBugInfo = zentaoClient.getBugById(bug.getPlatformBugId());
-			if (!StringUtils.equals(zenBugInfo.get("deleted").toString(), "1")) {
+			Map<String, Object> zenBugInfo = zentaoJsonClient.getBugById(bug.getPlatformBugId());
+			if (!StringUtils.equals(zenBugInfo.get(ZENTAO_BUG_DELETED).toString(), ZENTAO_BUG_DELETED_STATUS)) {
 				syncZentaoFieldToMsBug(bug, zenBugInfo, false);
 				parseAttachmentOrBuildToMsBug(syncResult, bug);
 				syncResult.getUpdateBug().add(bug);
@@ -434,7 +450,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 				SyncBugResult syncBugResult = new SyncBugResult();
 
 				// query zentao bug by page
-				Map<String, Object> bugResponseMap = zentaoClient.getBugsByProjectId(pageNum, pageSize, projectConfig.getProductKey());
+				Map<String, Object> bugResponseMap = zentaoJsonClient.getBugsByProjectId(pageNum, pageSize, projectConfig.getProductKey());
 				List<?> zentaoBugs = (List<?>) bugResponseMap.get("bugs");
 				currentSize = zentaoBugs.size();
 				zentaoBugs = filterBySyncCondition(zentaoBugs, request);
@@ -464,7 +480,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 				pageNum++;
 				// noinspection unchecked
 				Map<String, Object> pagerMap = (Map<String, Object>) bugResponseMap.get("pager");
-				if (pageNum > (Integer) (pagerMap).get("pageTotal")) {
+				if (pageNum > (Integer) (pagerMap).get(ZENTAO_PAGE_TOTAL_PARAM)) {
 					// if page num > page total, break loop; avoid loop forever
 					break;
 				}
@@ -483,7 +499,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 	 */
 	@Override
 	public void getAttachmentContent(String fileKey, Consumer<InputStream> inputStreamHandler) {
-		zentaoClient.getAttachmentBytes(fileKey, inputStreamHandler);
+		zentaoJsonClient.getAttachmentBytes(fileKey, inputStreamHandler);
 	}
 
 	/**
@@ -583,7 +599,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 		iterationField.setId(ZentaoDemandCustomField.PLAN_FIELD_ID);
 		iterationField.setName(ZentaoDemandCustomField.PLAN_FIELD_NAME);
 		iterationField.setSupportSearch(true);
-		if (StringUtils.equals(projectConfig.getType(), "products")) {
+		if (StringUtils.equals(projectConfig.getType(), ZentaoConfigType.PRODUCT)) {
 			// 产品计划
 			iterationField.setOptions(PluginUtils.toJSONString(getProductPlanOption()));
 		}
@@ -630,6 +646,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 	 * @param request 表单项请求参数
 	 * @return 用户下拉选项
 	 */
+	@SuppressWarnings("unused")
 	public List<SelectOption> getAssignUsers(GetOptionRequest request) {
 		ZentaoRestUserResponse users = zentaoRestClient.getUsers();
 		return users.getUsers().stream().map(user -> new SelectOption(user.getRealname(), user.getAccount())).collect(Collectors.toList());
@@ -735,7 +752,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 							});
 							field.setValue(PluginUtils.toJSONString(values));
 						}
-					} else if (StringUtils.equals(field.getCustomData(), "openedBuild") || value.toString().contains(",")) {
+					} else if (StringUtils.equals(field.getCustomData(), ZENTAO_BUILD) || value.toString().contains(COMMA)) {
 						List<String> values = new ArrayList<>(Arrays.asList(value.toString().split(",")));
 						field.setValue(PluginUtils.toJSONString(values));
 					} else {
@@ -762,7 +779,8 @@ public class ZentaoPlatform extends AbstractPlatform {
 		Map<String, Object> child = (Map<String, Object>) valObj.get("child");
 		String idValue = Optional.ofNullable(valObj.get("id")).orElse(StringUtils.EMPTY).toString();
 
-		if (child != null) {// 级联框
+		if (child != null) {
+			// 级联框
 			return PluginUtils.toJSONString(getCascadeValues(idValue, child));
 		} else {
 			if (StringUtils.isNotBlank(idValue)) {
@@ -785,8 +803,8 @@ public class ZentaoPlatform extends AbstractPlatform {
 		if (StringUtils.isNotBlank(idValue)) {
 			values.add(idValue);
 		}
-		if (child.get("id") != null && StringUtils.isNotBlank(child.get("id").toString())) {
-			values.add(child.get("id"));
+		if (child.get(ZENTAO_ID) != null && StringUtils.isNotBlank(child.get(ZENTAO_ID).toString())) {
+			values.add(child.get(ZENTAO_ID));
 		}
 		return values;
 	}
@@ -834,7 +852,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 				List<String> buildIds = new ArrayList<>();
 				response.getOpenedBuild().forEach(build -> buildIds.add("\"" + build.get("id") + "\""));
 				bug.getCustomFieldList().forEach(field -> {
-					if (StringUtils.equals(field.getId(), "openedBuild")) {
+					if (StringUtils.equals(field.getId(), ZENTAO_BUILD)) {
 						field.setValue(buildIds);
 					}
 				});
@@ -920,7 +938,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 			List<PlatformCustomFieldItemDTO> statusList = request.getCustomFieldList().stream().filter(item ->
 					StringUtils.equals(item.getCustomData(), "status")).toList();
 			request.getCustomFieldList().removeAll(statusList);
-			return statusList.get(0);
+			return statusList.getFirst();
 		} else {
 			return null;
 		}
@@ -948,7 +966,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 			return null;
 		}
 		// psrc => src
-		if (content.contains("psrc")) {
+		if (content.contains(MS_RICH_TEXT_REPLACE_WORD)) {
 			// eg: <img psrc="/file-read-zFid.png" src=/bug/attachment/preview/md/pid/fid/true">
 			// => <img src="/file-read-zFid.png" src="/bug/attachment/preview/md/pid/fid/true"/>
 			// 图片双向同步过, 直接替换URL即可
@@ -960,7 +978,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 					// eg: <img src="/attachment/download/file/pid/fid/true" permalinksrc="/attachment/download/file/pid/fid/true">
 					// => <img src="/file-read-zFid.png" alt="/attachment/download/file/pid/fid/true"/>
 					// 还未双向同步的图片, 上传附件(图片)至禅道
-					String fileId = zentaoClient.uploadFile(msFileMap.get(key), "bug", projectKey);
+					String fileId = zentaoJsonClient.uploadFile(msFileMap.get(key), "bug", projectKey);
 					// 替换的目标禅道URL
 					String zentaoImgUrl = "<img src=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX + fileId + ".jpg";
 					// 替换的源MS-URL正则

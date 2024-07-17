@@ -8,7 +8,7 @@ import java.util.regex.Pattern;
 /**
  * GET方式调用超级Model接口
  */
-public class ZentaoGetClient extends ZentaoClient {
+public class ZentaoGetClient extends BaseZentaoJsonClient {
 
 	private static final String LOGIN = "/?m=user&f=login&t=json&zentaosid=";
 	private static final String SESSION_GET = "/?m=api&f=getSessionID&t=json";

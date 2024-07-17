@@ -38,6 +38,7 @@ import java.util.stream.Collectors;
  * @author song-cc-rock
  */
 @Extension
+@SuppressWarnings("unused")
 public class TapdPlatform extends AbstractPlatform {
 
 	protected TapdClient tapdClient;
@@ -46,8 +47,13 @@ public class TapdPlatform extends AbstractPlatform {
 
 	protected static final String TAPD_RICH_TEXT_PIC_SRC_PREFIX = "/tfl";
 
+	protected static final String MS_RICH_TEXT_PIC_KEY_WORD = "permalinksrc";
+
+	protected static final String SEMICOLON = ";";
+
 	protected SimpleDateFormat sdfDateTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
+	@SuppressWarnings("unused")
 	public TapdPlatform(PlatformRequest request) {
 		super(request);
 		TapdIntegrationConfig config = getIntegrationConfig(request.getIntegrationConfig(), TapdIntegrationConfig.class);
@@ -112,7 +118,7 @@ public class TapdPlatform extends AbstractPlatform {
 	/**
 	 * 获取第三方平台缺陷的自定义字段
 	 *
-	 * @param projectConfigStr 项目配置信息
+	 * @param projectConfig 项目配置信息
 	 * @return 自定义字段集合
 	 */
 	@Override
@@ -149,11 +155,10 @@ public class TapdPlatform extends AbstractPlatform {
 	 * @param projectConfig  项目配置
 	 * @param issueKey       缺陷ID
 	 * @param previousStatus 当前状态
-	 * @return
-	 * @throws Exception 业务异常
+	 * @return 状态流选项
 	 */
 	@Override
-	public List<SelectOption> getStatusTransitions(String projectConfig, String issueKey, String previousStatus) throws Exception {
+	public List<SelectOption> getStatusTransitions(String projectConfig, String issueKey, String previousStatus) {
 		TapdProjectConfig config = getProjectConfig(projectConfig);
 		List<SelectOption> statusOptions = new ArrayList<>();
 		if (StringUtils.isBlank(issueKey)) {
@@ -170,7 +175,7 @@ public class TapdPlatform extends AbstractPlatform {
 	 * 需求分页查询
 	 *
 	 * @param request 请求参数
-	 * @return
+	 * @return 需求列表
 	 */
 	@Override
 	public PluginPager<PlatformDemandDTO> pageDemand(DemandPageRequest request) {
@@ -196,7 +201,7 @@ public class TapdPlatform extends AbstractPlatform {
 	 * 根据ID获取需求
 	 *
 	 * @param request 请求参数
-	 * @return
+	 * @return 需求结果
 	 */
 	@Override
 	public PlatformDemandDTO getDemands(DemandRelateQueryRequest request) {
@@ -213,39 +218,32 @@ public class TapdPlatform extends AbstractPlatform {
 	 * 新增缺陷
 	 *
 	 * @param request 请求参数
-	 * @return
+	 * @return 平台缺陷内容
 	 */
 	@Override
 	public PlatformBugUpdateDTO addBug(PlatformBugUpdateRequest request) {
-		// validate config
-		TapdProjectConfig config = validateAndSetUserConfig(request.getUserPlatformConfig(), request.getProjectConfig());
-
-		// prepare and init tapd param
-		PlatformBugUpdateDTO platformBug = new PlatformBugUpdateDTO();
-		// filter status field
-		PlatformCustomFieldItemDTO statusField = filterStatusTransition(request);
-		// set param
-		MultiValueMap<String, Object> editParam = buildUpdateParam(request, platformBug);
-		editParam.add("status", statusField.getValue());
-		TapdBugResponse tapdBug = tapdClient.editBug(editParam, config.getTapdKey());
-		if (tapdBug != null && StringUtils.isNotBlank(tapdBug.getId())) {
-			platformBug.setPlatformBugKey(tapdBug.getId());
-			platformBug.setPlatformStatus(statusField.getValue().toString());
-		} else {
-			throw new MSPluginException("创建Tapd缺陷失败!");
-		}
-
-		return platformBug;
+		return editBug(request, false);
 	}
 
 	/**
 	 * 更新缺陷
 	 *
 	 * @param request 请求参数
-	 * @return
+	 * @return 平台缺陷内容
 	 */
 	@Override
 	public PlatformBugUpdateDTO updateBug(PlatformBugUpdateRequest request) {
+		return editBug(request, true);
+	}
+
+	/**
+	 * 编辑缺陷
+	 *
+	 * @param request  请求参数
+	 * @param isUpdate 是否更新操作
+	 * @return 平台缺陷内容
+	 */
+	private PlatformBugUpdateDTO editBug(PlatformBugUpdateRequest request, boolean isUpdate) {
 		// validate config
 		TapdProjectConfig config = validateAndSetUserConfig(request.getUserPlatformConfig(), request.getProjectConfig());
 		// prepare and init tapd param
@@ -254,14 +252,20 @@ public class TapdPlatform extends AbstractPlatform {
 		PlatformCustomFieldItemDTO statusField = filterStatusTransition(request);
 		// set param
 		MultiValueMap<String, Object> editParam = buildUpdateParam(request, platformBug);
-		editParam.add("status", statusField.getValue());
-		editParam.add("id", request.getPlatformBugId());
+		if (statusField != null) {
+			editParam.add("status", statusField.getValue());
+		}
+		if (isUpdate) {
+			editParam.add("id", request.getPlatformBugId());
+		}
 		TapdBugResponse tapdBug = tapdClient.editBug(editParam, config.getTapdKey());
 		if (tapdBug != null && StringUtils.isNotBlank(tapdBug.getId())) {
 			platformBug.setPlatformBugKey(tapdBug.getId());
-			platformBug.setPlatformStatus(statusField.getValue().toString());
+			if (statusField != null) {
+				platformBug.setPlatformStatus(statusField.getValue().toString());
+			}
 		} else {
-			throw new MSPluginException("修改Tapd缺陷失败!");
+			throw new MSPluginException(isUpdate ? "更新Tapd缺陷失败!" : "创建Tapd缺陷失败!");
 		}
 
 		return platformBug;
@@ -274,7 +278,7 @@ public class TapdPlatform extends AbstractPlatform {
 
 	@Override
 	public boolean isSupportAttachment() {
-		// TODO: Tapd-API currently does not support attachment uplaod or delete
+		// TODO: Tapd-API currently does not support attachment upload or delete
 		// https://o.tapd.cn/document/api-doc/API%E6%96%87%E6%A1%A3/api_reference/attachment/get_attachments.html
 		return false;
 	}
@@ -287,8 +291,8 @@ public class TapdPlatform extends AbstractPlatform {
 	/**
 	 * 同步存量缺陷
 	 *
-	 * @param request
-	 * @return
+	 * @param request 同步请求参数
+	 * @return 同步结果
 	 */
 	@Override
 	public SyncBugResult syncBugs(SyncBugRequest request) {
@@ -298,7 +302,6 @@ public class TapdPlatform extends AbstractPlatform {
 		// prepare param
 		SyncBugResult syncResult = new SyncBugResult();
 		List<PlatformBugDTO> bugs = request.getBugs();
-		List<String> syncBugIds = bugs.stream().map(PlatformBugDTO::getPlatformBugId).collect(Collectors.toList());
 
 		// query bug list by page
 		int page = 1, limit = 200, querySize;
@@ -312,10 +315,8 @@ public class TapdPlatform extends AbstractPlatform {
 			page++;
 		} while (querySize >= limit);
 
-		Map<String, Map> queryBugMap = new HashMap<>();
-		totalQueryBugs.forEach(queryBug -> {
-			queryBugMap.put(queryBug.get("id").toString(), queryBug);
-		});
+		Map<String, Map> queryBugMap = new HashMap<>(16);
+		totalQueryBugs.forEach(queryBug -> queryBugMap.put(queryBug.get("id").toString(), queryBug));
 		// Handle bug that require sync
 		bugs.forEach(bug -> {
 			Map findBug = queryBugMap.get(bug.getPlatformBugId());
@@ -377,8 +378,8 @@ public class TapdPlatform extends AbstractPlatform {
 	/**
 	 * 获取附件下载流
 	 *
-	 * @param fileKey
-	 * @param inputStreamHandler
+	 * @param fileKey            文件Key
+	 * @param inputStreamHandler 文件流处理
 	 */
 	@Override
 	public void getAttachmentContent(String fileKey, Consumer<InputStream> inputStreamHandler) {
@@ -415,9 +416,9 @@ public class TapdPlatform extends AbstractPlatform {
 	/**
 	 * 同步Tapd缺陷字段 => MS字段值
 	 *
-	 * @param msBug
-	 * @param tapdBug
-	 * @param useCustomAllFields
+	 * @param msBug              MS缺陷
+	 * @param tapdBug            Tapd缺陷
+	 * @param useCustomAllFields 是否同步全量自定义字段
 	 */
 	private void syncTapdFieldToMsBug(PlatformBugDTO msBug, Map tapdBug, boolean useCustomAllFields, String projectKey) {
 		try {
@@ -433,8 +434,9 @@ public class TapdPlatform extends AbstractPlatform {
 	/**
 	 * 解析基础字段到平台缺陷字段
 	 *
-	 * @param msBug      平台缺陷
-	 * @param zenBugInfo 禅道字段集合
+	 * @param msBug       平台缺陷
+	 * @param tapdBugInfo Tapd缺陷内容
+	 * @param projectKey  项目Key
 	 */
 	private void parseBaseFieldToMsBug(PlatformBugDTO msBug, Map tapdBugInfo, String projectKey) {
 		// 处理基础字段(TITLE, DESCRIPTION, HANDLE_USER, STATUS)
@@ -446,8 +448,8 @@ public class TapdPlatform extends AbstractPlatform {
 			msBug.setHandleUser(StringUtils.EMPTY);
 		} else {
 			String ownerStr;
-			if (ownerObj.toString().contains(";")) {
-				ownerStr = List.of(ownerObj.toString().split(";")).get(0);
+			if (ownerObj.toString().contains(SEMICOLON)) {
+				ownerStr = List.of(ownerObj.toString().split(";")).getFirst();
 			} else {
 				ownerStr = ownerObj.toString();
 			}
@@ -480,9 +482,11 @@ public class TapdPlatform extends AbstractPlatform {
 	/**
 	 * 解析自定义字段到平台缺陷字段
 	 *
-	 * @param msBug  平台缺陷
-	 * @param zenBug 禅道字段集合
+	 * @param msBug              平台缺陷
+	 * @param tapdBugInfo        Tapd缺陷内容
+	 * @param useCustomAllFields 是否同步全量自定义字段
 	 */
+	@SuppressWarnings("unchecked")
 	private void parseCustomFieldToMsBug(PlatformBugDTO msBug, Map tapdBugInfo, boolean useCustomAllFields) {
 		List<PlatformCustomFieldItemDTO> needSyncCustomFields = new ArrayList<>();
 		if (useCustomAllFields) {
@@ -501,9 +505,7 @@ public class TapdPlatform extends AbstractPlatform {
 			if (CollectionUtils.isEmpty(needSyncCustomFields)) {
 				return;
 			}
-			needSyncCustomFields.forEach(field -> {
-				field.setValue(tapdBugInfo.get(field.getCustomData()));
-			});
+			needSyncCustomFields.forEach(field -> field.setValue(tapdBugInfo.get(field.getCustomData())));
 		}
 		msBug.setCustomFieldList(needSyncCustomFields);
 	}
@@ -518,7 +520,7 @@ public class TapdPlatform extends AbstractPlatform {
 	private MultiValueMap<String, Object> buildUpdateParam(PlatformBugUpdateRequest request, PlatformBugUpdateDTO platformBug) {
 		MultiValueMap<String, Object> paramMap = new LinkedMultiValueMap<>();
 		paramMap.add("title", request.getTitle());
-		paramMap.add("description", parseRichTextPicToTapd(request.getBaseUrl(), request.getDescription(), platformBug));
+		paramMap.add("description", parseRichTextPicToTapd(request.getDescription(), platformBug));
 		parseCustomFields(request, paramMap, platformBug);
 		return paramMap;
 	}
@@ -564,15 +566,15 @@ public class TapdPlatform extends AbstractPlatform {
 		TapdProjectConfig config = validateConfig(request.getProjectConfig());
 
 		// query demand list no limit
-		List<TapdStoryResponse> storys = tapdClient.getProjectStories(config.getTapdKey(), request.getStartPage(), Integer.MAX_VALUE);
+		List<TapdStoryResponse> storyList = tapdClient.getProjectStories(config.getTapdKey(), request.getStartPage(), Integer.MAX_VALUE);
 		// handle empty data
-		if (CollectionUtils.isEmpty(storys)) {
+		if (CollectionUtils.isEmpty(storyList)) {
 			return List.of();
 		}
 
 		// prepare demand list
 		List<PlatformDemandDTO.Demand> demands = new ArrayList<>();
-		storys.forEach(story -> {
+		storyList.forEach(story -> {
 			PlatformDemandDTO.Demand demand = new PlatformDemandDTO.Demand();
 			demand.setDemandId(story.getId());
 			demand.setDemandName(story.getName());
@@ -598,7 +600,7 @@ public class TapdPlatform extends AbstractPlatform {
 				demand.setChildren(childrenDemands);
 			}
 			if (isParentDemandShow || !CollectionUtils.isEmpty(demand.getChildren())) {
-				// When parent story meet the condition or it's child story meet the condition, show the story
+				// When parent story meet the condition, it's child story meet the condition, show the story
 				demands.add(demand);
 			}
 		});
@@ -622,6 +624,7 @@ public class TapdPlatform extends AbstractPlatform {
 	 * @param request 表单项请求参数
 	 * @return 用户下拉选项
 	 */
+	@SuppressWarnings("unused")
 	public List<SelectOption> getOwnerList(GetOptionRequest request) {
 		TapdProjectConfig config = getProjectConfig(request.getProjectConfig());
 		return tapdClient.getProjectUsers(config.getTapdKey());
@@ -674,9 +677,9 @@ public class TapdPlatform extends AbstractPlatform {
 	/**
 	 * 校验并设置用户配置
 	 *
-	 * @param userPlatformConfig
-	 * @param projectConfig
-	 * @return
+	 * @param userPlatformConfig 用户配置
+	 * @param projectConfig      项目配置
+	 * @return 项目配置
 	 */
 	private TapdProjectConfig validateAndSetUserConfig(String userPlatformConfig, String projectConfig) {
 		setUserConfig(userPlatformConfig, true);
@@ -686,8 +689,7 @@ public class TapdPlatform extends AbstractPlatform {
 	/**
 	 * 校验配置
 	 *
-	 * @param userPlatformConfig 用户平台配置
-	 * @param projectConfig      项目配置
+	 * @param projectConfig 项目配置
 	 */
 	private TapdProjectConfig validateConfig(String projectConfig) {
 		TapdProjectConfig config = getProjectConfig(projectConfig);
@@ -709,7 +711,7 @@ public class TapdPlatform extends AbstractPlatform {
 			List<PlatformCustomFieldItemDTO> statusList = request.getCustomFieldList().stream().filter(item ->
 					StringUtils.equals(item.getCustomData(), "status")).toList();
 			request.getCustomFieldList().removeAll(statusList);
-			return statusList.get(0);
+			return statusList.getFirst();
 		} else {
 			return null;
 		}
@@ -720,14 +722,14 @@ public class TapdPlatform extends AbstractPlatform {
 	 *
 	 * @param content     富文本内容
 	 * @param platformBug 平台缺陷内容
-	 * @return
+	 * @return 解析后的内容
 	 */
-	private String parseRichTextPicToTapd(String baseUrl, String content, PlatformBugUpdateDTO platformBug) {
+	private String parseRichTextPicToTapd(String content, PlatformBugUpdateDTO platformBug) {
 		if (StringUtils.isBlank(content)) {
 			return null;
 		}
 		platformBug.setPlatformDescription(content);
-		if (content.contains("permalinksrc")) {
+		if (StringUtils.contains(content, MS_RICH_TEXT_PIC_KEY_WORD)) {
 			// 不保留permalinksrc链接, 不支持双向同步
 			String permalinkRegex = "(permalinksrc=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX + "/)(\\d+)(/(\\d+)" + "/true)";
 			content = content.replaceAll(permalinkRegex, "alt =\"暂不支持图片同步");
@@ -741,7 +743,7 @@ public class TapdPlatform extends AbstractPlatform {
 	 *
 	 * @param content 富文本内容
 	 * @param msBug   MS缺陷
-	 * @return
+	 * @return 解析后的内容
 	 */
 	private String parseTapdPicToMsRichText(String content, PlatformBugDTO msBug, String projectKey) {
 		// 图片链接中存在本地上传的URL, 及已经双向同步的URL, 网络链接的URL

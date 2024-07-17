@@ -8,7 +8,7 @@ import java.util.regex.Pattern;
 /**
  * PATH_INFO方式调用超级Model接口
  */
-public class ZentaoPathInfoClient extends ZentaoClient {
+public class ZentaoPathInfoClient extends BaseZentaoJsonClient {
 
 	private static final String LOGIN = "/user-login.json?zentaosid=";
 	private static final String SESSION_GET = "/api-getsessionid.json";

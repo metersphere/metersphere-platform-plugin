@@ -30,7 +30,7 @@ import java.util.function.Consumer;
  * 故保留了JSON-API调用方式供部分不支持接口的调用, 例如附件下载, 附件上传等等;
  * 注意: 禅道JSON-API接口支持配置两种请求方式{PATH_INFO, GET}, 具体请求方式按照配置文件及插件集成配置而定;
  */
-public abstract class ZentaoClient extends BaseClient {
+public abstract class BaseZentaoJsonClient extends BaseClient {
 
 	protected static String ENDPOINT;
 
@@ -44,7 +44,7 @@ public abstract class ZentaoClient extends BaseClient {
 
 	public static final String END_SUFFIX = "/";
 
-	public ZentaoClient(String url) {
+	public BaseZentaoJsonClient(String url) {
 		ENDPOINT = url;
 	}
 
