@@ -27,7 +27,7 @@
         "required": true,
         "subDesc": "如何填写禅道产品Key",
         "inputSearch": false,
-        "instructionsIcon": "static/zentao-product.jpg",
+        "instructionsIcon": "static/zentao-product.png",
         "displayConditions": {
           "field": "type",
           "value": "products"
