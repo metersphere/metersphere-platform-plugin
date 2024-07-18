@@ -1,28 +1,26 @@
 package io.metersphere.plugin.zentao.client;
 
-import io.metersphere.plugin.platform.dto.SelectOption;
 import io.metersphere.plugin.platform.spi.BaseClient;
 import io.metersphere.plugin.sdk.util.MSPluginException;
 import io.metersphere.plugin.sdk.util.PluginLogUtils;
 import io.metersphere.plugin.sdk.util.PluginUtils;
 import io.metersphere.plugin.zentao.domain.ZentaoIntegrationConfig;
 import io.metersphere.plugin.zentao.domain.ZentaoJsonApiUrl;
-import io.metersphere.plugin.zentao.domain.response.json.ZentaoAddBugResponse;
 import io.metersphere.plugin.zentao.domain.response.json.ZentaoAuthUserResponse;
 import io.metersphere.plugin.zentao.domain.response.json.ZentaoBugResponse;
 import io.metersphere.plugin.zentao.domain.response.json.ZentaoSessionResponse;
-import io.metersphere.plugin.zentao.utils.UnicodeConvertUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.*;
-import org.springframework.util.CollectionUtils;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RequestCallback;
 
 import java.io.File;
 import java.io.InputStream;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 
 /**
@@ -40,9 +38,9 @@ public abstract class BaseZentaoJsonClient extends BaseClient {
 
 	public ZentaoJsonApiUrl requestUrl;
 
-	public static final String PROJECT_PARAM_KEY = "project";
-
 	public static final String END_SUFFIX = "/";
+
+	protected static final String FAIL = "fail";
 
 	public BaseZentaoJsonClient(String url) {
 		ENDPOINT = url;
@@ -96,79 +94,6 @@ public abstract class BaseZentaoJsonClient extends BaseClient {
 	}
 
 	/**
-	 * 添加缺陷
-	 *
-	 * @param paramMap 参数集合
-	 * @return 禅道缺陷返回结果
-	 */
-	public ZentaoAddBugResponse.Bug addBug(MultiValueMap<String, Object> paramMap) {
-		PluginLogUtils.info("Add Zentao Bug Param:" + paramMap);
-		String sessionId = auth();
-		String defaultProject = getDefaultProject(paramMap);
-		ResponseEntity<String> response;
-		try {
-			response = restTemplate.exchange(requestUrl.getBugCreate() + sessionId + (StringUtils.isNotEmpty(defaultProject) ? "&project=" + defaultProject : StringUtils.EMPTY),
-					HttpMethod.POST, getHttpEntity(paramMap), String.class);
-		} catch (Exception e) {
-			PluginLogUtils.error(e.getMessage(), e);
-			throw new MSPluginException(e.getMessage());
-		}
-		ZentaoAddBugResponse addBugResponse = getResultForObject(ZentaoAddBugResponse.class, response);
-		ZentaoAddBugResponse.Bug bug = null;
-		try {
-			bug = PluginUtils.parseObject(addBugResponse.getData(), ZentaoAddBugResponse.Bug.class);
-		} catch (Exception e) {
-			PluginLogUtils.error(e);
-		}
-		if (bug == null) {
-			throw new MSPluginException(UnicodeConvertUtils.unicodeToCn(response.getBody()));
-		}
-		return bug;
-	}
-
-	/**
-	 * 更新缺陷
-	 *
-	 * @param id       缺陷ID
-	 * @param paramMap 参数集合
-	 */
-	public void updateBug(String id, MultiValueMap<String, Object> paramMap) {
-		PluginLogUtils.info("Update Zentao Bug Param:" + paramMap);
-		String sessionId = auth();
-		ResponseEntity<String> response;
-		try {
-			response = restTemplate.exchange(requestUrl.getBugUpdate(),
-					HttpMethod.POST, getHttpEntity(paramMap), String.class, id, sessionId);
-		} catch (Exception e) {
-			PluginLogUtils.error(e.getMessage(), e);
-			throw new MSPluginException(e.getMessage());
-		}
-
-		ZentaoAddBugResponse addBugResponse = getResultForObject(ZentaoAddBugResponse.class, response);
-		if (!StringUtils.equalsIgnoreCase(addBugResponse.getStatus(), "success")
-				&& StringUtils.isNotBlank(addBugResponse.getData())
-				&& !StringUtils.equals(addBugResponse.getData(), "[]")) {
-			// 如果没改啥东西保存也会报错，addIssueResponse.getData() 值为 "[]"
-			throw new MSPluginException(UnicodeConvertUtils.unicodeToCn(response.getBody()));
-		}
-	}
-
-	/**
-	 * 删除缺陷
-	 *
-	 * @param id 缺陷ID
-	 */
-	public void deleteBug(String id) {
-		String sessionId = auth();
-		try {
-			restTemplate.exchange(requestUrl.getBugDelete(), HttpMethod.GET, getHttpEntity(), String.class, id, sessionId);
-		} catch (Exception e) {
-			PluginLogUtils.error(e.getMessage(), e);
-			throw new MSPluginException(e.getMessage());
-		}
-	}
-
-	/**
 	 * 获取缺陷详情
 	 *
 	 * @param id 缺陷ID
@@ -178,7 +103,7 @@ public abstract class BaseZentaoJsonClient extends BaseClient {
 		String sessionId = auth();
 		ResponseEntity<String> response = restTemplate.exchange(requestUrl.getBugGet(), HttpMethod.GET, getHttpEntity(), String.class, id, sessionId);
 		ZentaoBugResponse bugResponse = getResultForObject(ZentaoBugResponse.class, response);
-		if (StringUtils.equalsIgnoreCase(bugResponse.getStatus(), "fail")) {
+		if (StringUtils.equalsIgnoreCase(bugResponse.getStatus(), FAIL)) {
 			ZentaoBugResponse.Bug bug = new ZentaoBugResponse.Bug();
 			bug.setId(id);
 			bug.setSteps(StringUtils.SPACE);
@@ -192,91 +117,6 @@ public abstract class BaseZentaoJsonClient extends BaseClient {
 		return PluginUtils.parseMap(bugResponse.getData());
 	}
 
-	/**
-	 * 获取用户集合
-	 *
-	 * @return 用户集合
-	 */
-	public Map<String, Object> getUsers() {
-		String sessionId = auth();
-		ResponseEntity<String> response = restTemplate.exchange(requestUrl.getUserGet() + sessionId,
-				HttpMethod.GET, getHttpEntity(), String.class);
-		// noinspection unchecked
-		return PluginUtils.parseMap(response.getBody());
-	}
-
-	/**
-	 * 获取关联需求集合
-	 *
-	 * @param projectKey 项目Key
-	 * @return 需求集合
-	 */
-	public Map<String, Object> pageDemands(String projectKey) {
-		String sessionId = auth();
-		ResponseEntity<String> response = restTemplate.exchange(requestUrl.getStoryGet() + sessionId,
-				HttpMethod.GET, getHttpEntity(), String.class, projectKey);
-		// noinspection unchecked
-		return PluginUtils.parseMap(response.getBody());
-	}
-
-	/**
-	 * 获取项目计划
-	 *
-	 * @param projectKey 项目Key
-	 * @return 计划集合
-	 */
-	public List<SelectOption> getProductPlanOption(String projectKey) {
-		String sessionId = auth();
-		ResponseEntity<String> response = restTemplate.exchange(requestUrl.getProductPlanUrl(),
-				HttpMethod.GET, getHttpEntity(), String.class, projectKey, sessionId);
-		// noinspection unchecked
-		Map<String, Object> responseMap = PluginUtils.parseMap(response.getBody());
-		if (responseMap == null) {
-			return new ArrayList<>();
-		}
-		String responseData = responseMap.get("data").toString();
-		if (StringUtils.isBlank(responseData)) {
-			return new ArrayList<>();
-		}
-		List<SelectOption> options = new ArrayList<>();
-		// noinspection unchecked
-		Map<String, Map<String, Object>> dataMap = PluginUtils.parseMap(responseData);
-		Map<String, Object> plansMap = dataMap.get("plans");
-		if (plansMap == null) {
-			return new ArrayList<>();
-		}
-		plansMap.values().forEach(v -> {
-			SelectOption option = new SelectOption();
-			// noinspection unchecked
-			Map<String, Object> planObj = PluginUtils.parseMap(PluginUtils.toJSONString(v));
-			option.setValue(planObj.get("id").toString());
-			option.setText(planObj.get("title").toString());
-			options.add(option);
-		});
-		return options;
-	}
-
-	/**
-	 * 校验项目是否存在
-	 *
-	 * @param projectKey 项目Key
-	 */
-	public void checkProject(String projectKey) {
-		String sessionId = auth();
-		ResponseEntity<String> response = restTemplate.exchange(requestUrl.getProductGet(),
-				HttpMethod.GET, getHttpEntity(), String.class, projectKey, sessionId);
-		try {
-			// noinspection unchecked
-			Map<String, Object> data = PluginUtils.parseMap(PluginUtils.parseMap(response.getBody()).get("data").toString());
-			// noinspection unchecked
-			if (data.get("id") != null || ((Map<String, Object>) data.get("product")).get("id") != null) {
-				return;
-			}
-		} catch (Exception e) {
-			PluginLogUtils.error("check zentao project error : " + response.getBody());
-		}
-		throw new MSPluginException("项目不存在");
-	}
 
 	/**
 	 * 上传附件
@@ -369,19 +209,6 @@ public abstract class BaseZentaoJsonClient extends BaseClient {
 	}
 
 	/**
-	 * 获取默认项目
-	 *
-	 * @param param 参数集合
-	 * @return 默认项目
-	 */
-	private String getDefaultProject(MultiValueMap<String, Object> param) {
-		if (param.containsKey(PROJECT_PARAM_KEY) && !CollectionUtils.isEmpty(param.get(PROJECT_PARAM_KEY))) {
-			return param.get(PROJECT_PARAM_KEY).get(0).toString();
-		}
-		return StringUtils.EMPTY;
-	}
-
-	/**
 	 * 获取请求地址
 	 *
 	 * @return 请求地址
@@ -405,7 +232,7 @@ public abstract class BaseZentaoJsonClient extends BaseClient {
 		String suffix = split[split.length - 1];
 		if (StringUtils.equals("biz", suffix)) {
 			suffix = baseUrl;
-		} else if (!StringUtils.equalsAny(suffix, "zentao", "pro", "zentaopms", "zentaopro", "zentaobiz")) {
+		} else if (!StringUtils.containsAny(suffix, "zentao", "pro", "zentaopms", "zentaopro", "zentaobiz")) {
 			suffix = "";
 		} else {
 			suffix = "/" + suffix;
