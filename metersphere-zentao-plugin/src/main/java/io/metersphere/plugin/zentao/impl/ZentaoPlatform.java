@@ -358,11 +358,11 @@ public class ZentaoPlatform extends AbstractPlatform {
 	/**
 	 * 删除缺陷
 	 *
-	 * @param platformBugId 平台缺陷ID
+	 * @param request 请求参数
 	 */
 	@Override
-	public void deleteBug(String platformBugId) {
-		zentaoRestClient.delete(platformBugId);
+	public void deleteBug(PlatformBugDeleteRequest request) {
+		zentaoRestClient.delete(request.getPlatformBugKey());
 	}
 
 	/**

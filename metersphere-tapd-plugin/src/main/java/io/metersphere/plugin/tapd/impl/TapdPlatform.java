@@ -272,7 +272,7 @@ public class TapdPlatform extends AbstractPlatform {
 	}
 
 	@Override
-	public void deleteBug(String platformBugId) {
+	public void deleteBug(PlatformBugDeleteRequest request) {
 		// TODO: Tapd-API currently does not support delete bug
 	}
 
