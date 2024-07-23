@@ -7,7 +7,7 @@ MeterSphere 平台插件
 
 ### 版本说明
 
-插件的版本与 Metersphere 版本相对应。由于基础SDK的调整, 最新的V3.x版本插件最低支持 MeterSphere 3.x 版本。
+插件的版本与 MeterSphere 版本相对应。由于基础SDK的调整, 最新的V3.x版本插件最低支持 MeterSphere 3.x 版本。
 
 ### 下载插件
 
