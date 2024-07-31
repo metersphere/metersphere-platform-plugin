@@ -7,21 +7,25 @@ import io.metersphere.plugin.platform.dto.response.PlatformBugDTO;
 import io.metersphere.plugin.platform.dto.response.PlatformBugUpdateDTO;
 import io.metersphere.plugin.platform.dto.response.PlatformCustomFieldItemDTO;
 import io.metersphere.plugin.platform.dto.response.PlatformDemandDTO;
+import io.metersphere.plugin.platform.enums.PlatformCustomFieldType;
 import io.metersphere.plugin.platform.spi.AbstractPlatform;
 import io.metersphere.plugin.platform.utils.PluginPager;
 import io.metersphere.plugin.sdk.util.MSPluginException;
 import io.metersphere.plugin.sdk.util.PluginLogUtils;
 import io.metersphere.plugin.sdk.util.PluginUtils;
 import io.metersphere.plugin.tapd.client.TapdClient;
+import io.metersphere.plugin.tapd.constants.TapdSpecialCustomField;
 import io.metersphere.plugin.tapd.constants.TapdSystemType;
-import io.metersphere.plugin.tapd.domain.TapdIntegrationConfig;
-import io.metersphere.plugin.tapd.domain.TapdProject;
-import io.metersphere.plugin.tapd.domain.TapdProjectConfig;
-import io.metersphere.plugin.tapd.domain.TapdUserPlatformInfo;
+import io.metersphere.plugin.tapd.constants.TapdTemplateSystemField;
+import io.metersphere.plugin.tapd.domain.*;
 import io.metersphere.plugin.tapd.domain.response.TapdBugResponse;
 import io.metersphere.plugin.tapd.domain.response.TapdStoryResponse;
+import io.metersphere.plugin.tapd.enums.TapdFieldType;
+import io.metersphere.plugin.tapd.enums.TapdOptionKey;
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.SerializationUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.time.DateUtils;
 import org.pf4j.Extension;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.LinkedMultiValueMap;
@@ -42,6 +46,8 @@ import java.util.stream.Collectors;
 public class TapdPlatform extends AbstractPlatform {
 
 	protected TapdClient tapdClient;
+
+	protected TapdProjectConfig projectConfig;
 
 	protected static final String MS_RICH_TEXT_PREVIEW_SRC_PREFIX = "/bug/attachment/preview/md";
 
@@ -111,20 +117,79 @@ public class TapdPlatform extends AbstractPlatform {
 	 */
 	@Override
 	public boolean isSupportDefaultTemplate() {
-		// Tapd currently does not support default templates
-		return false;
+		return true;
 	}
 
 	/**
 	 * 获取第三方平台缺陷的自定义字段
 	 *
-	 * @param projectConfig 项目配置信息
+	 * @param projectConfigStr 项目配置信息
 	 * @return 自定义字段集合
 	 */
 	@Override
-	public List<PlatformCustomFieldItemDTO> getDefaultTemplateCustomField(String projectConfig) {
-		// when isSupportDefaultTemplate get true, implement this method;
-		return null;
+	public List<PlatformCustomFieldItemDTO> getDefaultTemplateCustomField(String projectConfigStr) {
+		// 项目配置校验
+		projectConfig = getProjectConfig(projectConfigStr);
+		// 准备一些选项值
+		Map<String, String> optionData = prepareOptionData();
+		// 获取默认模板
+		Map<String, String> projectDefaultTemplate = tapdClient.getBugDefaultTemplate(projectConfig.getTapdKey());
+		if (CollectionUtils.isEmpty(projectDefaultTemplate)) {
+			return new ArrayList<>();
+		}
+
+		// 获取默认模板的字段及所有字段详情和待选值
+		List<TapdTemplateField> defaultTemplateFields = tapdClient.getDefaultTemplateFields(projectDefaultTemplate.get("id"), projectConfig.getTapdKey());
+		Map<String, TapdTemplateFieldDetail> allFieldsMap = tapdClient.getAllFieldsMap(projectConfig.getTapdKey());
+		if (CollectionUtils.isEmpty(defaultTemplateFields) || CollectionUtils.isEmpty(allFieldsMap)) {
+			return new ArrayList<>();
+		}
+
+		List<TapdTemplateField> sortFields = sortCustomField(defaultTemplateFields);
+		List<PlatformCustomFieldItemDTO> fields = new ArrayList<>();
+		Character filedKey = 'A';
+		for (TapdTemplateField item : sortFields) {
+			TapdTemplateFieldDetail fieldDetail = allFieldsMap.get(item.getField());
+			if (fieldDetail == null) {
+				continue;
+			}
+			PlatformCustomFieldItemDTO customField = new PlatformCustomFieldItemDTO();
+			setCustomFieldBaseProperty(item, fieldDetail, customField, filedKey);
+			setCustomFieldTypeAndOption(fieldDetail, customField, optionData);
+			setCustomFieldDefaultValue(item, customField, fieldDetail.getHtml_type());
+			fields.add(customField);
+			filedKey++;
+		}
+
+		// 类型为空的字段不展示
+		fields = fields.stream().filter(i -> StringUtils.isNotBlank(i.getType())).collect(Collectors.toList());
+		return fields;
+	}
+
+	/**
+	 * 排序自定义字段
+	 *
+	 * @param fields 字段集合
+	 * @return 排序后的字段集合
+	 */
+	private List<TapdTemplateField> sortCustomField(List<TapdTemplateField> fields) {
+		// 默认按照sort字段排序 (title在最前面, 描述其次)
+		fields.sort((a, b) -> {
+			if (StringUtils.equals(a.getField(), TapdTemplateSystemField.DESCRIPTION)) {
+				return 1;
+			}
+			if (StringUtils.equals(b.getField(), TapdTemplateSystemField.DESCRIPTION)) {
+				return -1;
+			}
+			if (StringUtils.equals(a.getField(), TapdTemplateSystemField.TITLE)) {
+				return 1;
+			}
+			if (StringUtils.equals(b.getField(), TapdTemplateSystemField.TITLE)) {
+				return -1;
+			}
+			return a.getSort().compareTo(b.getSort());
+		});
+		return fields;
 	}
 
 	/**
@@ -273,12 +338,12 @@ public class TapdPlatform extends AbstractPlatform {
 
 	@Override
 	public void deleteBug(PlatformBugDeleteRequest request) {
-		// TODO: Tapd-API currently does not support delete bug
+		// TODO: Tapd-API currently does not support delete bug;
 	}
 
 	@Override
 	public boolean isSupportAttachment() {
-		// TODO: Tapd-API currently does not support attachment upload or delete
+		// TODO: Tapd-API currently does not support attachment upload or delete;
 		// https://o.tapd.cn/document/api-doc/API%E6%96%87%E6%A1%A3/api_reference/attachment/get_attachments.html
 		return false;
 	}
@@ -440,10 +505,10 @@ public class TapdPlatform extends AbstractPlatform {
 	 */
 	private void parseBaseFieldToMsBug(PlatformBugDTO msBug, Map tapdBugInfo, String projectKey) {
 		// 处理基础字段(TITLE, DESCRIPTION, HANDLE_USER, STATUS)
-		msBug.setTitle(tapdBugInfo.get("title") == null ? StringUtils.EMPTY : tapdBugInfo.get("title").toString());
-		msBug.setDescription(parseTapdPicToMsRichText(tapdBugInfo.get("description") == null ?
-				StringUtils.EMPTY : tapdBugInfo.get("description").toString(), msBug, projectKey));
-		Object ownerObj = tapdBugInfo.get("current_owner");
+		msBug.setTitle(tapdBugInfo.get(TapdTemplateSystemField.TITLE) == null ? StringUtils.EMPTY : tapdBugInfo.get(TapdTemplateSystemField.TITLE).toString());
+		msBug.setDescription(parseTapdPicToMsRichText(tapdBugInfo.get(TapdTemplateSystemField.DESCRIPTION) == null ?
+				StringUtils.EMPTY : tapdBugInfo.get(TapdTemplateSystemField.DESCRIPTION).toString(), msBug, projectKey));
+		Object ownerObj = tapdBugInfo.get(TapdTemplateSystemField.HANDLER_USER);
 		if (ownerObj == null || StringUtils.isBlank(ownerObj.toString())) {
 			msBug.setHandleUser(StringUtils.EMPTY);
 		} else {
@@ -519,8 +584,6 @@ public class TapdPlatform extends AbstractPlatform {
 	 */
 	private MultiValueMap<String, Object> buildUpdateParam(PlatformBugUpdateRequest request, PlatformBugUpdateDTO platformBug) {
 		MultiValueMap<String, Object> paramMap = new LinkedMultiValueMap<>();
-		paramMap.add("title", request.getTitle());
-		paramMap.add("description", parseRichTextPicToTapd(request.getDescription(), platformBug));
 		parseCustomFields(request, paramMap, platformBug);
 		return paramMap;
 	}
@@ -537,17 +600,50 @@ public class TapdPlatform extends AbstractPlatform {
 			List<PlatformCustomFieldItemDTO> customFields = request.getCustomFieldList();
 			if (!CollectionUtils.isEmpty(customFields)) {
 				for (PlatformCustomFieldItemDTO item : customFields) {
-					if (StringUtils.isNotBlank(item.getCustomData())) {
-						if (StringUtils.equals(item.getCustomData(), "currentOwner")) {
-							// Tapd处理人/创建人
+					if (StringUtils.isEmpty(item.getCustomData()) || StringUtils.isEmpty(item.getType()) || ObjectUtils.isEmpty(item.getValue())) {
+						continue;
+					}
+					if (StringUtils.equals(item.getType(), PlatformCustomFieldType.MULTIPLE_MEMBER.name())) {
+						// 多选成员类型
+						tapdEditParam.add(item.getCustomData(), StringUtils.join(PluginUtils.parseArray(item.getValue().toString(), String.class), ";"));
+					} else if (StringUtils.equals(item.getType(), PlatformCustomFieldType.MEMBER.name())) {
+						tapdEditParam.add(item.getCustomData(), item.getValue());
+						if (StringUtils.equals(item.getCustomData(), TapdTemplateSystemField.HANDLER_USER)) {
 							platformBug.setPlatformHandleUser(item.getValue().toString());
-							tapdEditParam.add("current_owner", item.getValue());
-						} else {
-							// 其他字段
-							tapdEditParam.add(item.getCustomData(), item.getValue());
 						}
+					} else if (StringUtils.equalsAnyIgnoreCase(item.getType(), PlatformCustomFieldType.MULTIPLE_SELECT.name(), PlatformCustomFieldType.CHECKBOX.name())) {
+						// 多选值类型
+						tapdEditParam.add(item.getCustomData(), StringUtils.join(PluginUtils.parseArray(item.getValue().toString(), String.class), "|"));
+					} else if (StringUtils.equalsIgnoreCase(item.getType(), PlatformCustomFieldType.CASCADER.name())) {
+						// 级联类型, 通常默认为["父级", "子级"]这样的结构处理
+						tapdEditParam.add(item.getCustomData(), StringUtils.join(PluginUtils.parseArray(item.getValue().toString(), String.class), "/"));
+					} else {
+						if (StringUtils.equals(item.getCustomData(), TapdTemplateSystemField.TITLE)) {
+							// 标题
+							platformBug.setPlatformTitle(item.getValue().toString());
+						}
+						if (StringUtils.equals(item.getCustomData(), TapdTemplateSystemField.DESCRIPTION)) {
+							// 内容
+							platformBug.setPlatformDescription(item.getValue().toString());
+						}
+						// 其他字段
+						tapdEditParam.add(item.getCustomData(), item.getValue());
 					}
 				}
+			}
+
+			if (!tapdEditParam.containsKey(TapdTemplateSystemField.TITLE)) {
+				tapdEditParam.add(TapdTemplateSystemField.TITLE, request.getTitle());
+				platformBug.setPlatformTitle(request.getTitle());
+			}
+			if (!tapdEditParam.containsKey(TapdTemplateSystemField.DESCRIPTION)) {
+				tapdEditParam.add(TapdTemplateSystemField.DESCRIPTION, parseRichTextPicToTapd(request.getDescription(), platformBug));
+			}
+
+			if (tapdEditParam.containsKey(TapdTemplateSystemField.BEGIN_DATE) && tapdEditParam.containsKey(TapdTemplateSystemField.DUE_DATE)
+					&& DateUtils.parseDate(tapdEditParam.get(TapdTemplateSystemField.BEGIN_DATE).getFirst().toString(), "yyyy-MM-dd")
+					.after(DateUtils.parseDate(tapdEditParam.get(TapdTemplateSystemField.DUE_DATE).getFirst().toString(), "yyyy-MM-dd"))) {
+				throw new MSPluginException("预计开始时间不能晚于预计结束时间!");
 			}
 		} catch (Exception e) {
 			throw new MSPluginException("解析Tapd自定义字段失败: " + e.getMessage());
@@ -710,8 +806,12 @@ public class TapdPlatform extends AbstractPlatform {
 			// filter and return bug status by custom fields, then remove it;
 			List<PlatformCustomFieldItemDTO> statusList = request.getCustomFieldList().stream().filter(item ->
 					StringUtils.equals(item.getCustomData(), "status")).toList();
-			request.getCustomFieldList().removeAll(statusList);
-			return statusList.getFirst();
+			if (CollectionUtils.isEmpty(statusList)) {
+				return null;
+			} else {
+				request.getCustomFieldList().removeAll(statusList);
+				return statusList.getFirst();
+			}
 		} else {
 			return null;
 		}
@@ -774,5 +874,166 @@ public class TapdPlatform extends AbstractPlatform {
 			PluginLogUtils.error("Parse tapd bug description error: " + e.getMessage());
 		}
 		return null;
+	}
+
+	/**
+	 * 设置自定义字段基础属性
+	 *
+	 * @param item        字段项
+	 * @param customField 自定义字段
+	 * @param filedKey    唯一KEY
+	 */
+	private void setCustomFieldBaseProperty(TapdTemplateField item, TapdTemplateFieldDetail fieldDetail, PlatformCustomFieldItemDTO customField, Character filedKey) {
+		customField.setId(item.getField());
+		if (StringUtils.equals(item.getField(), TapdTemplateSystemField.TITLE)) {
+			customField.setName(TapdTemplateSystemField.TITLE_LABEL_ZH);
+			customField.setPlaceHolder(TapdTemplateSystemField.TITLE_PLACEHOLDER);
+		} else if (StringUtils.equals(item.getField(), TapdTemplateSystemField.DESCRIPTION)) {
+			customField.setName(TapdTemplateSystemField.DESCRIPTION_LABEL_ZH);
+			customField.setPlaceHolder(TapdTemplateSystemField.DESCRIPTION_PLACEHOLDER);
+		} else if (StringUtils.equals(item.getField(), TapdTemplateSystemField.SIZE)) {
+			customField.setName(fieldDetail.getLabel());
+			customField.setPlaceHolder(TapdTemplateSystemField.SIZE_PLACEHOLDER);
+		} else {
+			customField.setName(fieldDetail.getLabel());
+		}
+		customField.setKey(String.valueOf(filedKey));
+		customField.setCustomData(item.getField());
+		customField.setRequired(StringUtils.equals(item.getRequired(), "1"));
+		customField.setSystemField(StringUtils.equalsAny(item.getField(), TapdTemplateSystemField.TITLE, TapdTemplateSystemField.DESCRIPTION));
+	}
+
+	/**
+	 * 设置自定义字段类型和选项值
+	 *
+	 * @param fieldDetail Tapd字段详情
+	 * @param customField 自定义字段
+	 */
+	private void setCustomFieldTypeAndOption(TapdTemplateFieldDetail fieldDetail, PlatformCustomFieldItemDTO customField, Map<String, String> optionData) {
+		Set<String> specialCustomFieldType = new HashSet<>(TapdSpecialCustomField.getSpecialFields());
+		String htmlType = fieldDetail.getHtml_type();
+		if (StringUtils.isNotBlank(htmlType)) {
+			// Tapd自定义字段类型
+			customField.setType(TapdFieldType.mappingTapdHtmlType(htmlType));
+			customField.setOptions(StringUtils.equalsIgnoreCase(customField.getType(), PlatformCustomFieldType.CASCADER.name()) ?
+					PluginUtils.toJSONString(parseCascadeFieldOptions(fieldDetail.getOptions())) : PluginUtils.toJSONString(parseCommonFieldOptions(fieldDetail.getOptions())));
+			if (mappingSpecialField(specialCustomFieldType, htmlType)) {
+				// 特殊自定义字段类型
+				handleSpecialCustomFieldType(fieldDetail, customField, optionData);
+			}
+		}
+	}
+
+	/**
+	 * 设置自定义字段默认值
+	 *
+	 * @param item        Tapd字段
+	 * @param customField 自定义字段
+	 */
+	private void setCustomFieldDefaultValue(TapdTemplateField item, PlatformCustomFieldItemDTO customField, String type) {
+		if (StringUtils.isNotBlank(item.getValue())) {
+			if (StringUtils.equalsAny(customField.getType(), PlatformCustomFieldType.MULTIPLE_MEMBER.name())) {
+				customField.setDefaultValue(PluginUtils.toJSONString(List.of(item.getValue().split(";"))));
+			} else if (StringUtils.equalsAny(customField.getType(), PlatformCustomFieldType.MEMBER.name())) {
+				customField.setDefaultValue(item.getValue().split(";")[0]);
+			} else if (StringUtils.equals(customField.getType(), PlatformCustomFieldType.CASCADER.name())) {
+				customField.setDefaultValue(item.getValue().substring(item.getValue().lastIndexOf("/") + 1));
+			} else if (StringUtils.equals(customField.getType(), PlatformCustomFieldType.RADIO.name())) {
+				customField.setDefaultValue(PluginUtils.parseArray(item.getValue()).getFirst().toString());
+			} else if (StringUtils.equalsAny(customField.getType(), PlatformCustomFieldType.MULTIPLE_SELECT.name(), PlatformCustomFieldType.CHECKBOX.name())) {
+				List<String> valList = PluginUtils.parseArray(item.getValue(), String.class);
+				valList.removeIf(StringUtils::isBlank);
+				customField.setDefaultValue(PluginUtils.toJSONString(valList));
+			} else {
+				customField.setDefaultValue(item.getValue());
+			}
+		}
+	}
+
+	/**
+	 * 根据字段类型, 匹配具体的字段集合
+	 *
+	 * @param specialFields 特殊字段集合
+	 * @param type          字段类型
+	 * @return true: 匹配到特殊字段, false: 未匹配到特殊字段
+	 */
+	private static boolean mappingSpecialField(Set<String> specialFields, String type) {
+		// 匹配特殊字段, 包含即可
+		Optional<String> findField = specialFields.stream().filter(field -> StringUtils.contains(type, field)).findAny();
+		return findField.isPresent();
+	}
+
+	/**
+	 * 处理特殊自定义字段类型
+	 *
+	 * @param item        tapd字段
+	 * @param customField 自定义字段
+	 * @param optionData  选项数据
+	 */
+	private void handleSpecialCustomFieldType(TapdTemplateFieldDetail item, PlatformCustomFieldItemDTO customField, Map<String, String> optionData) {
+		if (StringUtils.equalsAnyIgnoreCase(item.getHtml_type(), TapdSpecialCustomField.USER_CHOOSER, TapdSpecialCustomField.MIX_CHOOSER)) {
+			// 自定义字段类型为user_chooser
+			customField.setOptions(optionData.get(TapdOptionKey.USER.name()));
+			customField.setType(StringUtils.equals(item.getName(), TapdTemplateSystemField.HANDLER_USER) ? PlatformCustomFieldType.MEMBER.name() : PlatformCustomFieldType.MULTIPLE_MEMBER.name());
+		}
+	}
+
+	/**
+	 * 准备特定的选项数据, 防止多次网络请求
+	 *
+	 * @return 选项数据映射集合
+	 */
+	private Map<String, String> prepareOptionData() {
+		Map<String, String> optionData = new HashMap<>(16);
+		// Tapd用户下拉选项
+		optionData.put(TapdOptionKey.USER.name(), PluginUtils.toJSONString(tapdClient.getProjectUsers(projectConfig.getTapdKey())));
+		return optionData;
+	}
+
+	/**
+	 * 解析通用的选项值
+	 *
+	 * @param options 选项值
+	 * @return 选项值集合
+	 */
+	private List<TapdFieldOption> parseCommonFieldOptions(List<Map> options) {
+		if (CollectionUtils.isEmpty(options)) {
+			return new ArrayList<>();
+		}
+		List<TapdFieldOption> fieldOptions = new ArrayList<>();
+		Map optionMap = options.getFirst();
+		// noinspection unchecked
+		optionMap.keySet().forEach(key -> {
+			TapdFieldOption fieldOption = new TapdFieldOption();
+			fieldOption.setText(optionMap.get(key).toString());
+			fieldOption.setValue(key.toString());
+			fieldOptions.add(fieldOption);
+		});
+		return fieldOptions;
+	}
+
+	/**
+	 * 解析级联选项值
+	 *
+	 * @param options 选项值
+	 * @return 级联选项值
+	 */
+	private List<TapdFieldOption> parseCascadeFieldOptions(List<Map> options) {
+		if (CollectionUtils.isEmpty(options)) {
+			return new ArrayList<>();
+		}
+		List<TapdFieldOption> fieldOptions = new ArrayList<>();
+		// 属于级联框选项值
+		options.forEach(option -> {
+			TapdFieldOption fieldOption = new TapdFieldOption();
+			fieldOption.setText(option.get("name").toString());
+			fieldOption.setValue(option.get("name").toString());
+			if (option.containsKey("children")) {
+				// noinspection unchecked
+				fieldOption.setChildren(parseCascadeFieldOptions((List<Map>) option.get("children")));
+			}
+			fieldOptions.add(fieldOption);
+		});
+		return fieldOptions;
 	}
 }

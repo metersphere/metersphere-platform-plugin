@@ -1,5 +1,8 @@
 package io.metersphere.plugin.zentao.domain.request.rest;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import java.util.List;
 
 /**
@@ -7,6 +10,8 @@ import java.util.List;
  * 基于18.10的V1版本API文档
  * 注意: 18.10的API暂时不支持{os, browser}字段, 需要改代码文件来支持 <a href="https://www.zentao.net/book/api/721.html"></a>
  */
+@Setter
+@Getter
 public class ZentaoRestBugEditRequest {
 
 	/**
@@ -70,123 +75,4 @@ public class ZentaoRestBugEditRequest {
 	 */
 	private String project;
 
-	public String getBranch() {
-		return branch;
-	}
-
-	public void setBranch(String branch) {
-		this.branch = branch;
-	}
-
-	public String getModule() {
-		return module;
-	}
-
-	public void setModule(String module) {
-		this.module = module;
-	}
-
-	public String getExecution() {
-		return execution;
-	}
-
-	public void setExecution(String execution) {
-		this.execution = execution;
-	}
-
-	public String getTitle() {
-		return title;
-	}
-
-	public void setTitle(String title) {
-		this.title = title;
-	}
-
-	public String getKeywords() {
-		return keywords;
-	}
-
-	public void setKeywords(String keywords) {
-		this.keywords = keywords;
-	}
-
-	public String getSeverity() {
-		return severity;
-	}
-
-	public void setSeverity(String severity) {
-		this.severity = severity;
-	}
-
-	public String getPri() {
-		return pri;
-	}
-
-	public void setPri(String pri) {
-		this.pri = pri;
-	}
-
-	public String getType() {
-		return type;
-	}
-
-	public void setType(String type) {
-		this.type = type;
-	}
-
-	public String getSteps() {
-		return steps;
-	}
-
-	public void setSteps(String steps) {
-		this.steps = steps;
-	}
-
-	public String getTask() {
-		return task;
-	}
-
-	public void setTask(String task) {
-		this.task = task;
-	}
-
-	public String getStory() {
-		return story;
-	}
-
-	public void setStory(String story) {
-		this.story = story;
-	}
-
-	public String getDeadline() {
-		return deadline;
-	}
-
-	public void setDeadline(String deadline) {
-		this.deadline = deadline;
-	}
-
-	public List<String> getOpenedBuild() {
-		return openedBuild;
-	}
-
-	public void setOpenedBuild(List<String> openedBuild) {
-		this.openedBuild = openedBuild;
-	}
-
-	public String getAssignedTo() {
-		return assignedTo;
-	}
-
-	public void setAssignedTo(String assignedTo) {
-		this.assignedTo = assignedTo;
-	}
-
-	public String getProject() {
-		return project;
-	}
-
-	public void setProject(String project) {
-		this.project = project;
-	}
 }

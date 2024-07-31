@@ -6,6 +6,12 @@ public class TapdUrl {
 
 	public static final String GET_PROJECT_INFO = "/workspaces/get_workspace_info?workspace_id={1}";
 
+	public static final String GET_BUGS_TEMPLATE_LIST = "/bugs/template_list?workspace_id={1}";
+
+	public static final String GET_BUGS_DEFAULT_TEMPLATE = "/bugs/get_default_bug_template?template_id={1}&workspace_id={2}";
+
+	public static final String GET_ALL_BUGS_FIELD = "/bugs/get_fields_info?workspace_id={1}";
+
 	public static final String GET_WORKFLOW_FIRST_STEP = "/workflows/first_step?system={1}&workspace_id={2}";
 
 	public static final String GET_WORKFLOW_TRANSITIONS = "/workflows/all_transitions?system={1}&workspace_id={2}";
