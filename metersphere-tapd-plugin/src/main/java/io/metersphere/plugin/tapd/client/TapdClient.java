@@ -81,7 +81,7 @@ public class TapdClient extends BaseClient {
 			}
 			return PluginUtils.parseObject(PluginUtils.toJSONString(((Map) response.getBody().getData()).get("Workspace")), TapdProject.class);
 		} catch (Exception e) {
-			holdUpTooManyException(e, "获取项目信息异常!");
+			holdUpTooManyException(e, "获取Tapd项目信息异常!");
 		}
 		return null;
 	}
@@ -93,20 +93,24 @@ public class TapdClient extends BaseClient {
 	 * @return 默认模板
 	 */
 	public Map<String, String> getBugDefaultTemplate(String projectKey) {
-		ResponseEntity<TapdBaseResponse> response = restTemplate.exchange(ENDPOINT + TapdUrl.GET_BUGS_TEMPLATE_LIST, HttpMethod.GET, getAuthHttpEntity(), TapdBaseResponse.class, projectKey);
-		if (response.getBody() == null) {
-			return null;
-		}
-		List<Map> templates = PluginUtils.parseArray(PluginUtils.toJSONString(response.getBody().getData()), Map.class);
-		if (CollectionUtils.isEmpty(templates)) {
-			return null;
-		}
-		for (Map template : templates) {
-			// noinspection unchecked
-			Map<String, String> workitemTemplate = PluginUtils.parseMap(PluginUtils.toJSONString(template.get("WorkitemTemplate")));
-			if (StringUtils.equals(workitemTemplate.get("default"), "1")) {
-				return workitemTemplate;
+		try {
+			ResponseEntity<TapdBaseResponse> response = restTemplate.exchange(ENDPOINT + TapdUrl.GET_BUGS_TEMPLATE_LIST, HttpMethod.GET, getAuthHttpEntity(), TapdBaseResponse.class, projectKey);
+			if (response.getBody() == null) {
+				return null;
 			}
+			List<Map> templates = PluginUtils.parseArray(PluginUtils.toJSONString(response.getBody().getData()), Map.class);
+			if (CollectionUtils.isEmpty(templates)) {
+				return null;
+			}
+			for (Map template : templates) {
+				// noinspection unchecked
+				Map<String, String> workitemTemplate = PluginUtils.parseMap(PluginUtils.toJSONString(template.get("WorkitemTemplate")));
+				if (StringUtils.equals(workitemTemplate.get("default"), "1")) {
+					return workitemTemplate;
+				}
+			}
+		} catch (Exception e) {
+			holdUpTooManyException(e, "获取Tapd默认模板异常!");
 		}
 		return null;
 	}
@@ -119,20 +123,25 @@ public class TapdClient extends BaseClient {
 	 * @return 默认模板字段集合
 	 */
 	public List<TapdTemplateField> getDefaultTemplateFields(String templateId, String projectKey) {
-		ResponseEntity<TapdBaseResponse> response = restTemplate.exchange(ENDPOINT + TapdUrl.GET_BUGS_DEFAULT_TEMPLATE, HttpMethod.GET, getAuthHttpEntity(), TapdBaseResponse.class, templateId, projectKey);
-		if (response.getBody() == null) {
-			return new ArrayList<>();
+		try {
+			ResponseEntity<TapdBaseResponse> response = restTemplate.exchange(ENDPOINT + TapdUrl.GET_BUGS_DEFAULT_TEMPLATE, HttpMethod.GET, getAuthHttpEntity(), TapdBaseResponse.class, templateId, projectKey);
+			if (response.getBody() == null) {
+				return new ArrayList<>();
+			}
+			List<Map> fields = PluginUtils.parseArray(PluginUtils.toJSONString(response.getBody().getData()), Map.class);
+			if (CollectionUtils.isEmpty(fields)) {
+				return new ArrayList<>();
+			}
+			List<TapdTemplateField> templateFields = new ArrayList<>();
+			for (Map field : fields) {
+				TapdTemplateField workItemField = PluginUtils.parseObject(PluginUtils.toJSONString(field.get("WorkitemTemplateField")), TapdTemplateField.class);
+				templateFields.add(workItemField);
+			}
+			return templateFields;
+		} catch (Exception e) {
+			holdUpTooManyException(e, "获取Tapd默认模板字段集合异常!");
 		}
-		List<Map> fields = PluginUtils.parseArray(PluginUtils.toJSONString(response.getBody().getData()), Map.class);
-		if (CollectionUtils.isEmpty(fields)) {
-			return new ArrayList<>();
-		}
-		List<TapdTemplateField> templateFields = new ArrayList<>();
-		for (Map field : fields) {
-			TapdTemplateField workItemField = PluginUtils.parseObject(PluginUtils.toJSONString(field.get("WorkitemTemplateField")), TapdTemplateField.class);
-			templateFields.add(workItemField);
-		}
-		return templateFields;
+		return null;
 	}
 
 	/**
@@ -142,19 +151,24 @@ public class TapdClient extends BaseClient {
 	 * @return 所有的字段详情
 	 */
 	public Map<String, TapdTemplateFieldDetail> getAllFieldsMap(String projectKey) {
-		ResponseEntity<TapdBaseResponse> response = restTemplate.exchange(ENDPOINT + TapdUrl.GET_ALL_BUGS_FIELD, HttpMethod.GET, getAuthHttpEntity(), TapdBaseResponse.class, projectKey);
-		if (response.getBody() == null) {
-			return null;
+		try {
+			ResponseEntity<TapdBaseResponse> response = restTemplate.exchange(ENDPOINT + TapdUrl.GET_ALL_BUGS_FIELD, HttpMethod.GET, getAuthHttpEntity(), TapdBaseResponse.class, projectKey);
+			if (response.getBody() == null) {
+				return null;
+			}
+			Map fieldMap = PluginUtils.parseMap(PluginUtils.toJSONString(response.getBody().getData()));
+			if (CollectionUtils.isEmpty(fieldMap)) {
+				return null;
+			}
+			Map<String, TapdTemplateFieldDetail> fieldDetailMap = new HashMap<>(16);
+			for (Object key : fieldMap.keySet()) {
+				fieldDetailMap.put(key.toString(), PluginUtils.parseObject(PluginUtils.toJSONString(fieldMap.get(key)), TapdTemplateFieldDetail.class));
+			}
+			return fieldDetailMap;
+		} catch (Exception e) {
+			holdUpTooManyException(e, "获取Tapd字段及候选值异常!");
 		}
-		Map fieldMap = PluginUtils.parseMap(PluginUtils.toJSONString(response.getBody().getData()));
-		if (CollectionUtils.isEmpty(fieldMap)) {
-			return null;
-		}
-		Map<String, TapdTemplateFieldDetail> fieldDetailMap = new HashMap<>(16);
-		for (Object key : fieldMap.keySet()) {
-			fieldDetailMap.put(key.toString(), PluginUtils.parseObject(PluginUtils.toJSONString(fieldMap.get(key)), TapdTemplateFieldDetail.class));
-		}
-		return fieldDetailMap;
+		return null;
 	}
 
 	/**
@@ -183,7 +197,7 @@ public class TapdClient extends BaseClient {
 			});
 			return statusOption;
 		} catch (Exception e) {
-			holdUpTooManyException(e, "获取起始状态流异常!");
+			holdUpTooManyException(e, "获取Tapd起始状态流异常!");
 		}
 		return null;
 	}
@@ -225,7 +239,7 @@ public class TapdClient extends BaseClient {
 			});
 			return statusOption;
 		} catch (Exception e) {
-			holdUpTooManyException(e, "获取状态流异常!");
+			holdUpTooManyException(e, "获取Tapd状态流异常!");
 		}
 		return null;
 	}
@@ -360,7 +374,7 @@ public class TapdClient extends BaseClient {
 			Map responseDataMap = PluginUtils.parseMap(PluginUtils.toJSONString(response.getBody().getData()));
 			return PluginUtils.parseMap(PluginUtils.toJSONString(responseDataMap.get("Attachment"))).get("download_url").toString();
 		} catch (Exception e) {
-			holdUpTooManyException(e, "获取图片下载链接异常!");
+			holdUpTooManyException(e, "获取Tapd图片下载链接异常!");
 		}
 		return null;
 	}
@@ -427,7 +441,7 @@ public class TapdClient extends BaseClient {
 	 * @param e        异常信息
 	 * @param extraMsg 额外信息
 	 */
-	private void holdUpTooManyException(Exception e, String extraMsg) {
+	public void holdUpTooManyException(Exception e, String extraMsg) {
 		if (((HttpClientErrorException) e).getStatusCode().value() == TapdErrorCode.TOO_MANY_REQUESTS) {
 			throw new MSPluginException("Tapd账号超过了请求频率限制, 请稍后再试!");
 		} else {

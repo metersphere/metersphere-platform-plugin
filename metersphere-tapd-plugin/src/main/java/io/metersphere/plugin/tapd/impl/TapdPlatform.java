@@ -207,10 +207,10 @@ public class TapdPlatform extends AbstractPlatform {
 			return (List<SelectOption>) this.getClass().getMethod(method, request.getClass()).invoke(this, request);
 		} catch (InvocationTargetException e) {
 			PluginLogUtils.error(e.getTargetException());
-			throw new MSPluginException(e.getTargetException());
+			throw new MSPluginException(e.getTargetException().getMessage());
 		} catch (Exception e) {
 			PluginLogUtils.error(e);
-			throw new MSPluginException(e);
+			throw new MSPluginException(e.getMessage());
 		}
 	}
 
@@ -436,7 +436,7 @@ public class TapdPlatform extends AbstractPlatform {
 			} while (querySize >= limit);
 		} catch (Exception e) {
 			PluginLogUtils.error(e);
-			throw new MSPluginException(e);
+			throw new MSPluginException(e.getMessage());
 		}
 	}
 
@@ -606,11 +606,9 @@ public class TapdPlatform extends AbstractPlatform {
 					if (StringUtils.equals(item.getType(), PlatformCustomFieldType.MULTIPLE_MEMBER.name())) {
 						// 多选成员类型
 						tapdEditParam.add(item.getCustomData(), StringUtils.join(PluginUtils.parseArray(item.getValue().toString(), String.class), ";"));
-					} else if (StringUtils.equals(item.getType(), PlatformCustomFieldType.MEMBER.name())) {
+					} else if (StringUtils.equals(item.getCustomData(), TapdTemplateSystemField.HANDLER_USER)) {
 						tapdEditParam.add(item.getCustomData(), item.getValue());
-						if (StringUtils.equals(item.getCustomData(), TapdTemplateSystemField.HANDLER_USER)) {
-							platformBug.setPlatformHandleUser(item.getValue().toString());
-						}
+						platformBug.setPlatformHandleUser(item.getValue().toString());
 					} else if (StringUtils.equalsAnyIgnoreCase(item.getType(), PlatformCustomFieldType.MULTIPLE_SELECT.name(), PlatformCustomFieldType.CHECKBOX.name())) {
 						// 多选值类型
 						tapdEditParam.add(item.getCustomData(), StringUtils.join(PluginUtils.parseArray(item.getValue().toString(), String.class), "|"));
@@ -806,12 +804,8 @@ public class TapdPlatform extends AbstractPlatform {
 			// filter and return bug status by custom fields, then remove it;
 			List<PlatformCustomFieldItemDTO> statusList = request.getCustomFieldList().stream().filter(item ->
 					StringUtils.equals(item.getCustomData(), "status")).toList();
-			if (CollectionUtils.isEmpty(statusList)) {
-				return null;
-			} else {
-				request.getCustomFieldList().removeAll(statusList);
-				return statusList.getFirst();
-			}
+			request.getCustomFieldList().removeAll(statusList);
+			return statusList.getFirst();
 		} else {
 			return null;
 		}
