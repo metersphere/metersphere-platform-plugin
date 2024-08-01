@@ -27,10 +27,13 @@ import io.metersphere.plugin.zentao.domain.ZentaoProjectConfig;
 import io.metersphere.plugin.zentao.domain.request.rest.ZentaoRestBugEditRequest;
 import io.metersphere.plugin.zentao.domain.response.json.ZentaoBugResponse;
 import io.metersphere.plugin.zentao.domain.response.rest.*;
+import io.metersphere.plugin.zentao.enums.ZentaoBugDefaultTemplateField;
 import io.metersphere.plugin.zentao.enums.ZentaoBugPlatformStatus;
+import io.metersphere.plugin.zentao.enums.ZentaoOptionKey;
 import org.apache.commons.lang3.SerializationUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.pf4j.Extension;
+import org.springframework.beans.BeanUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.io.File;
@@ -180,8 +183,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 	 */
 	@Override
 	public boolean isSupportDefaultTemplate() {
-		// Zentao currently does not support default templates
-		return false;
+		return true;
 	}
 
 	/**
@@ -192,8 +194,58 @@ public class ZentaoPlatform extends AbstractPlatform {
 	 */
 	@Override
 	public List<PlatformCustomFieldItemDTO> getDefaultTemplateCustomField(String projectConfigStr) {
-		// when isSupportDefaultTemplate get true, implement this method;
-		return null;
+		// 项目配置校验
+		projectConfig = getProjectConfig(projectConfigStr);
+		// 准备一些选项值
+		Map<String, String> optionData = prepareOptionData();
+		List<PlatformCustomFieldItemDTO> fields = new ArrayList<>();
+		char filedKey = 'A';
+		List<ZentaoBugDefaultTemplateField> sortFields = sortCustomField(new ArrayList<>(List.of(ZentaoBugDefaultTemplateField.values())));
+		for (ZentaoBugDefaultTemplateField field : sortFields) {
+			PlatformCustomFieldItemDTO customField = new PlatformCustomFieldItemDTO();
+			BeanUtils.copyProperties(field, customField);
+			customField.setKey(String.valueOf(filedKey++));
+			customField.setSystemField(StringUtils.equalsAny(field.getId(), ZentaoBugDefaultTemplateField.TITLE.getId(), ZentaoBugDefaultTemplateField.STEPS.getId()));
+			if (StringUtils.equals(field.getId(), ZentaoBugDefaultTemplateField.ASSIGNED_TO.getId())) {
+				customField.setOptions(optionData.get(ZentaoOptionKey.USER.name()));
+			} else if (StringUtils.equals(field.getId(), ZentaoBugDefaultTemplateField.EXECUTION.getId())) {
+				customField.setOptions(optionData.get(ZentaoOptionKey.EXECUTION.name()));
+			} else if (StringUtils.equals(field.getId(), ZentaoBugDefaultTemplateField.OPENED_BUILD.getId())) {
+				customField.setOptions(optionData.get(ZentaoOptionKey.BUILD.name()));
+			} else if (StringUtils.equals(field.getId(), ZentaoBugDefaultTemplateField.STORY.getId())) {
+				customField.setOptions(optionData.get(ZentaoOptionKey.STORY.name()));
+			} else {
+				customField.setOptions(PluginUtils.toJSONString(field.getOptions()));
+			}
+			fields.add(customField);
+		}
+		return fields;
+	}
+
+	/**
+	 * 排序自定义字段
+	 *
+	 * @param fields 字段集合
+	 * @return 排序后的字段集合
+	 */
+	private List<ZentaoBugDefaultTemplateField> sortCustomField(List<ZentaoBugDefaultTemplateField> fields) {
+		// 默认按照sort字段排序 (title在最前面, 重现步骤其次)
+		fields.sort((a, b) -> {
+			if (StringUtils.equals(a.getId(), ZentaoBugDefaultTemplateField.STEPS.getId())) {
+				return 1;
+			}
+			if (StringUtils.equals(b.getId(), ZentaoBugDefaultTemplateField.STEPS.getId())) {
+				return -1;
+			}
+			if (StringUtils.equals(a.getId(), ZentaoBugDefaultTemplateField.TITLE.getId())) {
+				return 1;
+			}
+			if (StringUtils.equals(b.getId(), ZentaoBugDefaultTemplateField.TITLE.getId())) {
+				return -1;
+			}
+			return a.getSort().compareTo(b.getSort());
+		});
+		return fields;
 	}
 
 	/**
@@ -1034,5 +1086,32 @@ public class ZentaoPlatform extends AbstractPlatform {
 			PluginLogUtils.error("Parse tapd bug description error: " + e.getMessage());
 		}
 		return null;
+	}
+
+	/**
+	 * 准备特定的选项数据, 防止多次网络请求
+	 *
+	 * @return 选项数据映射集合
+	 */
+	private Map<String, String> prepareOptionData() {
+		Map<String, String> optionData = new HashMap<>(16);
+		// Tapd用户下拉选项
+		ZentaoRestUserResponse users = zentaoRestClient.getUsers();
+		List<SelectOption> userOptions = users.getUsers().stream().map(user -> new SelectOption(user.getRealname(), user.getAccount())).collect(Collectors.toList());
+		optionData.put(ZentaoOptionKey.USER.name(), PluginUtils.toJSONString(userOptions));
+		// 版本下拉选项 {默认加上主干分支}
+		ZentaoRestBuildResponse builds = zentaoRestClient.getBuilds(StringUtils.isNotBlank(projectConfig.getProjectKey()) ? projectConfig.getProjectKey() : projectConfig.getProductKey());
+		List<SelectOption> buildOptions = builds.getBuilds().stream().map(user -> new SelectOption(user.getName(), user.getId())).collect(Collectors.toList());
+		buildOptions.add(new SelectOption("主干", "trunk"));
+		optionData.put(ZentaoOptionKey.BUILD.name(), PluginUtils.toJSONString(buildOptions));
+		// 执行下拉选项
+		ZentaoRestExecutionResponse executions = zentaoRestClient.getExecutions(StringUtils.isNotBlank(projectConfig.getProjectKey()) ? projectConfig.getProjectKey() : projectConfig.getProductKey());
+		List<SelectOption> executionOptions = executions.getExecutions().stream().map(user -> new SelectOption(user.getName(), user.getId())).collect(Collectors.toList());
+		optionData.put(ZentaoOptionKey.EXECUTION.name(), PluginUtils.toJSONString(executionOptions));
+		// 相关需求下拉选项
+		ZentaoRestExecutionStoriesResponse stories = zentaoRestClient.getProjectStories(StringUtils.isNotBlank(projectConfig.getProjectKey()) ? projectConfig.getProjectKey() : projectConfig.getProductKey());
+		List<SelectOption> storyOptions = stories.getStories().stream().map(user -> new SelectOption(user.getTitle(), user.getId())).collect(Collectors.toList());
+		optionData.put(ZentaoOptionKey.STORY.name(), PluginUtils.toJSONString(storyOptions));
+		return optionData;
 	}
 }

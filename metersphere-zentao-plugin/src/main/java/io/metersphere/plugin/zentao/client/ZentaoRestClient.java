@@ -213,6 +213,61 @@ public class ZentaoRestClient extends BaseClient {
 	}
 
 	/**
+	 * 获取禅道版本列表
+	 *
+	 * @return 版本列表
+	 */
+	public ZentaoRestBuildResponse getBuilds(String projectKey) {
+		ResponseEntity<ZentaoRestBuildResponse> response;
+		try {
+			response = restTemplate.exchange(getRestUrl(ZentaoRestApiUrl.GET_BUILDS, null), HttpMethod.GET, getJsonHttpEntityWithToken(StringUtils.EMPTY), ZentaoRestBuildResponse.class, projectKey);
+			if (response.getBody() == null) {
+				throw new MSPluginException("获取禅道版本列表失败!");
+			}
+		} catch (Exception e) {
+			throw new MSPluginException(UnicodeConvertUtils.unicodeToCn(e.getMessage()));
+		}
+		return response.getBody();
+	}
+
+	/**
+	 * 获取禅道执行列表
+	 *
+	 * @return 执行列表
+	 */
+	public ZentaoRestExecutionResponse getExecutions(String projectKey) {
+		ResponseEntity<ZentaoRestExecutionResponse> response;
+		try {
+			response = restTemplate.exchange(getRestUrl(ZentaoRestApiUrl.GET_EXECUTIONS, null), HttpMethod.GET, getJsonHttpEntityWithToken(StringUtils.EMPTY), ZentaoRestExecutionResponse.class, projectKey);
+			if (response.getBody() == null) {
+				throw new MSPluginException("获取禅道执行列表失败!");
+			}
+		} catch (Exception e) {
+			throw new MSPluginException(UnicodeConvertUtils.unicodeToCn(e.getMessage()));
+		}
+		return response.getBody();
+	}
+
+	/**
+	 * 获取禅道项目需求列表
+	 * (由于执行需求列表接口需与所属执行字段联动, 而MS暂时表单交互与联动效果冲突, 故暂时弃用)
+	 *
+	 * @return 执行列表
+	 */
+	public ZentaoRestExecutionStoriesResponse getProjectStories(String projectKey) {
+		ResponseEntity<ZentaoRestExecutionStoriesResponse> response;
+		try {
+			response = restTemplate.exchange(getRestUrl(ZentaoRestApiUrl.GET_PROJECT_STORIES, null), HttpMethod.GET, getJsonHttpEntityWithToken(StringUtils.EMPTY), ZentaoRestExecutionStoriesResponse.class, projectKey);
+			if (response.getBody() == null) {
+				throw new MSPluginException("获取禅道项目需求列表!");
+			}
+		} catch (Exception e) {
+			throw new MSPluginException(UnicodeConvertUtils.unicodeToCn(e.getMessage()));
+		}
+		return response.getBody();
+	}
+
+	/**
 	 * 解决BUG
 	 */
 	public void resolveBug(String zentaoKey, String assignedTo) {

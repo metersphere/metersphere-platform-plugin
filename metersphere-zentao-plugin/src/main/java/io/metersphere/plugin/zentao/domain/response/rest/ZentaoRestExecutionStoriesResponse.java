@@ -7,13 +7,13 @@ import java.util.List;
 
 @Data
 @EqualsAndHashCode(callSuper = false)
-public class ZentaoRestBuildResponse extends ZentaoRestBaseResponse {
+public class ZentaoRestExecutionStoriesResponse extends ZentaoRestBaseResponse {
 
-	private List<Build> builds;
+	private List<Story> stories;
 
 	@Data
-	public static class Build {
+	public static class Story {
 		private String id;
-		private String name;
+		private String title;
 	}
 }
