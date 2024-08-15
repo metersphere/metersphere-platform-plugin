@@ -618,14 +618,15 @@ public class TapdPlatform extends AbstractPlatform {
 					} else {
 						if (StringUtils.equals(item.getCustomData(), TapdTemplateSystemField.TITLE)) {
 							// 标题
+							tapdEditParam.add(TapdTemplateSystemField.TITLE, item.getValue());
 							platformBug.setPlatformTitle(item.getValue().toString());
-						}
-						if (StringUtils.equals(item.getCustomData(), TapdTemplateSystemField.DESCRIPTION)) {
+						} else if (StringUtils.equals(item.getCustomData(), TapdTemplateSystemField.DESCRIPTION)) {
 							// 内容
-							platformBug.setPlatformDescription(item.getValue().toString());
+							tapdEditParam.add(TapdTemplateSystemField.DESCRIPTION, parseRichTextPicToTapd(item.getValue().toString(), platformBug));
+						} else {
+							// 其他字段
+							tapdEditParam.add(item.getCustomData(), item.getValue());
 						}
-						// 其他字段
-						tapdEditParam.add(item.getCustomData(), item.getValue());
 					}
 				}
 			}
@@ -893,7 +894,7 @@ public class TapdPlatform extends AbstractPlatform {
 		}
 		customField.setKey(String.valueOf(filedKey));
 		customField.setCustomData(item.getField());
-		customField.setRequired(StringUtils.equals(item.getRequired(), "1"));
+		customField.setRequired(StringUtils.equals(item.getRequired(), "1") && !StringUtils.equals(item.getField(), TapdTemplateSystemField.DESCRIPTION));
 		customField.setSystemField(StringUtils.equalsAny(item.getField(), TapdTemplateSystemField.TITLE, TapdTemplateSystemField.DESCRIPTION));
 	}
 

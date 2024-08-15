@@ -963,6 +963,13 @@ public class ZentaoPlatform extends AbstractPlatform {
 							// 指派给
 							platformBug.setPlatformHandleUser(item.getValue().toString());
 							zentaoEditParam.setAssignedTo(item.getValue().toString());
+						} else if (StringUtils.equals(item.getCustomData(), ZentaoBugDefaultTemplateField.TITLE.getId())) {
+							// 标题
+							platformBug.setPlatformTitle(item.getValue().toString());
+							zentaoEditParam.setTitle(item.getValue().toString());
+						} else if (StringUtils.equals(item.getCustomData(), ZentaoBugDefaultTemplateField.STEPS.getId())) {
+							// 描述
+							zentaoEditParam.setSteps(parseRichTextPicToZentao(item.getValue().toString(), StringUtils.equals("projects", projectConfig.getType()) ? projectConfig.getProjectKey() : projectConfig.getProductKey(), request.getRichFileMap(), platformBug));
 						} else if (StringUtils.equalsAnyIgnoreCase(item.getType(), PlatformCustomFieldType.MULTIPLE_SELECT.name())) {
 							// 多选字段
 							PluginBeanUtils.setFieldValueByName(zentaoEditParam, item.getCustomData(), PluginUtils.parseArray(item.getValue().toString(), String.class), List.class);
