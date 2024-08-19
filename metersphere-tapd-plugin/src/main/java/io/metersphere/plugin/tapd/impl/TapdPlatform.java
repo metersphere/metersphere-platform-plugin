@@ -661,7 +661,7 @@ public class TapdPlatform extends AbstractPlatform {
 		TapdProjectConfig config = validateConfig(request.getProjectConfig());
 
 		// query demand list no limit
-		List<TapdStoryResponse> storyList = tapdClient.getProjectStories(config.getTapdKey(), request.getStartPage(), Integer.MAX_VALUE);
+		List<TapdStoryResponse> storyList = tapdClient.getProjectStories(config.getTapdKey(), Integer.MAX_VALUE);
 		// handle empty data
 		if (CollectionUtils.isEmpty(storyList)) {
 			return List.of();

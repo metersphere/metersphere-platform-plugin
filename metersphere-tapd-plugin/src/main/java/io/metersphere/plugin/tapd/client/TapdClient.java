@@ -280,15 +280,14 @@ public class TapdClient extends BaseClient {
 	 * 分页获取项目的需求
 	 *
 	 * @param projectKey 项目Key
-	 * @param startPage  开始页码
 	 * @param pageSize   每页Size
 	 * @return 需求列表
 	 */
-	public List<TapdStoryResponse> getProjectStories(String projectKey, Integer startPage, Integer pageSize) {
+	public List<TapdStoryResponse> getProjectStories(String projectKey, Integer pageSize) {
 		List<TapdStoryResponse> stories = new ArrayList<>();
 		try {
 			ResponseEntity<TapdBaseResponse> response = restTemplate.exchange(ENDPOINT + TapdUrl.GET_PROJECT_STORY, HttpMethod.GET, getAuthHttpEntity(),
-					TapdBaseResponse.class, projectKey, startPage, pageSize);
+					TapdBaseResponse.class, projectKey, pageSize);
 			if (response.getBody() == null) {
 				return new ArrayList<>();
 			}

@@ -20,7 +20,7 @@ public class TapdUrl {
 
 	public static final String GET_PROJECT_USERS = "/workspaces/users?workspace_id={1}";
 
-	public static final String GET_PROJECT_STORY = "/stories?workspace_id={1}&page={2}&limit={3}";
+	public static final String GET_PROJECT_STORY = "/stories?workspace_id={1}&limit={3}";
 
 	public static final String EDIT_BUG = "/bugs";
 
