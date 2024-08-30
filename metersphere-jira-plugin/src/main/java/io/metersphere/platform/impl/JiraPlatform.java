@@ -788,7 +788,11 @@ public class JiraPlatform extends AbstractPlatform {
                             if (StringUtils.isNotBlank(item.getType())) {
                                 if (StringUtils.equalsAny(item.getType(), "select", "radio", "member")) {
                                     Map param = new LinkedHashMap<>();
-                                    param.put("id", item.getValue());
+                                    if (StringUtils.equals(item.getName(), "assignee")) {
+                                        param.put("name", item.getValue());
+                                    } else {
+                                        param.put("id", item.getValue());
+                                    }
                                     fields.put(fieldName, param);
                                 } else if (StringUtils.equalsAny(item.getType(), "multipleSelect", "checkbox", "multipleMember")) {
                                     List attrs = new ArrayList();
