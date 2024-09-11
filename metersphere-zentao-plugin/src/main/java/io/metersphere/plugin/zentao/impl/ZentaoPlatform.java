@@ -494,7 +494,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 		validateProjectKey();
 
 		// prepare page param
-		int pageNum = 0, pageSize = 200, currentSize;
+		int pageNum = 1, pageSize = 200, currentSize;
 		try {
 			do {
 				// prepare post process func param
@@ -1102,7 +1102,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 	 */
 	private Map<String, String> prepareOptionData() {
 		Map<String, String> optionData = new HashMap<>(16);
-		// Tapd用户下拉选项
+		// 禅道用户下拉选项
 		ZentaoRestUserResponse users = zentaoRestClient.getUsers();
 		List<SelectOption> userOptions = users.getUsers().stream().map(user -> new SelectOption(user.getRealname(), user.getAccount())).collect(Collectors.toList());
 		optionData.put(ZentaoOptionKey.USER.name(), PluginUtils.toJSONString(userOptions));
