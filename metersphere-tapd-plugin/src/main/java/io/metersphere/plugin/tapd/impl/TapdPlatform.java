@@ -81,12 +81,7 @@ public class TapdPlatform extends AbstractPlatform {
 	 */
 	@Override
 	public void validateUserConfig(String userConfig) {
-		TapdUserPlatformInfo platformConfig = PluginUtils.parseObject(userConfig, TapdUserPlatformInfo.class);
-		if (StringUtils.isBlank(platformConfig.getTapdAccount()) && StringUtils.isBlank(platformConfig.getTapdPassword())) {
-			throw new MSPluginException("TAPD认证失败: 账号或密码为空");
-		}
-		setUserConfig(userConfig, true);
-		tapdClient.auth();
+
 	}
 
 	/**
@@ -310,13 +305,14 @@ public class TapdPlatform extends AbstractPlatform {
 	 */
 	private PlatformBugUpdateDTO editBug(PlatformBugUpdateRequest request, boolean isUpdate) {
 		// validate config
-		TapdProjectConfig config = validateAndSetUserConfig(request.getUserPlatformConfig(), request.getProjectConfig());
+		TapdProjectConfig config = validateAndSetUserConfig(request.getProjectConfig());
+		TapdUserPlatformInfo userPlatformInfo = getUserPlatformInfo(request.getUserPlatformConfig());
 		// prepare and init tapd param
 		PlatformBugUpdateDTO platformBug = new PlatformBugUpdateDTO();
 		// filter status field
 		PlatformCustomFieldItemDTO statusField = filterStatusTransition(request);
 		// set param
-		MultiValueMap<String, Object> editParam = buildUpdateParam(request, platformBug);
+		MultiValueMap<String, Object> editParam = buildUpdateParam(request, platformBug, userPlatformInfo);
 		if (statusField != null) {
 			editParam.add("status", statusField.getValue());
 		}
@@ -582,9 +578,13 @@ public class TapdPlatform extends AbstractPlatform {
 	 * @param platformBug 平台缺陷
 	 * @return 参数
 	 */
-	private MultiValueMap<String, Object> buildUpdateParam(PlatformBugUpdateRequest request, PlatformBugUpdateDTO platformBug) {
+	private MultiValueMap<String, Object> buildUpdateParam(PlatformBugUpdateRequest request, PlatformBugUpdateDTO platformBug, TapdUserPlatformInfo userPlatformInfo) {
 		MultiValueMap<String, Object> paramMap = new LinkedMultiValueMap<>();
 		parseCustomFields(request, paramMap, platformBug);
+		// 替换MS-用户信息(Tapd昵称) => Tapd创建人
+		if (StringUtils.isNotEmpty(userPlatformInfo.getTapdNickName())) {
+			paramMap.add("reporter", userPlatformInfo.getTapdNickName());
+		}
 		return paramMap;
 	}
 
@@ -726,28 +726,6 @@ public class TapdPlatform extends AbstractPlatform {
 	}
 
 	/**
-	 * 设置用户平台配置(集成信息)
-	 *
-	 * @param userPlatformConfig 用户平台配置
-	 */
-	public void setUserConfig(String userPlatformConfig, Boolean isUserConfig) {
-		TapdIntegrationConfig integrationConfig;
-		if (isUserConfig) {
-			// 如果是用户配置, 则直接从平台参数中获取集成信息, 并替换用户账号配置
-			integrationConfig = getIntegrationConfig(TapdIntegrationConfig.class);
-			TapdUserPlatformInfo userConfig = PluginUtils.parseObject(userPlatformConfig, TapdUserPlatformInfo.class);
-			if (userConfig != null) {
-				integrationConfig.setAccount(userConfig.getTapdAccount());
-				integrationConfig.setPassword(userConfig.getTapdPassword());
-			}
-		} else {
-			// 如果是集成配置, 则直接从参数中获取集成信息
-			integrationConfig = getIntegrationConfig(userPlatformConfig, TapdIntegrationConfig.class);
-		}
-		validateAndSetConfig(integrationConfig);
-	}
-
-	/**
 	 * 校验并设置集成配置
 	 *
 	 * @param config 集成配置
@@ -772,13 +750,20 @@ public class TapdPlatform extends AbstractPlatform {
 	/**
 	 * 校验并设置用户配置
 	 *
-	 * @param userPlatformConfig 用户配置
 	 * @param projectConfig      项目配置
 	 * @return 项目配置
 	 */
-	private TapdProjectConfig validateAndSetUserConfig(String userPlatformConfig, String projectConfig) {
-		setUserConfig(userPlatformConfig, true);
+	private TapdProjectConfig validateAndSetUserConfig(String projectConfig) {
 		return validateConfig(projectConfig);
+	}
+
+	/**
+	 * 获取用户平台信息
+	 * @param userPlatformConfig 用户平台信息
+	 * @return 用户平台信息
+	 */
+	private TapdUserPlatformInfo getUserPlatformInfo(String userPlatformConfig) {
+		return PluginUtils.parseObject(userPlatformConfig, TapdUserPlatformInfo.class);
 	}
 
 	/**

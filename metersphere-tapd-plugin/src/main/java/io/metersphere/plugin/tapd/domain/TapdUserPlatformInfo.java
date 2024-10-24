@@ -4,6 +4,5 @@ import lombok.Data;
 
 @Data
 public class TapdUserPlatformInfo {
-	private String tapdAccount;
-	private String tapdPassword;
+	private String tapdNickName;
 }
