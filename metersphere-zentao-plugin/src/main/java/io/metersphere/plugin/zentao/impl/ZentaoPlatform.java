@@ -1037,9 +1037,9 @@ public class ZentaoPlatform extends AbstractPlatform {
 					// eg: <img src="/attachment/download/file/pid/fid/true" permalinksrc="/attachment/download/file/pid/fid/true">
 					// => <img src="/file-read-zFid.png" alt="/attachment/download/file/pid/fid/true"/>
 					// 还未双向同步的图片, 上传附件(图片)至禅道
-					String fileId = zentaoJsonClient.uploadFile(msFileMap.get(key), "bug", projectKey);
+					String imgUrl = zentaoJsonClient.uploadImgFile(msFileMap.get(key));
 					// 替换的目标禅道URL
-					String zentaoImgUrl = "<img src=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX + fileId + ".jpg";
+					String zentaoImgUrl = "<img src=\"" + imgUrl;
 					// 替换的源MS-URL正则
 					String sourceRegex = "(<img src=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX + "/)(\\d+)(/" + key + "/true)";
 					// 保留permalinksrc链接, 同步至MS时备用

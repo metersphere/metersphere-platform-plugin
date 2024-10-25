@@ -269,6 +269,32 @@ public abstract class BaseZentaoJsonClient extends BaseClient {
 		return id;
 	}
 
+	/**
+	 * 单独上传图片并获取返回的文件ID
+	 * @param file 图片文件
+	 * @return 文件URL
+	 */
+	public String uploadImgFile(File file) {
+		String imgUrl = "";
+		String sessionId = auth();
+		MultiValueMap<String, Object> paramMap = new LinkedMultiValueMap<>();
+		paramMap.add("imgFile", new FileSystemResource(file));
+		try {
+			ResponseEntity<String> responseEntity = restTemplate.exchange(getBaseUrl() + "/file-ajaxUpload.json?zentaosid={1}", HttpMethod.POST, getHttpEntity(paramMap),
+					String.class, sessionId);
+			// noinspection unchecked
+			Map<String, Object> dataMap = (Map<String, Object>) PluginUtils.parseMap(responseEntity.getBody());
+			imgUrl = dataMap.get("url").toString();
+			if (StringUtils.isEmpty(imgUrl)) {
+				PluginLogUtils.error("upload img file error");
+			}
+		} catch (Exception e) {
+			PluginLogUtils.error(e, e.getMessage());
+		}
+		PluginLogUtils.info("upload zentao img url: " + imgUrl);
+		return imgUrl;
+	}
+
 	protected HttpHeaders getHeader() {
 		HttpHeaders httpHeaders = new HttpHeaders();
 		httpHeaders.set(HttpHeaders.ACCEPT_ENCODING, "gzip,x-gzip,deflate");
