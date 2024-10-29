@@ -774,7 +774,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 			zenBug.keySet().forEach(fieldKey -> {
 				PlatformCustomFieldItemDTO field = new PlatformCustomFieldItemDTO();
 				field.setId(fieldKey);
-				field.setValue(zenBug.get(fieldKey));
+				field.setValue(StringUtils.equals(fieldKey, ZentaoBugDefaultTemplateField.STEPS.getId()) ? parseZentaoPicToMsRichText(zenBug.get(fieldKey).toString(), msBug) : zenBug.get(fieldKey));
 				needSyncCustomFields.add(field);
 			});
 		} else {
