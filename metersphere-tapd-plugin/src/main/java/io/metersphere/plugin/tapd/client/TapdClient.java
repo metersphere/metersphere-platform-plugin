@@ -277,17 +277,36 @@ public class TapdClient extends BaseClient {
 	}
 
 	/**
+	 * 获取需求总数量
+	 * @param projectKey 项目Key
+	 * @return 需求总数量
+	 */
+	public Integer getStoriesCount(String projectKey) {
+		try {
+			ResponseEntity<TapdBaseResponse> response = restTemplate.exchange(ENDPOINT + TapdUrl.GET_PROJECT_STORY_COUNT, HttpMethod.GET, getAuthHttpEntity(),
+					TapdBaseResponse.class, projectKey);
+			if (response.getBody() == null) {
+				return 0;
+			}
+			return response.getBody().getData() == null ? 0 : (int) PluginUtils.parseMap(PluginUtils.toJSONString(response.getBody().getData())).get("count");
+		} catch (Exception e) {
+			holdUpTooManyException(e, "获取Tapd项目需求异常!");
+		}
+		return 0;
+	}
+
+	/**
 	 * 分页获取项目的需求
 	 *
 	 * @param projectKey 项目Key
 	 * @param pageSize   每页Size
 	 * @return 需求列表
 	 */
-	public List<TapdStoryResponse> getProjectStories(String projectKey, Integer pageSize) {
+	public List<TapdStoryResponse> getProjectStories(String projectKey, Integer pageStart, Integer pageSize) {
 		List<TapdStoryResponse> stories = new ArrayList<>();
 		try {
 			ResponseEntity<TapdBaseResponse> response = restTemplate.exchange(ENDPOINT + TapdUrl.GET_PROJECT_STORY, HttpMethod.GET, getAuthHttpEntity(),
-					TapdBaseResponse.class, projectKey, pageSize);
+					TapdBaseResponse.class, projectKey, pageStart, pageSize);
 			if (response.getBody() == null) {
 				return new ArrayList<>();
 			}

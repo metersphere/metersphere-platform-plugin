@@ -661,7 +661,16 @@ public class TapdPlatform extends AbstractPlatform {
 		TapdProjectConfig config = validateConfig(request.getProjectConfig());
 
 		// query demand list no limit
-		List<TapdStoryResponse> storyList = tapdClient.getProjectStories(config.getTapdKey(), Integer.MAX_VALUE);
+		Integer total = tapdClient.getStoriesCount(config.getTapdKey());
+		if (total == null || total == 0) {
+			return List.of();
+		}
+		// 由于tapd接口限制, 一次最多查询200条需求, 所以需要分页查询
+		List<TapdStoryResponse> storyList = new ArrayList<>();
+		for (int start = 1; start <= total / 200 + 1; start++) {
+			List<TapdStoryResponse> pageStories = tapdClient.getProjectStories(config.getTapdKey(), start, 200);
+			storyList.addAll(pageStories);
+		}
 		// handle empty data
 		if (CollectionUtils.isEmpty(storyList)) {
 			return List.of();
