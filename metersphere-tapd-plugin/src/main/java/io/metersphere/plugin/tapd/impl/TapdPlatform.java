@@ -582,7 +582,7 @@ public class TapdPlatform extends AbstractPlatform {
 		MultiValueMap<String, Object> paramMap = new LinkedMultiValueMap<>();
 		parseCustomFields(request, paramMap, platformBug);
 		// 替换MS-用户信息(Tapd昵称) => Tapd创建人
-		if (StringUtils.isNotEmpty(userPlatformInfo.getTapdNickName())) {
+		if (userPlatformInfo != null && StringUtils.isNotEmpty(userPlatformInfo.getTapdNickName())) {
 			paramMap.add("reporter", userPlatformInfo.getTapdNickName());
 		}
 		return paramMap;
