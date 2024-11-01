@@ -17,6 +17,16 @@
         <plugin.id>tapd</plugin.id>
         <plugin.class>io.metersphere.plugin.tapd.impl.TapdPlugin</plugin.class>
         <plugin.provider>fit2cloud</plugin.provider>
+        <guava.version>33.0.0-jre</guava.version>
         <plugin.dependencies/>
     </properties>
+
+    <dependencies>
+        <!-- 后续移入Platform-SDK -->
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>${guava.version}</version>
+        </dependency>
+    </dependencies>
 </project>

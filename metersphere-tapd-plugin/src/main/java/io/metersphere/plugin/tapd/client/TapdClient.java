@@ -1,5 +1,7 @@
 package io.metersphere.plugin.tapd.client;
 
+import com.google.common.annotations.Beta;
+import com.google.common.util.concurrent.RateLimiter;
 import io.metersphere.plugin.platform.dto.SelectOption;
 import io.metersphere.plugin.platform.spi.BaseClient;
 import io.metersphere.plugin.sdk.util.MSPluginException;
@@ -34,8 +36,11 @@ public class TapdClient extends BaseClient {
 
 	protected static String PASSWORD;
 
+	protected RateLimiter rateLimiter;
+
 	public TapdClient(TapdIntegrationConfig integrationConfig) {
 		initConfig(integrationConfig);
+		rateLimiter = RateLimiter.create(1.0);
 	}
 
 	/**
@@ -290,7 +295,31 @@ public class TapdClient extends BaseClient {
 			}
 			return response.getBody().getData() == null ? 0 : (int) PluginUtils.parseMap(PluginUtils.toJSONString(response.getBody().getData())).get("count");
 		} catch (Exception e) {
-			holdUpTooManyException(e, "获取Tapd项目需求异常!");
+			holdUpTooManyException(e, "获取Tapd需求总数异常!");
+		}
+		return 0;
+	}
+
+	/**
+	 * 获取缺陷总数量
+	 * @param projectKey 项目Key
+	 * @param query 查询条件
+	 * @return 缺陷总数量
+	 */
+	public Integer getBugCount(String projectKey, String query) {
+		try {
+			String queryUrl = ENDPOINT + TapdUrl.GET_BUG_COUNT;
+			if (StringUtils.isNotEmpty(query)) {
+				queryUrl += "&" + query;
+			}
+			ResponseEntity<TapdBaseResponse> response = restTemplate.exchange(queryUrl, HttpMethod.GET, getAuthHttpEntity(),
+					TapdBaseResponse.class, projectKey);
+			if (response.getBody() == null) {
+				return 0;
+			}
+			return response.getBody().getData() == null ? 0 : (int) PluginUtils.parseMap(PluginUtils.toJSONString(response.getBody().getData())).get("count");
+		} catch (Exception e) {
+			holdUpTooManyException(e, "获取Tapd缺陷总数异常!");
 		}
 		return 0;
 	}
@@ -360,9 +389,13 @@ public class TapdClient extends BaseClient {
 	 * @param limit      每页大小
 	 * @return 缺陷列表
 	 */
-	public List<Map> getBugForPage(String projectKey, int page, int limit) {
+	public List<Map> getBugForPage(String projectKey, int page, int limit, String query) {
 		try {
-			ResponseEntity<TapdBaseResponse> response = restTemplate.exchange(ENDPOINT + TapdUrl.LIST_BUG, HttpMethod.GET,
+			String queryUrl = ENDPOINT + TapdUrl.LIST_BUG;
+			if (StringUtils.isNotEmpty(query)) {
+				queryUrl += "&" + query;
+			}
+			ResponseEntity<TapdBaseResponse> response = restTemplate.exchange(queryUrl, HttpMethod.GET,
 					getAuthHttpEntity(), TapdBaseResponse.class, projectKey, page, limit);
 			if (response.getBody() == null || response.getBody().getData() == null) {
 				return new ArrayList<>();
@@ -377,11 +410,13 @@ public class TapdClient extends BaseClient {
 
 	/**
 	 * 获取图片下载链接
+	 * (由于该接口在同步时调用频次很高且Tapd账号默认请求频率为60req/1min, 无法保证其稳定性, 会存在获取图片下载链接被拒绝的情况)
 	 *
 	 * @param projectKey 项目Key
 	 * @param imagePath  图片路径
 	 * @return 获取图片下载链接
 	 */
+	@Beta
 	public String getPicTmpDownUrl(String projectKey, String imagePath) {
 		try {
 			ResponseEntity<TapdBaseResponse> response = restTemplate.exchange(ENDPOINT + TapdUrl.GET_DOWNLOAD_URL, HttpMethod.GET,
@@ -392,7 +427,12 @@ public class TapdClient extends BaseClient {
 			Map responseDataMap = PluginUtils.parseMap(PluginUtils.toJSONString(response.getBody().getData()));
 			return PluginUtils.parseMap(PluginUtils.toJSONString(responseDataMap.get("Attachment"))).get("download_url").toString();
 		} catch (Exception e) {
-			holdUpTooManyException(e, "获取Tapd图片下载链接异常!");
+			// 获取的图片下载URL异常时, 捕获, 不影响同步主流程
+			if (((HttpClientErrorException) e).getStatusCode().value() == TapdErrorCode.TOO_MANY_REQUESTS) {
+				PluginLogUtils.error("获取Tapd单个图片下载链接异常: API账号超过了 \"60req/1min\" 的频率限制!");
+			} else {
+				PluginLogUtils.error("获取Tapd单个图片下载链接异常: " + e.getMessage(), e);
+			}
 		}
 		return null;
 	}
@@ -404,6 +444,7 @@ public class TapdClient extends BaseClient {
 	 * @param inputStreamHandler 流处理
 	 */
 	public void getAttachmentBytes(String fileDownUrl, Consumer<InputStream> inputStreamHandler) {
+		rateLimiter.acquire();
 		RequestCallback requestCallback = request -> {
 			// 定义请求头的接收类型
 			request.getHeaders().setAccept(Arrays.asList(MediaType.APPLICATION_OCTET_STREAM, MediaType.ALL));
@@ -432,6 +473,8 @@ public class TapdClient extends BaseClient {
 	 * @return 获取认证头
 	 */
 	protected HttpEntity<MultiValueMap<String, String>> getAuthHttpEntity() {
+		// Tapd-Api 网络请求调用频率限制
+		rateLimiter.acquire();
 		return new HttpEntity<>(getAuthHeader());
 	}
 
@@ -454,7 +497,7 @@ public class TapdClient extends BaseClient {
 	}
 
 	/**
-	 * 拦截Tapd-API 请求过多异常
+	 * 拦截Tapd-API 请求过多异常信息
 	 *
 	 * @param e        异常信息
 	 * @param extraMsg 额外信息

@@ -368,7 +368,7 @@ public class TapdPlatform extends AbstractPlatform {
 		int page = 1, limit = 200, querySize;
 		List<Map> totalQueryBugs = new ArrayList<>();
 		do {
-			List<Map> queryPageBugs = tapdClient.getBugForPage(config.getTapdKey(), page, limit);
+			List<Map> queryPageBugs = tapdClient.getBugForPage(config.getTapdKey(), page, limit, null);
 			querySize = queryPageBugs.size();
 			if (querySize > 0) {
 				totalQueryBugs.addAll(queryPageBugs);
@@ -396,9 +396,11 @@ public class TapdPlatform extends AbstractPlatform {
 	public void syncAllBugs(SyncAllBugRequest request) {
 		// validate config
 		TapdProjectConfig config = validateConfig(request.getProjectConfig());
+		String createdQuery = getCreatedQuery(request);
 
+		Integer total = tapdClient.getBugCount(config.getTapdKey(), createdQuery);
 		// prepare page param
-		int page = 1, limit = 200, querySize;
+		int start = 1, limit = 200, size = total / limit + 1;
 		try {
 			do {
 				// prepare post process func param
@@ -406,9 +408,7 @@ public class TapdPlatform extends AbstractPlatform {
 				SyncBugResult syncBugResult = new SyncBugResult();
 
 				// query tapd bug by page
-				List<Map> tapdBugs = tapdClient.getBugForPage(config.getTapdKey(), page, limit);
-				querySize = tapdBugs.size();
-				tapdBugs = filterBySyncCondition(tapdBugs, request);
+				List<Map> tapdBugs = tapdClient.getBugForPage(config.getTapdKey(), start, limit, createdQuery);
 				if (!CollectionUtils.isEmpty(tapdBugs)) {
 					for (Map bugMap : tapdBugs) {
 						// transfer tapd bug field to ms
@@ -428,8 +428,8 @@ public class TapdPlatform extends AbstractPlatform {
 				request.getSyncPostProcessFunc().accept(syncPostParamRequest);
 
 				// next page
-				page++;
-			} while (querySize >= limit);
+				start++;
+			} while (start <= size);
 		} catch (Exception e) {
 			PluginLogUtils.error(e);
 			throw new MSPluginException(e.getMessage());
@@ -450,28 +450,18 @@ public class TapdPlatform extends AbstractPlatform {
 	/**
 	 * 根据同步参数过滤缺陷集合
 	 *
-	 * @param tapdBugs tapd缺陷集合
 	 * @param request  同步全量参数
 	 * @return 过滤后的缺陷集合
 	 */
-	private List<Map> filterBySyncCondition(List<Map> tapdBugs, SyncAllBugRequest request) {
+	private String getCreatedQuery(SyncAllBugRequest request) {
 		if (request.getPre() == null || request.getCreateTime() == null) {
-			return tapdBugs;
+			return null;
 		}
-		return tapdBugs.stream().filter(bug -> {
-			long createTimeMills;
-			try {
-				createTimeMills = sdfDateTime.parse(bug.get("created").toString()).getTime();
-				if (request.getPre()) {
-					return createTimeMills <= request.getCreateTime();
-				} else {
-					return createTimeMills >= request.getCreateTime();
-				}
-			} catch (Exception e) {
-				PluginLogUtils.error(e.getMessage());
-				return false;
-			}
-		}).collect(Collectors.toList());
+		if (request.getPre()) {
+			return "created=<" + sdfDateTime.format(new Date(request.getCreateTime()));
+		} else {
+			return "created=>" + sdfDateTime.format(new Date(request.getCreateTime()));
+		}
 	}
 
 	/**
@@ -847,11 +837,12 @@ public class TapdPlatform extends AbstractPlatform {
 			Map<String, String> richFileMap = new HashMap<>(16);
 			for (String imgStr : splitStr) {
 				if (imgStr.contains(TAPD_RICH_TEXT_PIC_SRC_PREFIX)) {
+					String targetUrl = imgStr.substring(imgStr.indexOf("src=\""), imgStr.indexOf("/>") + 2);
 					String tapdUrlKey = imgStr.substring(imgStr.indexOf("src=\"") + 5, imgStr.indexOf("\" "));
 					String picTmpDownUrl = tapdClient.getPicTmpDownUrl(projectKey, tapdUrlKey);
 					if (StringUtils.isNotBlank(picTmpDownUrl)) {
-						String replaceTmpUrl = imgStr.replaceAll("src", "psrc").replaceAll("/>", "alt=\"" + picTmpDownUrl + "\" />");
-						content = content.replaceAll(imgStr, replaceTmpUrl);
+						String replaceTmpUrl = targetUrl.replaceAll("src", "psrc").replaceAll("/>", "alt=\"" + picTmpDownUrl + "\" />");
+						content = content.replaceAll(targetUrl, replaceTmpUrl);
 						// Tapd的图片默认命名为*.jpg, *: 唯一文件ID, 标识, 整数
 						richFileMap.put(picTmpDownUrl, UUID.randomUUID() + ".jpg");
 					}

@@ -28,5 +28,7 @@ public class TapdUrl {
 
 	public static final String LIST_BUG = "/bugs?workspace_id={1}&page={2}&limit={3}";
 
+	public static final String GET_BUG_COUNT = "/bugs/count?workspace_id={1}";
+
 	public static final String GET_DOWNLOAD_URL = "/files/get_image?workspace_id={1}&image_path={2}";
 }
