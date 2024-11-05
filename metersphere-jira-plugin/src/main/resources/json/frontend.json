@@ -83,7 +83,8 @@
         "i18n": true,
         "label": "project.jira_key",
         "withProjectCheck": true,
-        "instructionsIcon": "/static/jira-key.png"
+        "instructionsIcon": "/static/jira-key.png",
+        "message": "project.platform.jira_key_require"
       },
       {
         "name": "jiraIssueTypeId",
@@ -93,7 +94,8 @@
         "i18n": true,
         "cascade": "jiraKey",
         "optionMethod": "getIssueTypes",
-        "label": "organization.integration.jira_issuetype"
+        "label": "organization.integration.jira_issuetype",
+        "message": "project.platform.jira_issuetype_require"
       },
       {
         "name": "jiraStoryTypeId",
@@ -103,7 +105,8 @@
         "i18n": true,
         "cascade": "jiraKey",
         "optionMethod": "getIssueTypes",
-        "label": "organization.integration.jira_storytype"
+        "label": "organization.integration.jira_storytype",
+        "message": "project.platform.jira_storytype_require"
       }
     ]
   },
