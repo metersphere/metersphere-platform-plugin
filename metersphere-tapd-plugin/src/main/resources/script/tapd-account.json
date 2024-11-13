@@ -4,13 +4,13 @@
   "script": {
     "formItems": [
       {
-        "name": "tapdNickName",
+        "name": "nickName",
         "type": "INPUT",
-        "label": "Tapd昵称",
+        "label": "昵称",
         "value": "",
         "required": false,
-        "platformPlaceHolder": "请输入TAPD账号名称",
-        "tooltip": "Tapd昵称在\"个人-我的设置-个人/基本信息\"中查看"
+        "platformPlaceHolder": "请录入登录账号对应的昵称以便工作台进行数据统计",
+        "tooltip": "昵称在\"个人-我的设置-个人/基本信息\"中查看"
       }
     ]
   }

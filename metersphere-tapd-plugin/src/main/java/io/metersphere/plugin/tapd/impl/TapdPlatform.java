@@ -231,6 +231,12 @@ public class TapdPlatform extends AbstractPlatform {
 		return statusOptions;
 	}
 
+	@Override
+	public List<SelectOption> getStatusTransitionsLastSteps(String projectConfig) {
+		TapdProjectConfig config = getProjectConfig(projectConfig);
+		return tapdClient.getWorkFlowLastSteps(TapdSystemType.BUG, config.getTapdKey());
+	}
+
 	/**
 	 * 需求分页查询
 	 *
@@ -571,9 +577,9 @@ public class TapdPlatform extends AbstractPlatform {
 	private MultiValueMap<String, Object> buildUpdateParam(PlatformBugUpdateRequest request, PlatformBugUpdateDTO platformBug, TapdUserPlatformInfo userPlatformInfo) {
 		MultiValueMap<String, Object> paramMap = new LinkedMultiValueMap<>();
 		parseCustomFields(request, paramMap, platformBug);
-		// 替换MS-用户信息(Tapd昵称) => Tapd创建人
-		if (userPlatformInfo != null && StringUtils.isNotEmpty(userPlatformInfo.getTapdNickName())) {
-			paramMap.add("reporter", userPlatformInfo.getTapdNickName());
+		// 替换MS-用户信息(昵称) => Tapd创建人
+		if (userPlatformInfo != null && StringUtils.isNotEmpty(userPlatformInfo.getNickName())) {
+			paramMap.add("reporter", userPlatformInfo.getNickName());
 		}
 		return paramMap;
 	}

@@ -250,6 +250,37 @@ public class TapdClient extends BaseClient {
 	}
 
 	/**
+	 * 获取工作流结束状态
+	 * @param systemType 系统类型
+	 * @param projectKey 项目ID
+	 * @return 结束工作流选项
+	 */
+	public List<SelectOption> getWorkFlowLastSteps(String systemType, String projectKey) {
+		List<SelectOption> statusOption = new ArrayList<>();
+		try {
+			ResponseEntity<TapdBaseResponse> response = restTemplate.exchange(ENDPOINT + TapdUrl.GET_WORKFLOW_LAST_STEPS, HttpMethod.GET, getAuthHttpEntity(), TapdBaseResponse.class, systemType, projectKey);
+			if (response.getBody() == null) {
+				return null;
+			}
+			// noinspection unchecked
+			Map<String, String> lastStatusMap = PluginUtils.parseMap(PluginUtils.toJSONString(response.getBody().getData()));
+			if (CollectionUtils.isEmpty(lastStatusMap)) {
+				return null;
+			}
+			lastStatusMap.keySet().forEach(statusKey -> {
+				SelectOption lastOption = new SelectOption();
+				lastOption.setText(statusKey);
+				lastOption.setValue(lastStatusMap.get(statusKey));
+				statusOption.add(lastOption);
+			});
+			return statusOption;
+		} catch (Exception e) {
+			holdUpTooManyException(e, "获取Tapd工作流结束状态异常!");
+		}
+		return null;
+	}
+
+	/**
 	 * 获取项目成员列表
 	 *
 	 * @param projectKey 项目Key

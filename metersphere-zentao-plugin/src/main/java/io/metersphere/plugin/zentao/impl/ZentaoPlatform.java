@@ -290,6 +290,21 @@ public class ZentaoPlatform extends AbstractPlatform {
 		return statusOptions;
 	}
 
+	@Override
+	public List<SelectOption> getStatusTransitionsLastSteps(String projectConfig) {
+		// Zentao don't support status flow, set last step
+		List<SelectOption> statusOptions = new ArrayList<>();
+		for (ZentaoBugPlatformStatus status : ZentaoBugPlatformStatus.values()) {
+			if (status.getLastStep()) {
+				SelectOption option = new SelectOption();
+				option.setText(status.getName());
+				option.setValue(status.name());
+				statusOptions.add(option);
+			}
+		}
+		return statusOptions;
+	}
+
 	/**
 	 * 分页获取需求
 	 *

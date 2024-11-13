@@ -16,6 +16,8 @@ public class TapdUrl {
 
 	public static final String GET_WORKFLOW_TRANSITIONS = "/workflows/all_transitions?system={1}&workspace_id={2}";
 
+	public static final String GET_WORKFLOW_LAST_STEPS = "/workflows/last_steps?system={1}&workspace_id={2}";
+
 	public static final String GET_WORKFLOW_STATUS_MAP = "/workflows/status_map?system={1}&workspace_id={2}";
 
 	public static final String GET_PROJECT_USERS = "/workspaces/users?workspace_id={1}";

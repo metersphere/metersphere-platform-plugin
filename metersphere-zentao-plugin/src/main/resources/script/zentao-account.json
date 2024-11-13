@@ -17,6 +17,15 @@
         "label": "禅道密码",
         "value": "",
         "required": true
+      },
+      {
+        "name": "nickName",
+        "type": "INPUT",
+        "label": "昵称",
+        "value": "",
+        "required": false,
+        "platformPlaceHolder": "请录入登录账号对应的昵称以便工作台进行数据统计",
+        "tooltip": "hover右上角头像即可查看昵称"
       }
     ]
   }
