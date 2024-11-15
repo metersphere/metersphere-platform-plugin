@@ -99,7 +99,7 @@ public class ZentaoRestClient extends BaseClient {
 	 */
 	public void validateProject(String zentaoKey, String type) {
 		if (StringUtils.isBlank(zentaoKey) || StringUtils.isBlank(type)) {
-			throw new MSPluginException("禅道项目校验参数不能为空!");
+			throw new MSPluginException("禅道项目Key不能为空!");
 		}
 		ResponseEntity<Map> response;
 		try {

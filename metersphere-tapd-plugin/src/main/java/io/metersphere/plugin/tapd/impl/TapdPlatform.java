@@ -94,11 +94,11 @@ public class TapdPlatform extends AbstractPlatform {
 		try {
 			TapdProjectConfig projectConfig = getProjectConfig(projectConfigStr);
 			if (StringUtils.isBlank(projectConfig.getTapdKey())) {
-				throw new MSPluginException("TAPD项目校验参数不能为空!");
+				throw new MSPluginException("TAPD项目Key不能为空!");
 			}
 			TapdProject project = tapdClient.getProject(projectConfig.getTapdKey());
 			if (project == null || StringUtils.isBlank(project.getId())) {
-				throw new MSPluginException("项目不存在");
+				throw new MSPluginException("项目不存在!");
 			}
 		} catch (Exception e) {
 			throw new MSPluginException(e.getMessage());

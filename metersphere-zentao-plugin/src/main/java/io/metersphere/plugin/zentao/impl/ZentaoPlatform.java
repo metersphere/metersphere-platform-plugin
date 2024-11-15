@@ -716,7 +716,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 	@SuppressWarnings("unused")
 	public List<SelectOption> getAssignUsers(GetOptionRequest request) {
 		ZentaoRestUserResponse users = zentaoRestClient.getUsers(1, Integer.MAX_VALUE);
-		return users.getUsers().stream().map(user -> new SelectOption(user.getRealname(), user.getAccount())).collect(Collectors.toList());
+		return users.getUsers().stream().sorted(Comparator.comparingInt(user -> Integer.parseInt(user.getId()))).map(user -> new SelectOption(user.getRealname(), user.getAccount())).collect(Collectors.toList());
 	}
 
 	/**

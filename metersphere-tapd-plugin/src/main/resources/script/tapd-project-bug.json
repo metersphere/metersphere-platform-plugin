@@ -12,6 +12,7 @@
         "subDesc": "如何获取TAPD项目Key",
         "inputSearch": false,
         "instructionsIcon": "static/tapd-key.jpg",
+        "platformPlaceHolder": "请输入项目Key并验证",
         "optionMethod": "",
         "couplingConfig": {}
       }

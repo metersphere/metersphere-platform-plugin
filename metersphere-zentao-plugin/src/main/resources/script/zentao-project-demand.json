@@ -41,6 +41,7 @@
         "subDesc": "如何填写禅道项目Key",
         "inputSearch": false,
         "instructionsIcon": "static/zentao-project.jpg",
+        "platformPlaceHolder": "请输入项目Key并验证",
         "displayConditions": {
           "field": "type",
           "value": "projects"
@@ -50,6 +51,7 @@
         "name": "productKey",
         "type": "INPUT",
         "label": "产品 Key",
+        "platformPlaceHolder": "请输入产品Key",
         "tooltip": "通常情况下, 禅道的项目会默认关联产品(注: 项目型项目会关联影子产品Key); 请按照上述提示正确填写产品Key, 否则影响数据的同步;",
         "displayConditions": {
           "field": "type",
