@@ -9,7 +9,7 @@ public class ZentaoRestApiUrl {
 	public static final String CLOSE_BUG = "/bugs/{1}/close";
 	public static final String ACTIVE_BUG = "/bugs/{1}/active";
 	public static final String GET_OR_UPDATE_OR_DELETE_BUG = "/bugs/{1}";
-	public static final String GET_USERS = "/users";
+	public static final String GET_USERS = "/users?page={1}&limit={2}";
 	public static final String LIST_DEMAND = "/{1}/stories?page={2}&limit={3}";
 	public static final String LIST_PLAN = "/products/{1}/plans?page={2}&limit={3}";
 	public static final String GET_BUILDS = "/projects/{1}/builds";

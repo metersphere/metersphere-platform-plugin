@@ -715,7 +715,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 	 */
 	@SuppressWarnings("unused")
 	public List<SelectOption> getAssignUsers(GetOptionRequest request) {
-		ZentaoRestUserResponse users = zentaoRestClient.getUsers();
+		ZentaoRestUserResponse users = zentaoRestClient.getUsers(1, Integer.MAX_VALUE);
 		return users.getUsers().stream().map(user -> new SelectOption(user.getRealname(), user.getAccount())).collect(Collectors.toList());
 	}
 
@@ -1118,7 +1118,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 	private Map<String, String> prepareOptionData() {
 		Map<String, String> optionData = new HashMap<>(16);
 		// 禅道用户下拉选项
-		ZentaoRestUserResponse users = zentaoRestClient.getUsers();
+		ZentaoRestUserResponse users = zentaoRestClient.getUsers(1, Integer.MAX_VALUE);
 		List<SelectOption> userOptions = users.getUsers().stream().map(user -> new SelectOption(user.getRealname(), user.getAccount())).collect(Collectors.toList());
 		optionData.put(ZentaoOptionKey.USER.name(), PluginUtils.toJSONString(userOptions));
 		// 版本下拉选项 {默认加上主干分支}

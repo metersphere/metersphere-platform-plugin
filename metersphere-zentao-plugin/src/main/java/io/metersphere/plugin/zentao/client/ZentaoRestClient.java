@@ -199,10 +199,10 @@ public class ZentaoRestClient extends BaseClient {
 	 *
 	 * @return 用户列表
 	 */
-	public ZentaoRestUserResponse getUsers() {
+	public ZentaoRestUserResponse getUsers(int page, int limit) {
 		ResponseEntity<ZentaoRestUserResponse> response;
 		try {
-			response = restTemplate.exchange(getRestUrl(ZentaoRestApiUrl.GET_USERS, null), HttpMethod.GET, getJsonHttpEntityWithToken(StringUtils.EMPTY), ZentaoRestUserResponse.class);
+			response = restTemplate.exchange(getRestUrl(ZentaoRestApiUrl.GET_USERS, null), HttpMethod.GET, getJsonHttpEntityWithToken(StringUtils.EMPTY), ZentaoRestUserResponse.class, page, limit);
 			if (response.getBody() == null) {
 				throw new MSPluginException("获取禅道用户列表失败!");
 			}
