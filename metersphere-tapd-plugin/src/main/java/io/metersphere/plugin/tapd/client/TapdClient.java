@@ -269,8 +269,8 @@ public class TapdClient extends BaseClient {
 			}
 			lastStatusMap.keySet().forEach(statusKey -> {
 				SelectOption lastOption = new SelectOption();
-				lastOption.setText(statusKey);
-				lastOption.setValue(lastStatusMap.get(statusKey));
+				lastOption.setText(lastStatusMap.get(statusKey));
+				lastOption.setValue(statusKey);
 				statusOption.add(lastOption);
 			});
 			return statusOption;
