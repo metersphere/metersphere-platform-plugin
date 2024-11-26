@@ -237,6 +237,10 @@ public class TapdClient extends BaseClient {
 				transitionStatus = statusTransitions.stream().map(TapdTransitionStatusItem::getStepPrevious).distinct().collect(Collectors.toList());
 			}
 			transitionStatus.forEach(statusKey -> {
+				if (StringUtils.equals(statusKey, "start")) {
+					// 起始状态不可选择
+					return;
+				}
 				SelectOption selectOption = new SelectOption();
 				selectOption.setText(statusDictMap.get(statusKey) == null ? statusKey : statusDictMap.get(statusKey));
 				selectOption.setValue(statusKey);
