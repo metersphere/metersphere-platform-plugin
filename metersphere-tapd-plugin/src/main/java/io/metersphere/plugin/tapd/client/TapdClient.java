@@ -464,9 +464,9 @@ public class TapdClient extends BaseClient {
 		} catch (Exception e) {
 			// 获取的图片下载URL异常时, 捕获, 不影响同步主流程
 			if (((HttpClientErrorException) e).getStatusCode().value() == TapdErrorCode.TOO_MANY_REQUESTS) {
-				PluginLogUtils.error("获取Tapd单个图片下载链接异常: API账号超过了 \"60req/1min\" 的频率限制!");
+				PluginLogUtils.warn("获取Tapd单个图片下载链接异常: API账号超过了 \"60req/1min\" 的频率限制!");
 			} else {
-				PluginLogUtils.error("获取Tapd单个图片下载链接异常: " + e.getMessage(), e);
+				PluginLogUtils.warn("获取Tapd单个图片下载链接异常: " + e.getMessage(), e);
 			}
 		}
 		return null;

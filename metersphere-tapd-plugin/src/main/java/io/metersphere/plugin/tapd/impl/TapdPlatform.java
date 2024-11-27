@@ -366,6 +366,8 @@ public class TapdPlatform extends AbstractPlatform {
 		// validate config
 		TapdProjectConfig config = validateConfig(request.getProjectConfig());
 
+		// 模板默认字段
+		List<PlatformCustomFieldItemDTO> defaultTemplateCustomFields = getDefaultTemplateCustomField(request.getProjectConfig());
 		// prepare param
 		SyncBugResult syncResult = new SyncBugResult();
 		List<PlatformBugDTO> bugs = request.getBugs();
@@ -388,7 +390,7 @@ public class TapdPlatform extends AbstractPlatform {
 		bugs.forEach(bug -> {
 			Map findBug = queryBugMap.get(bug.getPlatformBugId());
 			if (findBug != null) {
-				syncTapdFieldToMsBug(bug, findBug, false, config.getTapdKey());
+				syncTapdFieldToMsBug(bug, findBug, defaultTemplateCustomFields, config.getTapdKey());
 				syncResult.getUpdateBug().add(bug);
 			} else {
 				// not found, delete it
@@ -402,6 +404,8 @@ public class TapdPlatform extends AbstractPlatform {
 	public void syncAllBugs(SyncAllBugRequest request) {
 		// validate config
 		TapdProjectConfig config = validateConfig(request.getProjectConfig());
+		// 模板默认字段
+		List<PlatformCustomFieldItemDTO> defaultTemplateCustomFields = getDefaultTemplateCustomField(request.getProjectConfig());
 		String createdQuery = getCreatedQuery(request);
 
 		Integer total = tapdClient.getBugCount(config.getTapdKey(), createdQuery);
@@ -421,7 +425,8 @@ public class TapdPlatform extends AbstractPlatform {
 						PlatformBugDTO bug = new PlatformBugDTO();
 						bug.setId(UUID.randomUUID().toString());
 						bug.setPlatformBugId(bugMap.get("id").toString());
-						syncTapdFieldToMsBug(bug, bugMap, true, config.getTapdKey());
+						bug.setPlatformDefaultTemplate(true);
+						syncTapdFieldToMsBug(bug, bugMap, defaultTemplateCustomFields, config.getTapdKey());
 						needSyncBugs.add(bug);
 					}
 				}
@@ -475,14 +480,15 @@ public class TapdPlatform extends AbstractPlatform {
 	 *
 	 * @param msBug              MS缺陷
 	 * @param tapdBug            Tapd缺陷
-	 * @param useCustomAllFields 是否同步全量自定义字段
+	 * @param defaultTemplateFields 模板默认字段
+	 * @param projectKey 	   项目Key
 	 */
-	private void syncTapdFieldToMsBug(PlatformBugDTO msBug, Map tapdBug, boolean useCustomAllFields, String projectKey) {
+	private void syncTapdFieldToMsBug(PlatformBugDTO msBug, Map tapdBug, List<PlatformCustomFieldItemDTO> defaultTemplateFields, String projectKey) {
 		try {
 			// 处理基础字段
 			parseBaseFieldToMsBug(msBug, tapdBug, projectKey);
 			// 处理自定义字段
-			parseCustomFieldToMsBug(msBug, tapdBug, useCustomAllFields);
+			parseCustomFieldToMsBug(msBug, tapdBug, defaultTemplateFields);
 		} catch (Exception e) {
 			PluginLogUtils.error(e);
 		}
@@ -541,29 +547,25 @@ public class TapdPlatform extends AbstractPlatform {
 	 *
 	 * @param msBug              平台缺陷
 	 * @param tapdBugInfo        Tapd缺陷内容
-	 * @param useCustomAllFields 是否同步全量自定义字段
+	 * @param defaultTemplateFields 模板默认字段
 	 */
-	@SuppressWarnings("unchecked")
-	private void parseCustomFieldToMsBug(PlatformBugDTO msBug, Map tapdBugInfo, boolean useCustomAllFields) {
+	private void parseCustomFieldToMsBug(PlatformBugDTO msBug, Map tapdBugInfo, List<PlatformCustomFieldItemDTO> defaultTemplateFields) {
 		List<PlatformCustomFieldItemDTO> needSyncCustomFields = new ArrayList<>();
-		if (useCustomAllFields) {
-			// 同步全量的时候, 需要同步所有自定义字段
-			tapdBugInfo.keySet().forEach(fieldKey -> {
-				PlatformCustomFieldItemDTO field = new PlatformCustomFieldItemDTO();
-				field.setId(fieldKey.toString());
-				field.setValue(tapdBugInfo.get(fieldKey));
-				needSyncCustomFields.add(field);
-			});
+		if (isSupportDefaultTemplate() && msBug.getPlatformDefaultTemplate()) {
+			// 缺陷使用的平台默认模板, 使用平台默认模板字段
+			for (PlatformCustomFieldItemDTO field : defaultTemplateFields) {
+				needSyncCustomFields.add(SerializationUtils.clone(field));
+			}
 		} else {
-			// 同步存量缺陷时, 只需同步MS配置的API自定义字段
+			// 陷使用的非平台默认模板, 使用模板中配置的映射字段
 			for (PlatformCustomFieldItemDTO field : msBug.getNeedSyncCustomFields()) {
 				needSyncCustomFields.add(SerializationUtils.clone(field));
 			}
-			if (CollectionUtils.isEmpty(needSyncCustomFields)) {
-				return;
-			}
-			needSyncCustomFields.forEach(field -> field.setValue(tapdBugInfo.get(field.getCustomData())));
 		}
+		if (CollectionUtils.isEmpty(needSyncCustomFields)) {
+			return;
+		}
+		needSyncCustomFields.forEach(field -> field.setValue(tapdBugInfo.get(field.getCustomData())));
 		msBug.setCustomFieldList(needSyncCustomFields);
 	}
 
