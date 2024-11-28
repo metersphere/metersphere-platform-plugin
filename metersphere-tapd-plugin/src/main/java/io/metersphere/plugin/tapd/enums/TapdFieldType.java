@@ -67,12 +67,12 @@ public enum TapdFieldType {
 		this.customFieldType = customFieldType;
 	}
 
-	public static String mappingTapdHtmlType(String jiraType) {
+	public static String mappingTapdHtmlType(String htmlType) {
 		// 这里的类型匹配为正则最佳匹配;
 		// 例如tapdFieldType为"fixVersion", 存在枚举A("version", "A"), 枚举B("fixVersion", "B"), 则会匹配到B, 并返回B的类型
 		List<Set<String>> typeSetList = Arrays.stream(TapdFieldType.values()).map(TapdFieldType::getTapdFieldTypeSet).toList();
 		Set<String> keys = typeSetList.stream().flatMap(Set::stream).collect(Collectors.toSet());
-		Set<String> matchKeys = keys.stream().filter(jiraType::contains).collect(Collectors.toSet());
+		Set<String> matchKeys = keys.stream().filter(htmlType::contains).collect(Collectors.toSet());
 		Optional<String> matchOptional = matchKeys.stream().max(Comparator.comparingInt(String::length));
 		if (matchOptional.isPresent()) {
 			String bestMatchKey = matchOptional.get();
@@ -84,7 +84,7 @@ public enum TapdFieldType {
 
 	public static String getCustomFieldType(String key) {
 		return Arrays.stream(TapdFieldType.values())
-				.filter(jiraMetadataFieldType -> jiraMetadataFieldType.getTapdFieldTypeSet().contains(key))
+				.filter(fieldType -> fieldType.getTapdFieldTypeSet().contains(key))
 				.findFirst()
 				.map(TapdFieldType::getCustomFieldType)
 				.orElse(null);

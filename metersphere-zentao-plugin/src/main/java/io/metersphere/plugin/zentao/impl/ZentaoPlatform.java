@@ -794,48 +794,50 @@ public class ZentaoPlatform extends AbstractPlatform {
 		List<PlatformCustomFieldItemDTO> needSyncCustomFields = new ArrayList<>();
 		if (isSupportDefaultTemplate() && msBug.getPlatformDefaultTemplate()) {
 			// 缺陷使用的平台默认模板, 使用平台默认模板字段
-			for (PlatformCustomFieldItemDTO field : defaultTemplateFields) {
-				needSyncCustomFields.add(SerializationUtils.clone(field));
-			}
+			zenBug.keySet().forEach(fieldKey -> {
+				PlatformCustomFieldItemDTO field = new PlatformCustomFieldItemDTO();
+				field.setId(fieldKey);
+				field.setValue(StringUtils.equals(fieldKey, ZentaoBugDefaultTemplateField.STEPS.getId()) ? parseZentaoPicToMsRichText(zenBug.get(fieldKey).toString(), msBug) : zenBug.get(fieldKey));
+				needSyncCustomFields.add(field);
+			});
 		} else {
 			// 缺陷使用的非平台默认模板, 使用模板中配置的映射字段
 			for (PlatformCustomFieldItemDTO field : msBug.getNeedSyncCustomFields()) {
 				needSyncCustomFields.add(SerializationUtils.clone(field));
 			}
-		}
-
-		if (CollectionUtils.isEmpty(needSyncCustomFields)) {
-			return;
-		}
-		needSyncCustomFields.forEach(field -> {
-			Object value = zenBug.get(field.getCustomData());
-			if (value != null) {
-				if (value instanceof Map) {
-					field.setValue(getSyncJsonParamValue(value));
-				} else if (value instanceof List) {
-					if (CollectionUtils.isEmpty((List<?>) value)) {
-						field.setValue(null);
-					} else {
-						List<Object> values = new ArrayList<>();
-						((List<?>) value).forEach(attr -> {
-							if (attr instanceof Map) {
-								values.add(getSyncJsonParamValue(attr));
+			if (!CollectionUtils.isEmpty(needSyncCustomFields)) {
+				needSyncCustomFields.forEach(field -> {
+					Object value = zenBug.get(field.getCustomData());
+					if (value != null) {
+						if (value instanceof Map) {
+							field.setValue(getSyncJsonParamValue(value));
+						} else if (value instanceof List) {
+							if (CollectionUtils.isEmpty((List<?>) value)) {
+								field.setValue(null);
 							} else {
-								values.add(attr);
+								List<Object> values = new ArrayList<>();
+								((List<?>) value).forEach(attr -> {
+									if (attr instanceof Map) {
+										values.add(getSyncJsonParamValue(attr));
+									} else {
+										values.add(attr);
+									}
+								});
+								field.setValue(PluginUtils.toJSONString(values));
 							}
-						});
-						field.setValue(PluginUtils.toJSONString(values));
+						} else if (StringUtils.equals(field.getCustomData(), ZENTAO_BUILD) || value.toString().contains(COMMA)) {
+							List<String> values = new ArrayList<>(Arrays.asList(value.toString().split(",")));
+							field.setValue(PluginUtils.toJSONString(values));
+						} else {
+							field.setValue(value.toString());
+						}
+					} else {
+						field.setValue(null);
 					}
-				} else if (StringUtils.equals(field.getCustomData(), ZENTAO_BUILD) || value.toString().contains(COMMA)) {
-					List<String> values = new ArrayList<>(Arrays.asList(value.toString().split(",")));
-					field.setValue(PluginUtils.toJSONString(values));
-				} else {
-					field.setValue(value.toString());
-				}
-			} else {
-				field.setValue(null);
+				});
 			}
-		});
+
+		}
 		msBug.setCustomFieldList(needSyncCustomFields);
 	}
 
