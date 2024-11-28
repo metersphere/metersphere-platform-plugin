@@ -280,7 +280,7 @@ public abstract class BaseZentaoJsonClient extends BaseClient {
 		MultiValueMap<String, Object> paramMap = new LinkedMultiValueMap<>();
 		paramMap.add("imgFile", new FileSystemResource(file));
 		try {
-			ResponseEntity<String> responseEntity = restTemplate.exchange(getBaseUrl() + "/file-ajaxUpload.json?zentaosid={1}", HttpMethod.POST, getHttpEntity(paramMap),
+			ResponseEntity<String> responseEntity = restTemplate.exchange(requestUrl.getAjaxUploadFile(), HttpMethod.POST, getHttpEntity(paramMap),
 					String.class, sessionId);
 			// noinspection unchecked
 			Map<String, Object> dataMap = (Map<String, Object>) PluginUtils.parseMap(responseEntity.getBody());

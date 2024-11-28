@@ -66,7 +66,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 	 */
 	protected static final String DATE_PREFIX = "0000-00-00";
 	protected static final String MS_RICH_TEXT_PREVIEW_SRC_PREFIX = "/bug/attachment/preview/md";
-	protected static final String ZENTAO_RICH_TEXT_IMG_SRC_PREFIX = "/file-read-";
+	protected static final String ZENTAO_RICH_TEXT_IMG_SRC_PREFIX = "/index.php?m=file&f=read&fileID=";
 	protected static final String ZENTAO_BUILD = "openedBuild";
 	protected static final String ZENTAO_ID = "id";
 	protected static final String ZENTAO_BUG_DELETED = "deleted";
@@ -205,6 +205,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 			PlatformCustomFieldItemDTO customField = new PlatformCustomFieldItemDTO();
 			BeanUtils.copyProperties(field, customField);
 			customField.setKey(String.valueOf(filedKey++));
+			customField.setCustomData(field.getId());
 			customField.setSystemField(StringUtils.equalsAny(field.getId(), ZentaoBugDefaultTemplateField.TITLE.getId(), ZentaoBugDefaultTemplateField.STEPS.getId()));
 			if (StringUtils.equals(field.getId(), ZentaoBugDefaultTemplateField.ASSIGNED_TO.getId())) {
 				customField.setOptions(optionData.get(ZentaoOptionKey.USER.name()));
@@ -794,50 +795,57 @@ public class ZentaoPlatform extends AbstractPlatform {
 		List<PlatformCustomFieldItemDTO> needSyncCustomFields = new ArrayList<>();
 		if (isSupportDefaultTemplate() && msBug.getPlatformDefaultTemplate()) {
 			// 缺陷使用的平台默认模板, 使用平台默认模板字段
-			zenBug.keySet().forEach(fieldKey -> {
-				PlatformCustomFieldItemDTO field = new PlatformCustomFieldItemDTO();
-				field.setId(fieldKey);
-				field.setValue(StringUtils.equals(fieldKey, ZentaoBugDefaultTemplateField.STEPS.getId()) ? parseZentaoPicToMsRichText(zenBug.get(fieldKey).toString(), msBug) : zenBug.get(fieldKey));
-				needSyncCustomFields.add(field);
-			});
+			for (PlatformCustomFieldItemDTO field : defaultTemplateFields) {
+				needSyncCustomFields.add(SerializationUtils.clone(field));
+			}
 		} else {
 			// 缺陷使用的非平台默认模板, 使用模板中配置的映射字段
 			for (PlatformCustomFieldItemDTO field : msBug.getNeedSyncCustomFields()) {
 				needSyncCustomFields.add(SerializationUtils.clone(field));
 			}
-			if (!CollectionUtils.isEmpty(needSyncCustomFields)) {
-				needSyncCustomFields.forEach(field -> {
-					Object value = zenBug.get(field.getCustomData());
-					if (value != null) {
-						if (value instanceof Map) {
-							field.setValue(getSyncJsonParamValue(value));
-						} else if (value instanceof List) {
-							if (CollectionUtils.isEmpty((List<?>) value)) {
-								field.setValue(null);
-							} else {
-								List<Object> values = new ArrayList<>();
-								((List<?>) value).forEach(attr -> {
-									if (attr instanceof Map) {
-										values.add(getSyncJsonParamValue(attr));
-									} else {
-										values.add(attr);
-									}
-								});
-								field.setValue(PluginUtils.toJSONString(values));
-							}
-						} else if (StringUtils.equals(field.getCustomData(), ZENTAO_BUILD) || value.toString().contains(COMMA)) {
-							List<String> values = new ArrayList<>(Arrays.asList(value.toString().split(",")));
-							field.setValue(PluginUtils.toJSONString(values));
-						} else {
-							field.setValue(value.toString());
-						}
-					} else {
-						field.setValue(null);
-					}
-				});
-			}
-
 		}
+		if (CollectionUtils.isEmpty(needSyncCustomFields)) {
+			return;
+		}
+		needSyncCustomFields.forEach(field -> {
+			Object value = zenBug.get(field.getCustomData());
+			if (value != null) {
+				if (value instanceof Map) {
+					field.setValue(getSyncJsonParamValue(value));
+				} else if (value instanceof List) {
+					if (CollectionUtils.isEmpty((List<?>) value)) {
+						field.setValue(null);
+					} else {
+						List<Object> values = new ArrayList<>();
+						((List<?>) value).forEach(attr -> {
+							if (attr instanceof Map) {
+								values.add(getSyncJsonParamValue(attr));
+							} else {
+								values.add(attr);
+							}
+						});
+						field.setValue(PluginUtils.toJSONString(values));
+					}
+				} else {
+					// 字符串
+					if (StringUtils.equals(field.getType(), PlatformCustomFieldType.RICH_TEXT.name())) {
+						// 富文本需单独处理
+						if (!StringUtils.equals(field.getCustomData(), ZentaoBugDefaultTemplateField.STEPS.getId())) {
+							field.setValue(parseZentaoPicToMsRichText(value.toString(), msBug));
+						} else {
+							field.setValue(msBug.getDescription());
+						}
+					} else if (StringUtils.equals(field.getCustomData(), ZENTAO_BUILD) || value.toString().contains(COMMA)) {
+						List<String> values = new ArrayList<>(Arrays.asList(value.toString().split(",")));
+						field.setValue(PluginUtils.toJSONString(values));
+					} else {
+						field.setValue(value.toString());
+					}
+				}
+			} else {
+				field.setValue(null);
+			}
+		});
 		msBug.setCustomFieldList(needSyncCustomFields);
 	}
 
@@ -1049,8 +1057,8 @@ public class ZentaoPlatform extends AbstractPlatform {
 		}
 		// psrc => src
 		if (content.contains(MS_RICH_TEXT_REPLACE_WORD)) {
-			// eg: <img psrc="/file-read-zFid.png" src=/bug/attachment/preview/md/pid/fid/true">
-			// => <img src="/file-read-zFid.png" src="/bug/attachment/preview/md/pid/fid/true"/>
+			// eg: <img psrc="/index.php?m=file&f=read&t=jpg&fileID=zFid" src=/bug/attachment/preview/md/pid/fid/true">
+			// => <img src="/index.php?m=file&f=read&t=jpg&fileID=zFid" src="/bug/attachment/preview/md/pid/fid/true"/>
 			// 图片双向同步过, 直接替换URL即可
 			content = content.replaceAll("psrc", "src");
 		}
@@ -1058,7 +1066,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 			for (String key : msFileMap.keySet()) {
 				if (content.contains("permalinksrc")) {
 					// eg: <img src="/attachment/download/file/pid/fid/true" permalinksrc="/attachment/download/file/pid/fid/true">
-					// => <img src="/file-read-zFid.png" alt="/attachment/download/file/pid/fid/true"/>
+					// => <img src="/index.php?m=file&f=read&t=jpg&fileID=zFid" alt="/attachment/download/file/pid/fid/true"/>
 					// 还未双向同步的图片, 上传附件(图片)至禅道
 					String imgUrl = zentaoJsonClient.uploadImgFile(msFileMap.get(key));
 					// 替换的目标禅道URL
@@ -1084,8 +1092,8 @@ public class ZentaoPlatform extends AbstractPlatform {
 
 	private String parseZentaoPicToMsRichText(String content, PlatformBugDTO msBug) {
 		// 图片链接中存在本地上传的URL, 及已经双向同步的URL, 网络链接的URL
-		// eg: <img src="/file-read-zFid.png" alt="/attachment/download/file/pid/fid/true" 需处理, 已双向同步无需下载
-		// eg: <img src="/file-read-51.jpg" alt /> 需替换图片URL, 并提供下载流, 供MS下载
+		// eg: <img src="/index.php?m=file&f=read&t=jpg&fileID=zFid" alt="/attachment/download/file/pid/fid/true" 需处理, 已双向同步无需下载
+		// eg: <img src="/index.php?m=file&f=read&t=jpg&fileID=zFid" alt /> 需替换图片URL, 并提供下载流, 供MS下载
 		// eg: <img src="https.pic.s" alt /> 不用处理
 		if (StringUtils.isBlank(content)) {
 			return null;
@@ -1095,17 +1103,16 @@ public class ZentaoPlatform extends AbstractPlatform {
 					.replaceAll("<img src=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX, "<img psrc=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX)
 					.replaceAll("<img src=\"\\{", "<img psrc=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX).replaceAll("}", StringUtils.EMPTY)
 					.replaceAll("alt=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX, "src=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX);
-			String zentaoLocalRegex = "(<img psrc=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX + ")(.*?)(alt=\"\" />)";
+
+			String zentaoLocalRegex = "(<img psrc=\"" + ")(.*?)(alt=\"\" />)";
 			Matcher matcher = Pattern.compile(zentaoLocalRegex).matcher(content);
 			Map<String, String> richFileMap = new HashMap<>(16);
 			while (matcher.find()) {
 				String matchLocalFileUrl = matcher.group(0);
-				String fileRegex = "\\d+";
-				Matcher fileMatch = Pattern.compile(fileRegex).matcher(matchLocalFileUrl);
-				while (fileMatch.find()) {
-					String fileId = fileMatch.group(0);
+				if (StringUtils.isNotBlank(matchLocalFileUrl) && matchLocalFileUrl.contains(ZENTAO_RICH_TEXT_IMG_SRC_PREFIX)) {
+					String fileId = matchLocalFileUrl.substring(matchLocalFileUrl.indexOf("fileID=") + 7, matchLocalFileUrl.lastIndexOf("."));
 					String replaceTmpUrl = matchLocalFileUrl.replaceAll("alt=\"\" />", "alt=\"" + fileId + "\" />");
-					content = content.replaceAll(matchLocalFileUrl, replaceTmpUrl);
+					content = content.replace(matchLocalFileUrl, replaceTmpUrl);
 					// 禅道富文本中的图片默认命名为*.jpg, *:唯一文件ID, 标识, 整数
 					richFileMap.put(fileId, fileId + ".jpg");
 				}

@@ -27,6 +27,7 @@ public class ZentaoGetClient extends BaseZentaoJsonClient {
 	private static final String REPLACE_IMG_URL = "<img src=\"%s/index.php?m=file&f=read&fileID=$1\"/>";
 	private static final Pattern IMG_PATTERN = Pattern.compile("m=file&f=read&fileID=(.*?)\"/>");
 	private static final String PRODUCT_GET = "&module=product&methodName=getById&params=productID={0}&t=json&zentaosid={1}";
+	private static final String AJAX_UPLOAD_FILE = "/?m=file&f=ajaxUpload&zentaosid={0}";
 	/**
 	 * 注意参数顺序不能调换
 	 */
@@ -59,6 +60,7 @@ public class ZentaoGetClient extends BaseZentaoJsonClient {
 		request.setFileDelete(getNotSuperModelUrl(FILE_DELETE));
 		request.setFileDownload(getNotSuperModelUrl(FILE_DOWNLOAD));
 		request.setProductPlanUrl(getNotSuperModelUrl(PRODUCT_PLAN));
+		request.setAjaxUploadFile(getNotSuperModelUrl(AJAX_UPLOAD_FILE));
 		requestUrl = request;
 	}
 

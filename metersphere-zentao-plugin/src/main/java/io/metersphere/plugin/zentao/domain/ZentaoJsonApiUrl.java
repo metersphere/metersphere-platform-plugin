@@ -25,4 +25,5 @@ public class ZentaoJsonApiUrl {
     private String productGet;
     private Pattern imgPattern;
     private String productPlanUrl;
+    private String ajaxUploadFile;
 }

@@ -488,7 +488,7 @@ public class TapdPlatform extends AbstractPlatform {
 			// 处理基础字段
 			parseBaseFieldToMsBug(msBug, tapdBug, projectKey);
 			// 处理自定义字段
-			parseCustomFieldToMsBug(msBug, tapdBug, defaultTemplateFields);
+			parseCustomFieldToMsBug(msBug, tapdBug, defaultTemplateFields, projectKey);
 		} catch (Exception e) {
 			PluginLogUtils.error(e);
 		}
@@ -549,7 +549,7 @@ public class TapdPlatform extends AbstractPlatform {
 	 * @param tapdBugInfo        Tapd缺陷内容
 	 * @param defaultTemplateFields 模板默认字段
 	 */
-	private void parseCustomFieldToMsBug(PlatformBugDTO msBug, Map tapdBugInfo, List<PlatformCustomFieldItemDTO> defaultTemplateFields) {
+	private void parseCustomFieldToMsBug(PlatformBugDTO msBug, Map tapdBugInfo, List<PlatformCustomFieldItemDTO> defaultTemplateFields, String projectKey) {
 		List<PlatformCustomFieldItemDTO> needSyncCustomFields = new ArrayList<>();
 		if (isSupportDefaultTemplate() && msBug.getPlatformDefaultTemplate()) {
 			// 缺陷使用的平台默认模板, 使用平台默认模板字段
@@ -565,7 +565,22 @@ public class TapdPlatform extends AbstractPlatform {
 		if (CollectionUtils.isEmpty(needSyncCustomFields)) {
 			return;
 		}
-		needSyncCustomFields.forEach(field -> field.setValue(tapdBugInfo.get(field.getCustomData())));
+		needSyncCustomFields.forEach(field -> {
+			Object value = tapdBugInfo.get(field.getCustomData());
+			if (value != null) {
+				if (StringUtils.equals(field.getType(), PlatformCustomFieldType.RICH_TEXT.name())) {
+					if (!StringUtils.equals(field.getCustomData(), TapdTemplateSystemField.DESCRIPTION)) {
+						field.setValue(parseTapdPicToMsRichText(value.toString(), msBug, projectKey));
+					} else {
+						field.setValue(msBug.getDescription());
+					}
+				} else {
+					field.setValue(value.toString());
+				}
+			} else {
+				field.setValue(null);
+			}
+		});
 		msBug.setCustomFieldList(needSyncCustomFields);
 	}
 
