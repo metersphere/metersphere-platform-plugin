@@ -77,17 +77,17 @@ public abstract class BaseZentaoJsonClient extends BaseClient {
 			ResponseEntity<String> response = restTemplate.exchange(loginUrl + sessionId, HttpMethod.POST, getHttpEntity(paramMap), String.class);
 			authUser = getResultForObject(ZentaoAuthUserResponse.class, response);
 		} catch (Exception e) {
-			PluginLogUtils.error(e);
+			PluginLogUtils.warn("zentao login fail: " + e.getMessage());
 			throw new MSPluginException(e.getMessage());
 		}
 		ZentaoAuthUserResponse.User user = authUser.getUser();
 		if (user == null) {
-			PluginLogUtils.error(PluginUtils.toJSONString(authUser));
+			PluginLogUtils.warn(PluginUtils.toJSONString(authUser));
 			// 登录失败，获取的session无效，置空session
 			throw new MSPluginException("zentao login fail, user is null");
 		}
 		if (!StringUtils.equals(user.getAccount(), USER_NAME)) {
-			PluginLogUtils.error("zentao login fail, inconsistent users");
+			PluginLogUtils.warn("zentao login fail, inconsistent users");
 			throw new MSPluginException("zentao login fail, inconsistent user");
 		}
 		return sessionId;

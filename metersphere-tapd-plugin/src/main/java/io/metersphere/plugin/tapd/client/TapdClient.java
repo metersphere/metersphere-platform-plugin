@@ -464,9 +464,11 @@ public class TapdClient extends BaseClient {
 		} catch (Exception e) {
 			// 获取的图片下载URL异常时, 捕获, 不影响同步主流程
 			if (((HttpClientErrorException) e).getStatusCode().value() == TapdErrorCode.TOO_MANY_REQUESTS) {
-				PluginLogUtils.warn("获取Tapd单个图片下载链接异常: API账号超过了 \"60req/1min\" 的频率限制!");
+				PluginLogUtils.warn("获取Tapd图片下载链接异常: API账号超过了 \"60req/1min\" 的频率限制!");
+			} else if (((HttpClientErrorException) e).getStatusCode().value() == TapdErrorCode.RESOURCE_NOT_BELONG_WORKSPACE) {
+				PluginLogUtils.warn("获取Tapd图片下载链接异常: 图片不属于当前项目Key=>" + projectKey + "!");
 			} else {
-				PluginLogUtils.warn("获取Tapd单个图片下载链接异常: " + e.getMessage(), e);
+				PluginLogUtils.warn("获取Tapd图片下载链接异常: " + e.getMessage(), e);
 			}
 		}
 		return null;
@@ -539,7 +541,8 @@ public class TapdClient extends BaseClient {
 	 */
 	public void holdUpTooManyException(Exception e, String extraMsg) {
 		if (((HttpClientErrorException) e).getStatusCode().value() == TapdErrorCode.TOO_MANY_REQUESTS) {
-			throw new MSPluginException("Tapd账号超过了请求频率限制, 请稍后再试!");
+			// 请求频率异常不在前台提示, 直接打印日志
+			PluginLogUtils.warn("稍后重试, Tapd-API账号超过了 \"60req/1min\" 的频率限制!");
 		} else {
 			PluginLogUtils.error(e.getMessage(), e);
 			throw new MSPluginException(extraMsg);

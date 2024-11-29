@@ -377,11 +377,14 @@ public class TapdPlatform extends AbstractPlatform {
 		List<Map> totalQueryBugs = new ArrayList<>();
 		do {
 			List<Map> queryPageBugs = tapdClient.getBugForPage(config.getTapdKey(), page, limit, null);
-			querySize = queryPageBugs.size();
-			if (querySize > 0) {
-				totalQueryBugs.addAll(queryPageBugs);
-			}
 			page++;
+			if (CollectionUtils.isEmpty(queryPageBugs)) {
+				querySize = 0;
+				continue;
+			} else {
+				querySize = queryPageBugs.size();
+			}
+			totalQueryBugs.addAll(queryPageBugs);
 		} while (querySize >= limit);
 
 		Map<String, Map> queryBugMap = new HashMap<>(16);
@@ -442,7 +445,7 @@ public class TapdPlatform extends AbstractPlatform {
 				start++;
 			} while (start <= size);
 		} catch (Exception e) {
-			PluginLogUtils.error(e);
+			PluginLogUtils.warn(e);
 			throw new MSPluginException(e.getMessage());
 		}
 	}
@@ -874,7 +877,7 @@ public class TapdPlatform extends AbstractPlatform {
 			msBug.setRichTextImageMap(richFileMap);
 			return content;
 		} catch (Exception e) {
-			PluginLogUtils.error("Parse tapd bug description error: " + e.getMessage());
+			PluginLogUtils.warn("Parse tapd bug description warn: " + e.getMessage());
 		}
 		return null;
 	}
