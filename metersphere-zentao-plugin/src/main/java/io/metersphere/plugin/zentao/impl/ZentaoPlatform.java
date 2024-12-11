@@ -532,6 +532,11 @@ public class ZentaoPlatform extends AbstractPlatform {
 						// transfer zentao bug field to ms
 						// noinspection unchecked
 						Map<String, Object> zenBugInfo = (Map<String, Object>) bugObj;
+						String projectKey = zenBugInfo.get("project").toString();
+						if (StringUtils.isBlank(projectKey) || !StringUtils.equals(projectKey, projectConfig.getProjectKey())) {
+							// project key not match, skip
+							continue;
+						}
 						PlatformBugDTO bug = new PlatformBugDTO();
 						bug.setId(UUID.randomUUID().toString());
 						bug.setPlatformBugId(zenBugInfo.get("id").toString());
