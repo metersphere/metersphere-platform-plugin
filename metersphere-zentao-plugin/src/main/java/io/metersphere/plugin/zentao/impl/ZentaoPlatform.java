@@ -66,7 +66,8 @@ public class ZentaoPlatform extends AbstractPlatform {
 	 */
 	protected static final String DATE_PREFIX = "0000-00-00";
 	protected static final String MS_RICH_TEXT_PREVIEW_SRC_PREFIX = "/bug/attachment/preview/md";
-	protected static final String ZENTAO_RICH_TEXT_IMG_SRC_PREFIX = "/index.php?m=file&f=read&fileID=";
+	protected static final String ZENTAO_RICH_TEXT_IMG_SRC_PREFIX = "/index.php?m=file";
+	protected static final String ZENTAO_RICH_TEXT_IMG_SRC_URL = "/index.php?m=file&f=read&fileID=";
 	protected static final String ZENTAO_BUILD = "openedBuild";
 	protected static final String ZENTAO_ID = "id";
 	protected static final String ZENTAO_BUG_DELETED = "deleted";
@@ -1088,8 +1089,8 @@ public class ZentaoPlatform extends AbstractPlatform {
 		content = content.replaceAll("src=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX, "alt=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX);
 
 		// MS-URL, 需同步修改为禅道可识别的URL
-		String msUrl = content.replaceAll("src=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX, "psrc=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX)
-				.replaceAll("alt=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX, "src=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX);
+		String msUrl = content.replace("src=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX, "psrc=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX)
+				.replace("alt=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX, "src=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX);
 		platformBug.setPlatformDescription(msUrl);
 		// 图片链接中存在HTTP-URL, 不用替换
 		return content;
@@ -1105,9 +1106,9 @@ public class ZentaoPlatform extends AbstractPlatform {
 		}
 		try {
 			content = content
-					.replaceAll("<img src=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX, "<img psrc=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX)
-					.replaceAll("<img src=\"\\{", "<img psrc=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX).replaceAll("}", StringUtils.EMPTY)
-					.replaceAll("alt=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX, "src=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX);
+					.replace("<img src=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX, "<img psrc=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX)
+					.replace("<img src=\"\\{", "<img psrc=\"" + ZENTAO_RICH_TEXT_IMG_SRC_URL).replaceAll("}", StringUtils.EMPTY)
+					.replace("alt=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX, "src=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX);
 
 			String zentaoLocalRegex = "(<img psrc=\"" + ")(.*?)(alt=\"\" />)";
 			Matcher matcher = Pattern.compile(zentaoLocalRegex).matcher(content);
