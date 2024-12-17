@@ -11,7 +11,7 @@
     </parent>
 
     <artifactId>metersphere-zentao-plugin</artifactId>
-    <version>3.5.0</version>
+    <version>3.6.0</version>
 
     <properties>
         <plugin.id>zentao</plugin.id>
