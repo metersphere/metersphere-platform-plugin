@@ -570,13 +570,19 @@ public class TapdPlatform extends AbstractPlatform {
 		}
 		needSyncCustomFields.forEach(field -> {
 			Object value = tapdBugInfo.get(field.getCustomData());
-			if (value != null) {
+			if (value != null && StringUtils.isNotBlank(value.toString())) {
 				if (StringUtils.equals(field.getType(), PlatformCustomFieldType.RICH_TEXT.name())) {
 					if (!StringUtils.equals(field.getCustomData(), TapdTemplateSystemField.DESCRIPTION)) {
 						field.setValue(parseTapdPicToMsRichText(value.toString(), msBug, projectKey));
 					} else {
 						field.setValue(msBug.getDescription());
 					}
+				} else if (StringUtils.equals(field.getType(), PlatformCustomFieldType.MULTIPLE_MEMBER.name())) {
+					field.setValue(PluginUtils.toJSONString(StringUtils.split(value.toString(), ";")));
+				} else if (StringUtils.equalsAnyIgnoreCase(field.getType(), PlatformCustomFieldType.MULTIPLE_SELECT.name(), PlatformCustomFieldType.CHECKBOX.name())) {
+					field.setValue(PluginUtils.toJSONString(StringUtils.split(value.toString(), "|")));
+				} else if (StringUtils.equalsIgnoreCase(field.getType(), PlatformCustomFieldType.CASCADER.name())) {
+					field.setValue(PluginUtils.toJSONString(StringUtils.split(value.toString(), "/")));
 				} else {
 					field.setValue(value.toString());
 				}
