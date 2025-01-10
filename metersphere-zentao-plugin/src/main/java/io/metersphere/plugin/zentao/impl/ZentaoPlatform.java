@@ -1107,7 +1107,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 		try {
 			content = content
 					.replace("<img src=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX, "<img psrc=\"" + ZENTAO_RICH_TEXT_IMG_SRC_PREFIX)
-					.replace("<img src=\"\\{", "<img psrc=\"" + ZENTAO_RICH_TEXT_IMG_SRC_URL).replaceAll("}", StringUtils.EMPTY)
+					.replaceAll("<img src=\"\\{", "<img psrc=\"" + ZENTAO_RICH_TEXT_IMG_SRC_URL).replaceAll("}", StringUtils.EMPTY)
 					.replace("alt=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX, "src=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX);
 
 			String zentaoLocalRegex = "(<img psrc=\"" + ")(.*?)(alt=\"\" />)";
