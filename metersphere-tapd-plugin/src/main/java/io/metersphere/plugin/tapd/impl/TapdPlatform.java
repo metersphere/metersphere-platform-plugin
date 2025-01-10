@@ -55,6 +55,8 @@ public class TapdPlatform extends AbstractPlatform {
 
 	protected static final String MS_RICH_TEXT_PIC_KEY_WORD = "permalinksrc";
 
+	protected static final String MS_RICH_TEXT_REPLACE_WORD = "psrc";
+
 	protected static final String SEMICOLON = ";";
 
 	protected SimpleDateFormat sdfDateTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
@@ -644,7 +646,7 @@ public class TapdPlatform extends AbstractPlatform {
 							platformBug.setPlatformTitle(item.getValue().toString());
 						} else if (StringUtils.equals(item.getCustomData(), TapdTemplateSystemField.DESCRIPTION)) {
 							// 内容
-							tapdEditParam.add(TapdTemplateSystemField.DESCRIPTION, parseRichTextPicToTapd(item.getValue().toString(), platformBug));
+							tapdEditParam.add(TapdTemplateSystemField.DESCRIPTION, parseRichTextPicToTapd(item.getValue().toString(), platformBug, request.getBaseUrl()));
 						} else {
 							// 其他字段
 							tapdEditParam.add(item.getCustomData(), item.getValue());
@@ -658,7 +660,7 @@ public class TapdPlatform extends AbstractPlatform {
 				platformBug.setPlatformTitle(request.getTitle());
 			}
 			if (!tapdEditParam.containsKey(TapdTemplateSystemField.DESCRIPTION)) {
-				tapdEditParam.add(TapdTemplateSystemField.DESCRIPTION, parseRichTextPicToTapd(request.getDescription(), platformBug));
+				tapdEditParam.add(TapdTemplateSystemField.DESCRIPTION, parseRichTextPicToTapd(request.getDescription(), platformBug, request.getBaseUrl()));
 			}
 
 			if (tapdEditParam.containsKey(TapdTemplateSystemField.BEGIN_DATE) && tapdEditParam.containsKey(TapdTemplateSystemField.DUE_DATE)
@@ -835,17 +837,21 @@ public class TapdPlatform extends AbstractPlatform {
 	 * @param platformBug 平台缺陷内容
 	 * @return 解析后的内容
 	 */
-	private String parseRichTextPicToTapd(String content, PlatformBugUpdateDTO platformBug) {
+	private String parseRichTextPicToTapd(String content, PlatformBugUpdateDTO platformBug, String baseUrl) {
 		if (StringUtils.isBlank(content)) {
 			return null;
 		}
-		platformBug.setPlatformDescription(content);
-		if (StringUtils.contains(content, MS_RICH_TEXT_PIC_KEY_WORD)) {
-			// 不保留permalinksrc链接, 不支持双向同步
-			String permalinkRegex = "(permalinksrc=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX + "/)(\\d+)(/(\\d+)" + "/true)";
-			content = content.replaceAll(permalinkRegex, "alt =\"暂不支持图片同步");
+		// psrc => src
+		if (content.contains(MS_RICH_TEXT_REPLACE_WORD)) {
+			content = content.replaceAll("src", "alt").replaceAll(MS_RICH_TEXT_REPLACE_WORD, "src");
 		}
-		// 图片链接中存在HTTP-URL, 不用替换
+		// http://localhost:5173/bug/attachment/preview/md/700165569839104/954754053398528/true
+		if (StringUtils.contains(content, MS_RICH_TEXT_PIC_KEY_WORD)) {
+			// 替换成MS站点的图片链接, Tapd无法访问到MS站点时, 无法显示图片
+			content = content.replaceAll(MS_RICH_TEXT_PIC_KEY_WORD, "alt").replaceAll("src=\"", "src=\"" + baseUrl);
+		}
+		String msUrl = content.replace("src=\"", "psrc=\"").replace("alt=\"", "src=\"");
+		platformBug.setPlatformDescription(msUrl);
 		return content;
 	}
 
