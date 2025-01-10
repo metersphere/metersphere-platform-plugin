@@ -884,6 +884,9 @@ public class TapdPlatform extends AbstractPlatform {
 						// Tapd的图片默认命名为*.jpg, *: 唯一文件ID, 标识, 整数
 						richFileMap.put(picTmpDownUrl, UUID.randomUUID() + ".jpg");
 					}
+				} else if (imgStr.contains("alt=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX)) {
+					String replaceTmpUrl = imgStr.replaceAll("src", "psrc").replaceAll("alt", "src");
+					content = content.replaceAll(imgStr, replaceTmpUrl);
 				}
 			}
 			msBug.setRichTextImageMap(richFileMap);
