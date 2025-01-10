@@ -841,13 +841,12 @@ public class TapdPlatform extends AbstractPlatform {
 		if (StringUtils.isBlank(content)) {
 			return null;
 		}
-		// psrc => src
 		if (content.contains(MS_RICH_TEXT_REPLACE_WORD)) {
+			// 双向同步过, 替换图片源和第三方图片源
 			content = content.replaceAll("src", "alt").replaceAll(MS_RICH_TEXT_REPLACE_WORD, "src");
 		}
-		// http://localhost:5173/bug/attachment/preview/md/700165569839104/954754053398528/true
 		if (StringUtils.contains(content, MS_RICH_TEXT_PIC_KEY_WORD)) {
-			// 替换成MS站点的图片链接, Tapd无法访问到MS站点时, 无法显示图片
+			// 暂未双向同步, 替换成MS站点的图片链接, Tapd无法访问到MS站点时, 无法显示图片
 			content = content.replaceAll(MS_RICH_TEXT_PIC_KEY_WORD, "alt").replaceAll("src=\"", "src=\"" + baseUrl);
 		}
 		String msUrl = content.replace("src=\"", "psrc=\"").replace("alt=\"", "src=\"");
@@ -863,10 +862,6 @@ public class TapdPlatform extends AbstractPlatform {
 	 * @return 解析后的内容
 	 */
 	private String parseTapdPicToMsRichText(String content, PlatformBugDTO msBug, String projectKey) {
-		// 图片链接中存在本地上传的URL, 及已经双向同步的URL, 网络链接的URL
-		// eg: <img src="/base-url/attachment/download/file/pid/fid/true" alt="/attachment/download/file/pid/fid/true" 需处理, 已双向同步无需下载
-		// eg: <img src="/tfl/*" alt /> Tapd本地上传的图片, 获取下载URL
-		// eg: <img src="https.pic.s" alt /> 不用处理
 		if (StringUtils.isBlank(content)) {
 			return null;
 		}
@@ -874,7 +869,12 @@ public class TapdPlatform extends AbstractPlatform {
 			String[] splitStr = content.split("<img");
 			Map<String, String> richFileMap = new HashMap<>(16);
 			for (String imgStr : splitStr) {
+				/*
+				 * 图片链接中存在本地上传的URL, 及已经双向同步的URL, 网络链接的URL
+				 * eg: <img src="https.pic.s" alt /> 不用处理
+				 */
 				if (imgStr.contains(TAPD_RICH_TEXT_PIC_SRC_PREFIX)) {
+					// eg: <img src="/tfl/*" alt /> Tapd本地上传的图片, 获取下载URL
 					String targetUrl = imgStr.substring(imgStr.indexOf("src=\""), imgStr.indexOf("/>") + 2);
 					String tapdUrlKey = imgStr.substring(imgStr.indexOf("src=\"") + 5, imgStr.indexOf("\" "));
 					String picTmpDownUrl = tapdClient.getPicTmpDownUrl(projectKey, tapdUrlKey);
@@ -885,6 +885,7 @@ public class TapdPlatform extends AbstractPlatform {
 						richFileMap.put(picTmpDownUrl, UUID.randomUUID() + ".jpg");
 					}
 				} else if (imgStr.contains("alt=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX)) {
+					// eg: <img src="/base-url/attachment/download/file/pid/fid/true" alt="/attachment/download/file/pid/fid/true" 需处理, 已双向同步, 直接替换
 					String replaceTmpUrl = imgStr.replaceAll("src", "psrc").replaceAll("alt", "src");
 					content = content.replaceAll(imgStr, replaceTmpUrl);
 				}
