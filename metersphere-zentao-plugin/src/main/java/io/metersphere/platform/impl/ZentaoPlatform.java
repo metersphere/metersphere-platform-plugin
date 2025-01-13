@@ -744,7 +744,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 
     @Override
     public ResponseEntity proxyForGet(String path, Class responseEntityClazz) {
-        // TODO: 该访问图片接口需要Cookie
+        zentaoClient.login();
         return zentaoClient.proxyForGet(path, responseEntityClazz);
     }
 }

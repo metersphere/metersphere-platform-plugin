@@ -340,7 +340,6 @@ public abstract class ZentaoClient extends BaseClient {
         LogUtil.info("zentao proxyForGet: " + path);
         String url = this.ENDPOINT + path;
         validateProxyUrl(url, "/index.php", "/file-read-");
-        login();
         return restTemplate.exchange(url, HttpMethod.GET, getHttpEntity(), responseEntityClazz);
     }
 }
