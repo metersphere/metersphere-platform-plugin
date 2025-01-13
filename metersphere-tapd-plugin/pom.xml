@@ -11,7 +11,7 @@
     </parent>
 
     <artifactId>metersphere-tapd-plugin</artifactId>
-    <version>3.6.0</version>
+    <version>3.6.1</version>
 
     <properties>
         <plugin.id>tapd</plugin.id>
