@@ -841,16 +841,23 @@ public class TapdPlatform extends AbstractPlatform {
 		if (StringUtils.isBlank(content)) {
 			return null;
 		}
-		if (content.contains(MS_RICH_TEXT_REPLACE_WORD)) {
-			// 双向同步过, 替换图片源和第三方图片源
-			content = content.replaceAll("src", "alt").replaceAll(MS_RICH_TEXT_REPLACE_WORD, "src");
+		StringBuilder msUrl = new StringBuilder();
+		String[] splitText = content.split(">");
+		for (String split : splitText) {
+			msUrl.append(split);
+			if (split.contains("<img") && !split.contains("http")) {
+				String replaceTmpUrl;
+				if (split.contains(MS_RICH_TEXT_REPLACE_WORD)) {
+					// 双向同步过, 替换图片源和第三方图片源
+					replaceTmpUrl = split.replaceAll("src", "alt").replaceAll(MS_RICH_TEXT_REPLACE_WORD, "src");
+				} else {
+					// 暂未双向同步, 替换成MS站点的图片链接, Tapd无法访问到MS站点时, 无法显示图片
+					replaceTmpUrl = split.replaceAll(MS_RICH_TEXT_PIC_KEY_WORD, "alt").replaceAll("src=\"", "src=\"" + baseUrl);
+				}
+				content = content.replace(split, replaceTmpUrl);
+			}
 		}
-		if (StringUtils.contains(content, MS_RICH_TEXT_PIC_KEY_WORD)) {
-			// 暂未双向同步, 替换成MS站点的图片链接, Tapd无法访问到MS站点时, 无法显示图片
-			content = content.replaceAll(MS_RICH_TEXT_PIC_KEY_WORD, "alt").replaceAll("src=\"", "src=\"" + baseUrl);
-		}
-		String msUrl = content.replace("src=\"", "psrc=\"").replace("alt=\"", "src=\"");
-		platformBug.setPlatformDescription(msUrl);
+		platformBug.setPlatformDescription(msUrl.toString());
 		return content;
 	}
 
