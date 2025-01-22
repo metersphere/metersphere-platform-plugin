@@ -883,7 +883,7 @@ public class TapdPlatform extends AbstractPlatform {
 				if (imgStr.contains(TAPD_RICH_TEXT_PIC_SRC_PREFIX)) {
 					// eg: <img src="/tfl/*" alt /> Tapd本地上传的图片, 获取下载URL
 					String targetUrl = imgStr.substring(imgStr.indexOf("src=\""), imgStr.indexOf("/>") + 2);
-					String tapdUrlKey = imgStr.substring(imgStr.indexOf("src=\"") + 5, imgStr.indexOf("\" "));
+					String tapdUrlKey = targetUrl.substring(targetUrl.indexOf("/"), targetUrl.indexOf("\" "));
 					String picTmpDownUrl = tapdClient.getPicTmpDownUrl(projectKey, tapdUrlKey);
 					if (StringUtils.isNotBlank(picTmpDownUrl)) {
 						String replaceTmpUrl = targetUrl.replaceAll("src", "psrc").replaceAll("/>", "alt=\"" + picTmpDownUrl + "\" />");
