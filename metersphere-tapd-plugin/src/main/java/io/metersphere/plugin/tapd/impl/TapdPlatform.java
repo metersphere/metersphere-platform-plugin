@@ -845,11 +845,11 @@ public class TapdPlatform extends AbstractPlatform {
 		String[] splitText = content.split(">");
 		for (String split : splitText) {
 			msUrl.append(split);
-			if (split.contains("<img") && !split.contains("http")) {
+			if (split.contains(MS_RICH_TEXT_PREVIEW_SRC_PREFIX)) {
 				String replaceTmpUrl;
 				if (split.contains(MS_RICH_TEXT_REPLACE_WORD)) {
 					// 双向同步过, 替换图片源和第三方图片源
-					replaceTmpUrl = split.replaceAll("src", "alt").replaceAll(MS_RICH_TEXT_REPLACE_WORD, "src");
+					replaceTmpUrl = split.replace("src=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX, "alt=\"" + MS_RICH_TEXT_PREVIEW_SRC_PREFIX).replace(MS_RICH_TEXT_REPLACE_WORD, "src");
 				} else {
 					// 暂未双向同步, 替换成MS站点的图片链接, Tapd无法访问到MS站点时, 无法显示图片
 					replaceTmpUrl = split.replaceAll(MS_RICH_TEXT_PIC_KEY_WORD, "alt").replaceAll("src=\"", "src=\"" + baseUrl);
