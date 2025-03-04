@@ -525,7 +525,19 @@ public class ZentaoPlatform extends AbstractPlatform {
 
 				// query zentao bug by page
 				Map<String, Object> bugResponseMap = zentaoJsonClient.getBugsByProjectId(pageNum, pageSize, projectConfig.getProductKey());
-				List<?> zentaoBugs = (List<?>) bugResponseMap.get("bugs");
+				Object bugData = bugResponseMap.get("bugs");
+				List<Object> zentaoBugs = new ArrayList<>();
+				if (bugData instanceof List) {
+					// noinspection unchecked
+					zentaoBugs = (List<Object>) bugResponseMap.get("bugs");
+				} else if (bugData instanceof Map) {
+					// noinspection unchecked
+					Map<String, Object> bugDataMap = (Map<String, Object>) bugData;
+					for (String key : bugDataMap.keySet()) {
+						zentaoBugs.add(bugDataMap.get(key));
+					}
+				}
+
 				currentSize = zentaoBugs.size();
 				zentaoBugs = filterBySyncCondition(zentaoBugs, request);
 				if (!CollectionUtils.isEmpty(zentaoBugs)) {
@@ -905,7 +917,7 @@ public class ZentaoPlatform extends AbstractPlatform {
 	 * @param request    同步全量参数
 	 * @return 过滤后的缺陷集合
 	 */
-	private List<?> filterBySyncCondition(List<?> zentaoBugs, SyncAllBugRequest request) {
+	private List<Object> filterBySyncCondition(List<Object> zentaoBugs, SyncAllBugRequest request) {
 		if (request.getPre() == null || request.getCreateTime() == null) {
 			return zentaoBugs;
 		}

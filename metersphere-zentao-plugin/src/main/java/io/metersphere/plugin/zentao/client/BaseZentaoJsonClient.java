@@ -9,6 +9,7 @@ import io.metersphere.plugin.zentao.domain.ZentaoJsonApiUrl;
 import io.metersphere.plugin.zentao.domain.response.json.ZentaoAuthUserResponse;
 import io.metersphere.plugin.zentao.domain.response.json.ZentaoBugResponse;
 import io.metersphere.plugin.zentao.domain.response.json.ZentaoSessionResponse;
+import io.metersphere.plugin.zentao.utils.UnicodeConvertUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.*;
@@ -188,8 +189,12 @@ public abstract class BaseZentaoJsonClient extends BaseClient {
 		ResponseEntity<String> response = restTemplate.exchange(requestUrl.getBugList(),
 				HttpMethod.GET, getHttpEntity(), String.class, projectId, 9999999, pageSize, pageNum, sessionId);
 		try {
+			if (response.getBody() == null) {
+				throw new MSPluginException("项目缺陷为空!");
+			}
+			String normalStr = UnicodeConvertUtils.normalizePunctuation(response.getBody());
 			// noinspection unchecked
-			return PluginUtils.parseMap(PluginUtils.parseMap(response.getBody()).get("data").toString());
+			return PluginUtils.parseMap(PluginUtils.parseMap(normalStr).get("data").toString());
 		} catch (Exception e) {
 			PluginLogUtils.error(e);
 			throw new MSPluginException("获取项目缺陷集合异常, 请检查集成或项目配置!");

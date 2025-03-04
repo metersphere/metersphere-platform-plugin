@@ -88,4 +88,19 @@ public class UnicodeConvertUtils {
         }
         return sb.toString();
     }
+
+    /**
+     * 中文标点替换成英文
+     * @param text 文本
+     * @return 替换后的文本
+     */
+    public static String normalizePunctuation(String text) {
+        return text.replaceAll("\\\\，", ",").replaceAll("\\\\。", ".")
+                .replaceAll("\\\\？", "?").replaceAll("\\\\！", "!")
+                .replaceAll("\\\\；", ";").replaceAll("\\\\：", ":")
+                .replaceAll("\\\\（", "(").replaceAll("\\\\）", ")")
+                .replaceAll("\\\\【", "[").replaceAll("\\\\】", "]")
+                .replaceAll("\\\\“", "'").replaceAll("\\\\”", "'")
+                .replaceAll("\\\\‘", "'").replaceAll("\\\\’", "'");
+    }
 }
