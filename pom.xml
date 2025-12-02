@@ -14,6 +14,7 @@
         <module>metersphere-platform-plugin-sdk</module>
         <module>metersphere-jira-plugin</module>
         <module>metersphere-zentao-plugin</module>
+        <module>metersphere-phabricator-plugin</module>
     </modules>
 
     <properties>
